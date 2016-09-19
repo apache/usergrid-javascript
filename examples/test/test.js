@@ -30,8 +30,8 @@ var _password = 'password2';
 var _newpassword = 'password3';
 
 var client = new Usergrid.Client({
-	orgName:'yourorgname',
-	appName:'sandbox',
+	orgId:'rwalsh',
+	appId:'sandbox',
 	logging: true, //optional - turn on logging, off by default
 	buildCurl: true //optional - turn on curl commands, off by default
 });

@@ -21,8 +21,8 @@
  */
 function getClient() {
 	return new Usergrid.Client({
-		orgName: 'yourorgname',
-		appName: 'sandbox',
+        orgId: 'rwalsh',
+		appId: 'sandbox',
 		logging: false, //optional - turn on logging, off by default
 		buildCurl: true //optional - turn on curl commands, off by default
 	});
@@ -47,10 +47,12 @@ function usergridTestHarness(err, data, done, tests, ignoreError) {
 	done();
 }
 describe('Ajax', function() {
+    var client = getClient();
     var dogName="dog"+Math.floor(Math.random()*10000);
     var dogData=JSON.stringify({type:"dog",name:dogName});
-    var dogURI='https://api.usergrid.com/yourorgname/sandbox/dogs'
-    it('should POST to a URI',function(done){
+    var dogURI=client.clientAppURL + '/dogs';
+
+    it('should POST to a URI ' + client.clientAppURL,function(done){
         Ajax.post(dogURI, dogData).then(function(err, data){
             assert(!err, err);
             done();
@@ -100,9 +102,10 @@ describe('Usergrid', function(){
         });
     });
     describe('Usergrid Request/Response', function() {
+        var client = getClient();
         var dogName="dog"+Math.floor(Math.random()*10000);
         var dogData=JSON.stringify({type:"dog",name:dogName});
-        var dogURI='https://api.usergrid.com/yourorgname/sandbox/dogs'
+        var dogURI=client.clientAppURL + '/dogs'
         it('should POST to a URI',function(done){
             var req=new Usergrid.Request("POST", dogURI, {}, dogData, function(err, response){
                 console.error(err, response);
@@ -201,8 +204,8 @@ describe('Usergrid', function(){
             it('should persist default query parameters', function(done) {
                 //create new client with default params
                 var client=new Usergrid.Client({
-                    orgName: 'yourorgname',
-                    appName: 'sandbox',
+                    orgId: 'rwalsh',
+                    appId: 'sandbox',
                     logging: false, //optional - turn on logging, off by default
                     buildCurl: true, //optional - turn on curl commands, off by default
                     qs:{
@@ -350,7 +353,7 @@ describe('Usergrid', function(){
                 done();
             })
             it('buildAssetURL',function(done){
-                var assetURL='https://api.usergrid.com/yourorgname/sandbox/assets/00000000-0000-0000-000000000000/data';
+                var assetURL=client.clientAppURL + '/assets/00000000-0000-0000-000000000000/data';
                 assert(assetURL===client.buildAssetURL('00000000-0000-0000-000000000000'), "buildAssetURL doesn't work")
                 done();
             })
@@ -376,7 +379,7 @@ describe('Usergrid', function(){
             })
             var dogCollection;
             it('createCollection',function(done){
-                client.createCollection({type:'dogs'},function(err, response, dogs){
+                client.createCollection({type:'dogs2s'},function(err, response, dogs){
                     assert(!err, "createCollection returned an error");
                     assert(dogs, "createCollection did not return a dogs collection");
                     dogCollection=dogs;

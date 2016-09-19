@@ -4265,7 +4265,13 @@ function doCallback(callback, params, context) {
             method: "POST",
             endpoint: options.type
         }, function(err, data) {
-            doCallback(callback, [ err, data, collection ], self);
+            if (!err) {
+                collection.fetch(function(err, response, collection) {
+                    doCallback(callback, [ err, response, collection ], self);
+                });
+            } else {
+                doCallback(callback, [ err, data, collection ], self);
+            }
         });
     };
     /*

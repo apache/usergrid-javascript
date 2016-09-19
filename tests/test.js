@@ -179,10 +179,6 @@ function runner(step, arg, arg2){
 			destroyUser(step, arg);
 			break;
 		case 31:
-			notice('-----running step '+step+': try to create existing entity');
-			createExistingEntity(step, arg);
-			break;
-		case 32:
 			notice('-----running step '+step+': try to create new entity with no name');
 			createNewEntityNoName(step, arg);
 			break;
@@ -311,7 +307,7 @@ function makeNewDog(step) {
 		name:'Rocky'
 	}
 
-	client.createEntity(options, function (err, dog) {
+	client.createEntity(options, function (err, response, dog) {
 		if (err) {
 			error('dog not created');
 		} else {
@@ -332,6 +328,7 @@ function makeNewDog(step) {
 			dog.save(function(err){
 				if (err){
 					error('dog not saved');
+					runner(step, dog);
 				} else {
 					success('new dog is saved');
 					runner(step, dog);
@@ -422,7 +419,7 @@ function testDogsCollection(step) {
 		qs:{ql:'order by index'}
 	}
 
-	client.createCollection(options, function (err, dogs) {
+	client.createCollection(options, function (err, data, dogs) {
 		if (err) {
 			error('could not make collection');
 		} else {
@@ -527,37 +524,48 @@ function cleanupAllDogs(step){
 		qs:{limit:50} //limit statement set to 50
 	}
 
-	client.createCollection(options, function (err, dogs) {
+	client.createCollection(options, function (err, response, dogs) {
 		if (err) {
 			error('could not get all dogs');
 		} else {
 			success('got at most 50 dogs');
 			//we got 50 dogs, now display the Entities:
-			while(dogs.hasNextEntity()) {
-				//get a reference to the dog
-				var dog = dogs.getNextEntity();
-				var name = dog.get('name');
-				notice('dog is called ' + name);
-			}
-			dogs.resetEntityPointer();
-			//do doggy cleanup
-			while(dogs.hasNextEntity()) {
-				//get a reference to the dog
-				var dog = dogs.getNextEntity();
-				var dogname = dog.get('name');
-				notice('removing dog ' + dogname + ' from database');
-				dog.destroy(function(err, data) {
-					if (err) {
-						error('dog not removed');
-					} else {
-						success('dog removed');
-					}
-				});
-			}
+
+			do {
+				while(dogs.hasNextEntity()) {
+					//get a reference to the dog
+					var dog = dogs.getNextEntity();
+					var name = dog.get('name');
+					notice('dog is called ' + name);
+				}
+				success('Poop');
+				dogs.resetEntityPointer();
+				//do doggy cleanup
+
+				while(dogs.hasNextEntity()) {
+					//get a reference to the dog
+					var dog = dogs.getNextEntity();
+					var dogname = dog.get('name');
+					notice('removing dog ' + dogname + ' from database');
+					dog.destroy(function(err, data) {
+						if (err) {
+							error('dog not removed');
+						} else {
+							success('dog removed');
+						}
+					});
+				}
+				if( !dogs.hasNextPage() ) {
+					break;
+				} else {
+					dogs.getNextPage(function(err,data) {});
+				}
+			} while(true)
+
 
 			//no need to wait around for dogs to be removed, so go on to next test
-			runner(step);
 		}
+		runner(step);
 	});
 }
 
@@ -582,7 +590,7 @@ function prepareDatabaseForNewUser(step) {
 
 function createUser(step) {
 	client.signup(_username, _password, _email, 'Marty McFly',
-		function (err, marty) {
+		function (err, response, marty) {
 			if (err){
 				error('user not created');
 				runner(step, marty);
@@ -616,7 +624,7 @@ function getExistingUser(step, marty) {
 		type:'users',
 		username:_username
 	}
-	client.getEntity(options, function(err, existingUser){
+	client.getEntity(options, function(err, response, existingUser){
 		if (err){
 			error('existing user not retrieved');
 		} else {
@@ -686,10 +694,7 @@ function loginUser(step, marty) {
 }
 
 function changeUsersPassword(step, marty) {
-
-	marty.set('oldpassword', _password);
-	marty.set('newpassword', _newpassword);
-	marty.save(function(err){
+	marty.changePassword(_password, _newpassword, function(err){
 		if (err){
 			error('user password not updated');
 		} else {
@@ -719,7 +724,7 @@ function reloginUser(step, marty) {
 
 	username = _username
 	password = _newpassword;
-	client.login(username, password,
+	client.login(_username, _newpassword,
 		function (err) {
 		if (err) {
 			error('could not relog user in');
@@ -749,7 +754,7 @@ function createDog(step, marty) {
 		breed:'mutt'
 	}
 
-	client.createEntity(options, function (err, dog) {
+	client.createEntity(options, function (err, response, dog) {
 		if (err) {
 			error('POST new dog by logged in user failed');
 		} else {
@@ -762,7 +767,7 @@ function createDog(step, marty) {
 
 function userLikesDog(step, marty, dog) {
 
-	marty.connect('likes', dog, function (err, data) {
+	marty.connect('likes', dog, function (err, response, data) {
 		if (err) {
 			error('connection not created');
 			runner(step, marty);
@@ -790,14 +795,14 @@ function userLikesDog(step, marty, dog) {
 
 function removeUserLikesDog(step, marty, dog) {
 
-	marty.disconnect('likes', dog, function (err, data) {
+	marty.disconnect('likes', dog, function (err, response, data) {
 		if (err) {
 			error('connection not deleted');
 			runner(step, marty);
 		} else {
 
 			//call succeeded, so pull the connections back down
-			marty.getConnections('likes', function (err, data) {
+			marty.getConnections('likes', function (err, response, data) {
 				if (err) {
 					error('error getting connections');
 				} else {
@@ -831,74 +836,13 @@ function removeDog(step, marty, dog) {
 
 function destroyUser(step, marty) {
 
-	marty.destroy(function(err){
-		if (err){
+	marty.destroy(function (err) {
+		if (err) {
 			error('user not deleted from database');
 		} else {
 			success('user deleted from database');
 			marty = null; //blow away the local object
 			runner(step);
-		}
-	});
-
-}
-
-function createExistingEntity(step, marty) {
-
-	var options = {
-		type:'dogs',
-		name:'einstein'
-	}
-
-	client.createEntity(options, function (err, dog) {
-		if (err) {
-			error('Create new entity to use for existing entity failed');
-		} else {
-			success('Create new entity to use for existing entity succeeded');
-
-			var uuid = dog.get('uuid');
-			//now create new entity, but use same entity name of einstein.  This means that
-			//the original einstein entity now exists.  Thus, the new einstein entity should
-			//be the same as the original + any data differences from the options var:
-
-			options = {
-				type:'dogs',
-				name:'einstein',
-				breed:'mutt'
-			}
-			client.createEntity(options, function (err, newdog) {
-				if (err) {
-					error('Create new entity to use for existing entity failed');
-				} else {
-					success('Create new entity to use for existing entity succeeded');
-
-					var newuuid = newdog.get('uuid');
-					if (newuuid === uuid) {
-						success('UUIDs of new and old entities match');
-					} else {
-						error('UUIDs of new and old entities do not match');
-					}
-
-					var breed = newdog.get('breed');
-					if (breed === 'mutt') {
-						success('attribute sucesfully set on new entity');
-					} else {
-						error('attribute not sucesfully set on new entity');
-					}
-
-					newdog.destroy(function(err){
-						if (err){
-							error('existing entity not deleted from database');
-						} else {
-							success('existing entity deleted from database');
-							dog = null; //blow away the local object
-							newdog = null; //blow away the local object
-							runner(step);
-						}
-					});
-
-				}
-			});
 		}
 	});
 
@@ -911,7 +855,7 @@ function createNewEntityNoName(step, marty) {
    othervalue:"something else"
 	}
 
-	client.createEntity(options, function (err, entity) {
+	client.createEntity(options, function (err, response, entity) {
 		if (err) {
 			error('Create new entity with no name failed');
 		} else {

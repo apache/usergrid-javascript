@@ -4260,9 +4260,12 @@ function doCallback(callback, params, context) {
    */
     Usergrid.Client.prototype.createCollection = function(options, callback) {
         options.client = this;
-        return new Usergrid.Collection(options, function(err, data, collection) {
-            console.log("createCollection", arguments);
-            doCallback(callback, [ err, collection, data ]);
+        var collection = new Usergrid.Collection(options);
+        this.request({
+            method: "POST",
+            endpoint: options.type
+        }, function(err, data) {
+            doCallback(callback, [ err, data, collection ], self);
         });
     };
     /*

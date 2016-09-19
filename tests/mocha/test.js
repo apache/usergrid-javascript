@@ -108,7 +108,6 @@ describe('Usergrid', function(){
         var dogURI=client.clientAppURL + '/dogs'
         it('should POST to a URI',function(done){
             var req=new Usergrid.Request("POST", dogURI, {}, dogData, function(err, response){
-                console.error(err, response);
                 assert(!err, err);
                 assert(response instanceof Usergrid.Response, "Response is not and instance of Usergrid.Response");
                 done();
@@ -316,7 +315,6 @@ describe('Usergrid', function(){
             before(function(){ client.logout();});
             it('createEntity',function(done){
                 client.createEntity({type:'dog',name:'createEntityTestDog'}, function(err, response, dog){
-                    console.warn(err, response, dog);
                     assert(!err, "createEntity returned an error")
                     assert(dog, "createEntity did not return a dog")
                     assert(dog.get("name")==='createEntityTestDog', "The dog's name is not 'createEntityTestDog'")
@@ -333,24 +331,6 @@ describe('Usergrid', function(){
                             done();
                         }
                     });
-            })
-            var testGroup;
-            it('createGroup',function(done){
-                client.createGroup({path:'dogLovers'},function(err, response, group){
-                        try{
-                            assert(!err, "createGroup returned an error")
-                        }catch(e){
-                            assert(true, "trying to create a group that already exists throws an error");
-                        }finally{
-                            done();
-                        }
-                    /*assert(!err, "createGroup returned an error: "+err);
-                    assert(group, "createGroup did not return a group");
-                    assert(group instanceof Usergrid.Group, "createGroup did not return a Usergrid.Group");
-                    testGroup=group;
-                    done();*/
-                })
-                done();
             })
             it('buildAssetURL',function(done){
                 var assetURL=client.clientAppURL + '/assets/00000000-0000-0000-000000000000/data';
@@ -379,7 +359,7 @@ describe('Usergrid', function(){
             })
             var dogCollection;
             it('createCollection',function(done){
-                client.createCollection({type:'dogs2s'},function(err, response, dogs){
+                client.createCollection({type:'dogs' + Math.floor(Math.random()*10000)},function(err, response, dogs){
                     assert(!err, "createCollection returned an error");
                     assert(dogs, "createCollection did not return a dogs collection");
                     dogCollection=dogs;
@@ -568,7 +548,6 @@ describe('Usergrid', function(){
             after(function(done){
                 dogEntity.destroy();
                 //dogCollection.destroy();
-                //testGroup.destroy();
                 done();
             })
         });
@@ -1024,10 +1003,11 @@ describe('Usergrid', function(){
         });
         it('should retrieve asset data', function(done) {
             this.timeout(5000);
-            asset.download(function(err, response, asset) {
+            asset.download(function(err, response, asset1) {
                 if(err){
                     assert(false, err.error_description);
                 }
+                assert(err == undefined);
                 assert(asset.get('content-type') == test_image.type, "MIME types don't match");
                 assert(asset.get('size') == test_image.size, "sizes don't match");
                 done();

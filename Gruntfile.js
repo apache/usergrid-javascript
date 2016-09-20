@@ -1,20 +1,23 @@
 module.exports = function(grunt) {
 	var files = [
+        "lib/modules/Enums.js",
         "lib/modules/util/Event.js",
         "lib/modules/util/Logger.js",
         "lib/modules/util/Promise.js",
         "lib/modules/util/Ajax.js",
-        "lib/modules/util/lodash.core.js",
+        "lib/modules/util/lodash.js",
+        "lib/modules/util/Helpers.js",
         "lib/Usergrid.js",
-		"lib/modules/Client.js",
+        "lib/modules/Client.js",
 		"lib/modules/Entity.js",
 		"lib/modules/Collection.js",
 		"lib/modules/Group.js",
 		"lib/modules/Counter.js",
 		"lib/modules/Folder.js",
 		"lib/modules/Asset.js",
-		"lib/modules/Error.js"
-	];
+		"lib/modules/Error.js",
+        "lib/modules/Auth.js"
+    ];
 	var tests = ["tests/mocha/index.html", "tests/mocha/test_*.html"];
 	// Project configuration.
 	grunt.initConfig({

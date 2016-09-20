@@ -20,7 +20,7 @@
 
  */
 function getClient() {
-	return new Usergrid.Client({
+	return Usergrid.initSharedInstance({
         orgId: 'rwalsh',
 		appId: 'sandbox',
 		logging: false, //optional - turn on logging, off by default
@@ -51,8 +51,17 @@ describe('Ajax', function() {
     var dogName="dog"+Math.floor(Math.random()*10000);
     var dogData=JSON.stringify({type:"dog",name:dogName});
     var dogURI=client.clientAppURL + '/dogs';
+    client.appAuth = new UsergridAppAuth(['YXA6WMhAuFJTEeWoggrRE9kXrQ','YXA6zZbat7PKgOlN73rpByc36LWaUhw'])
 
-    it('should POST to a URI ' + client.clientAppURL,function(done){
+    console.log(client.appAuth instanceof UsergridAuth)
+    console.log("BEFORE DESTROY:" + client.appAuth.expiry)
+    client.appAuth.destroy()
+    console.log("AFTER: DESTROY" + client.appAuth.expiry)
+
+    console.log("Client Id=" + client.appAuth.clientId + " Client Secret=" + client.appAuth.clientSecret)
+
+    it('should POST to a URI ' + dogURI, function(done){
+        // appAuth.destroy()
         Ajax.post(dogURI, dogData).then(function(err, data){
             assert(!err, err);
             done();

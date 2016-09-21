@@ -86,7 +86,7 @@ module.exports = function(grunt) {
  * <%= meta.package.name %>@<%= meta.package.version %> <%= grunt.template.today('yyyy-mm-dd') %> \n\
  */\n",
                     "mangle": false,
-                    "compress": true,
+                    "compress": {},
                     "beautify": false,
                     "preserveComments": "some"
                 },

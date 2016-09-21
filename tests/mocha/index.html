@@ -24,13 +24,13 @@
   <script src="../resources/js/mocha.js"></script>
   <script>mocha.setup('bdd')</script>
   <script src="../resources/js/blanket_mocha.min.js"></script>
+  <script src="../resources/js/should.js"></script>
   <script type="text/javascript" src="../../node_modules/grunt-blanket-mocha/support/mocha-blanket.js"></script>
 	<script>
       function assert(expr, msg) {
         if (!expr) throw new Error(msg || 'failed');
       }
     </script>
-
   <script src="../../usergrid.js" data-cover></script>
   <script src="test.js"></script>
 <!-- run mocha -->

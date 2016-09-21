@@ -7,6 +7,7 @@ module.exports = function(grunt) {
         "lib/modules/util/Ajax.js",
         "lib/modules/util/lodash.js",
         "lib/modules/util/Helpers.js",
+        "lib/modules/Query.js",
         "lib/Usergrid.js",
         "lib/modules/Client.js",
 		"lib/modules/Entity.js",

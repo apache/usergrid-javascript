@@ -17,7 +17,7 @@
  *under the License.
  * 
  * 
- * usergrid@0.11.0 2016-09-20 
+ * usergrid@0.11.0 2016-09-21 
  */
 var UsergridAuthMode = Object.freeze({
     NONE: "none",
@@ -15518,6 +15518,142 @@ function configureTempAuth(auth) {
     }
 }
 
+function useQuotesIfRequired(value) {
+    return _.isFinite(value) || isUUID(value) || _.isBoolean(value) || _.isObject(value) && !_.isFunction(value) || _.isArray(value) ? value : "'" + value + "'";
+}
+
+/*
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
+"use strict";
+
+var UsergridQuery = function(type) {
+    var self = this;
+    var query = "", queryString, sort, __nextIsNot = false;
+    _.assign(self, {
+        type: function(value) {
+            self._type = value;
+            return self;
+        },
+        collection: function(value) {
+            self._type = value;
+            return self;
+        },
+        limit: function(value) {
+            self._limit = value;
+            return self;
+        },
+        cursor: function(value) {
+            self._cursor = value;
+            return self;
+        },
+        eq: function(key, value) {
+            query = self.andJoin(key + " = " + useQuotesIfRequired(value));
+            return self;
+        },
+        equal: this.eq,
+        gt: function(key, value) {
+            query = self.andJoin(key + " > " + useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThan: this.gt,
+        gte: function(key, value) {
+            query = self.andJoin(key + " >= " + useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThanOrEqual: this.gte,
+        lt: function(key, value) {
+            query = self.andJoin(key + " < " + useQuotesIfRequired(value));
+            return self;
+        },
+        lessThan: this.lt,
+        lte: function(key, value) {
+            query = self.andJoin(key + " <= " + useQuotesIfRequired(value));
+            return self;
+        },
+        lessThanOrEqual: this.lte,
+        contains: function(key, value) {
+            query = self.andJoin(key + " contains " + useQuotesIfRequired(value));
+            return self;
+        },
+        locationWithin: function(distanceInMeters, lat, lng) {
+            query = self.andJoin("location within " + distanceInMeters + " of " + lat + ", " + lng);
+            return self;
+        },
+        asc: function(key) {
+            self.sort(key, "asc");
+            return self;
+        },
+        desc: function(key) {
+            self.sort(key, "desc");
+            return self;
+        },
+        sort: function(key, order) {
+            sort = key && order ? " order by " + key + " " + order : "";
+            return self;
+        },
+        fromString: function(string) {
+            queryString = string;
+            return self;
+        },
+        andJoin: function(append) {
+            if (__nextIsNot) {
+                append = "not " + append;
+                __nextIsNot = false;
+            }
+            if (!append) {
+                return query;
+            } else if (query.length === 0) {
+                return append;
+            } else {
+                return _.endsWith(query, "and") || _.endsWith(query, "or") ? query + " " + append : query + " and " + append;
+            }
+        },
+        orJoin: function() {
+            return query.length > 0 && !_.endsWith(query, "or") ? query + " or" : query;
+        }
+    });
+    self._type = self._type || type;
+    Object.defineProperty(self, "_ql", {
+        get: function() {
+            if (queryString !== undefined) {
+                return queryString;
+            } else {
+                return query.length > 0 || sort !== undefined ? "select * where " + (query || "") + (sort || "") : "";
+            }
+        }
+    });
+    Object.defineProperty(self, "and", {
+        get: function() {
+            query = self.andJoin("");
+            return self;
+        }
+    });
+    Object.defineProperty(self, "or", {
+        get: function() {
+            query = self.orJoin();
+            return self;
+        }
+    });
+    Object.defineProperty(self, "not", {
+        get: function() {
+            __nextIsNot = true;
+            return self;
+        }
+    });
+    return self;
+};
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18645,15 +18781,14 @@ var UsergridAuth = function(token, expiry) {
         configurable: true,
         writable: true
     });
+    _.assign(self, {
+        destroy: function() {
+            self.token = undefined;
+            self.expiry = 0;
+            self.tokenTtl = undefined;
+        }
+    });
     return self;
-};
-
-UsergridAuth.prototype = {
-    destroy: function() {
-        this.token = undefined;
-        this.expiry = 0;
-        this.tokenTtl = undefined;
-    }
 };
 
 var UsergridAppAuth = function() {
@@ -18679,14 +18814,14 @@ var UsergridUserAuth = function() {
     var self = this;
     var args = flattenArgs(arguments);
     if (_.isPlainObject(args[0])) {
-        options = args[0];
+        self.username = args[0].username;
+        self.email = args[0].email;
+        self.tokenTtl = args[0].tokenTtl;
+    } else {
+        self.username = args[0];
+        self.email = args[1];
+        self.tokenTtl = args[2];
     }
-    self.username = options.username || args[0];
-    self.email = options.email;
-    if (options.password || args[1]) {
-        self.password = options.password || args[1];
-    }
-    self.tokenTtl = options.tokenTtl || args[2];
     UsergridAuth.call(self);
     _.assign(self, UsergridAuth);
     return self;

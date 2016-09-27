@@ -10,14 +10,17 @@ module.exports = function(grunt) {
         "lib/modules/Query.js",
         "lib/Usergrid.js",
         "lib/modules/Client.js",
-		"lib/modules/Entity.js",
-		"lib/modules/Collection.js",
+        "lib/modules/request.js",
+        "lib/modules/Entity.js",
+        "lib/modules/Auth.js",
+        "lib/modules/UsergridEntity.js",
+        "lib/modules/Collection.js",
 		"lib/modules/Group.js",
 		"lib/modules/Counter.js",
 		"lib/modules/Folder.js",
-		"lib/modules/Asset.js",
-		"lib/modules/Error.js",
-        "lib/modules/Auth.js"
+        "lib/modules/Response.js",
+        "lib/modules/Asset.js",
+		"lib/modules/Error.js"
     ];
 	var tests = ["tests/mocha/index.html", "tests/mocha/test_*.html"];
 	// Project configuration.
@@ -114,21 +117,22 @@ module.exports = function(grunt) {
             "files": [files, 'Gruntfile.js'],
             "tasks": ["default"]
         },
-        "blanket_mocha": {
+        "mocha": {
             //"all": tests,
-            urls: [ 'http://localhost:8000/tests/mocha/index.html' ],
             "options": {
+                urls: [ 'http://localhost:8000/tests/mocha/index.html' ],
                 "dest": "report/coverage.html",
                 "reporter": "Spec",
                 "threshold": 70
             }
         }
     });
+    grunt.loadNpmTasks("grunt-mocha");
 	grunt.loadNpmTasks("grunt-contrib-clean");
 	grunt.loadNpmTasks("grunt-contrib-uglify");
 	grunt.loadNpmTasks("grunt-contrib-watch");
 	grunt.loadNpmTasks("grunt-contrib-connect");
-	grunt.loadNpmTasks("grunt-blanket-mocha");
+    grunt.loadNpmTasks("should");
 	grunt.registerTask("default", [
 		"clean",
 		"uglify"
@@ -139,6 +143,6 @@ module.exports = function(grunt) {
 	]);
 	grunt.registerTask("test", [
 		"connect:test",
-		"blanket_mocha"
+		"mocha"
 	]);
 };

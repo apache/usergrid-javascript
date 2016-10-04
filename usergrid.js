@@ -17,7 +17,20 @@
  *under the License.
  * 
  * 
- * usergrid@0.11.0 2016-09-23 
+ * usergrid@0.11.0 2016-10-03 
+ */
+/*
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
  */
 var UsergridAuthMode = Object.freeze({
     NONE: "none",
@@ -15582,8 +15595,46 @@ UsergridEventable.mixin = function(destObject) {
         var joined = [].slice.call(input, 0).join("/");
         return UsergridHelpers.normalize(joined, options);
     };
-    UsergridHelpers.uri = function(client, options) {
-        return UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, options.path || options.type, options.method !== "POST" ? _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "entity.name"), "" ].filter(_.isString)) : "");
+    UsergridHelpers.uri = function(client, method, options) {
+        var path = "";
+        if (options instanceof UsergridEntity) {
+            path = options.type;
+        } else if (options instanceof UsergridQuery) {
+            path = options._type;
+        } else {
+            path = options.path || options.type || _.get(options, "entity.type") || _.get(options, "query._type");
+        }
+        var uuidOrName = "";
+        if (method !== UsergridHttpMethod.POST) {
+            uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "entity.name"), "" ].filter(_.isString));
+        }
+        return UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, path, uuidOrName);
+    };
+    UsergridHelpers.body = function(options) {
+        var rawBody = undefined;
+        if (options instanceof UsergridEntity) {
+            rawBody = options;
+        } else {
+            rawBody = options.body || options.entity || options.entities;
+            if (rawBody === undefined) {
+                if (_.isArray(options)) {
+                    if (options[0] instanceof UsergridEntity) {
+                        rawBody = options;
+                    }
+                }
+            }
+        }
+        var returnBody = rawBody;
+        if (rawBody instanceof UsergridEntity) {
+            returnBody = rawBody.jsonValue();
+        } else if (rawBody instanceof Array) {
+            if (rawBody[0] instanceof UsergridEntity) {
+                returnBody = _.map(rawBody, function(entity) {
+                    return entity.jsonValue();
+                });
+            }
+        }
+        return returnBody;
     };
     UsergridHelpers.headers = function(client, options) {
         var headers = {
@@ -15596,7 +15647,7 @@ UsergridEventable.mixin = function(destObject) {
             client.tempAuth = undefined;
         } else if (_.get(client, "currentUser.auth.isValid")) {
             token = client.currentUser.auth.token;
-        } else if (_.get(client, "authFallback") === UsergridAuthMode.APP && _.get(client, "appAuth.isValid")) {
+        } else if (client.authMode === UsergridAuthMode.APP && _.get(client, "appAuth.isValid")) {
             token = client.appAuth.token;
         }
         if (token) {
@@ -15636,12 +15687,10 @@ UsergridEventable.mixin = function(destObject) {
         if (typeof data === "string") {
             result = data;
         } else {
-            var e = encodeURIComponent;
-            for (var i in data) {
-                if (data.hasOwnProperty(i)) {
-                    result += "&" + e(i) + "=" + e(data[i]);
-                }
-            }
+            var encode = encodeURIComponent;
+            _.forOwn(data, function(value, key) {
+                result += "&" + encode(key) + "=" + encode(value);
+            });
         }
         return result;
     };
@@ -15673,6 +15722,7 @@ UsergridEventable.mixin = function(destObject) {
 var UsergridQuery = function(type) {
     var self = this;
     var query = "", queryString, sort, __nextIsNot = false;
+    self._type = type;
     _.assign(self, {
         type: function(value) {
             self._type = value;
@@ -15724,11 +15774,11 @@ var UsergridQuery = function(type) {
             return self;
         },
         asc: function(key) {
-            self.sort(key, "asc");
+            self.sort(key, UsergridQuerySortOrder.ASC);
             return self;
         },
         desc: function(key) {
-            self.sort(key, "desc");
+            self.sort(key, UsergridQuerySortOrder.DESC);
             return self;
         },
         sort: function(key, order) {
@@ -15756,7 +15806,6 @@ var UsergridQuery = function(type) {
             return query.length > 0 && !_.endsWith(query, "or") ? query + " or" : query;
         }
     });
-    self._type = self._type || type;
     Object.defineProperty(self, "_ql", {
         get: function() {
             if (queryString !== undefined) {
@@ -15764,6 +15813,38 @@ var UsergridQuery = function(type) {
             } else {
                 return query.length > 0 || sort !== undefined ? "select * where " + (query || "") + (sort || "") : "";
             }
+        }
+    });
+    Object.defineProperty(self, "encodedStringValue", {
+        get: function() {
+            var self = this;
+            var limit = self._limit;
+            var cursor = self._cursor;
+            var requirementsString = self._ql;
+            var encodedStringValue = undefined;
+            if (!_.isEmpty(limit)) {
+                queryString = "limit=" + limit;
+            }
+            if (!_.isEmpty(cursor)) {
+                var cursorString = "cursor=" + cursor;
+                if (_.isEmpty(queryString)) {
+                    queryString = cursorString;
+                } else {
+                    queryString += "&" + cursorString;
+                }
+            }
+            if (!_.isEmpty(requirementsString)) {
+                var qLString = "ql=" + encodeURIComponent(requirementsString);
+                if (_.isEmpty(queryString)) {
+                    queryString = qLString;
+                } else {
+                    queryString += "&" + qLString;
+                }
+            }
+            if (!_.isEmpty(queryString)) {
+                queryString = "?" + queryString;
+            }
+            return !_.isEmpty(queryString) ? queryString : undefined;
         }
     });
     Object.defineProperty(self, "and", {
@@ -15955,7 +16036,7 @@ function doCallback(callback, params, context) {
         console.warn("TRYING TO INITIALIZING SHARED INSTANCE");
         if (!this.isInitialized) {
             console.warn("INITIALIZING SHARED INSTANCE");
-            this.__sharedInstance = new Usergrid.Client(options);
+            this.__sharedInstance = new UsergridClient(options);
             this.isInitialized = true;
         }
         return this.__sharedInstance;
@@ -15968,9 +16049,9 @@ function doCallback(callback, params, context) {
     };
     Usergrid.validateAndRetrieveClient = function(args) {
         var client = undefined;
-        if (args instanceof Usergrid.Client) {
+        if (args instanceof UsergridClient) {
             client = args;
-        } else if (args[0] instanceof Usergrid.Client) {
+        } else if (args[0] instanceof UsergridClient) {
             client = args[0];
         } else if (Usergrid.isInitialized) {
             client = Usergrid.getInstance();
@@ -15982,125 +16063,6 @@ function doCallback(callback, params, context) {
     Usergrid.calculateExpiry = function(expires_in) {
         return Date.now() + (expires_in ? expires_in - 5 : 0) * 1e3;
     };
-    Usergrid.Request = function(method, endpoint, query_params, data, callback) {
-        var p = new Promise();
-        /*
-         Create a logger
-         */
-        this.logger = new global.Logger("Usergrid.Request");
-        this.logger.time("process request " + method + " " + endpoint);
-        /*
-         Validate our input
-         */
-        this.endpoint = endpoint + "?" + encodeParams(query_params);
-        this.method = method.toUpperCase();
-        this.data = "object" === typeof data ? JSON.stringify(data) : data;
-        if (VALID_REQUEST_METHODS.indexOf(this.method) === -1) {
-            throw new UsergridInvalidHTTPMethodError("invalid request method '" + this.method + "'");
-        }
-        /*
-         Prepare our request
-         */
-        if (!isValidUrl(this.endpoint)) {
-            this.logger.error(endpoint, this.endpoint, /^https:\/\//.test(endpoint));
-            throw new UsergridInvalidURIError("The provided endpoint is not valid: " + this.endpoint);
-        }
-        /* a callback to make the request */
-        var request = function() {
-            return new UsergridRequest({
-                method: this.method,
-                uri: this.endpoint,
-                body: this.data
-            });
-        }.bind(this);
-        /* a callback to process the response */
-        var response = function(request) {
-            return new UsergridResponse(request);
-        }.bind(this);
-        /* a callback to clean up and return data to the client */
-        var oncomplete = function(response) {
-            p.done(response);
-            doCallback(callback, [ response ]);
-        }.bind(this);
-        /* and a promise to chain them all together */
-        Promise.chain([ request, response ]).then(oncomplete);
-        return p;
-    };
-    Usergrid.Response = function(err, response) {
-        var p = new Promise();
-        var data = null;
-        try {
-            data = JSON.parse(response.responseText);
-        } catch (e) {
-            data = {};
-        }
-        Object.keys(data).forEach(function(key) {
-            Object.defineProperty(this, key, {
-                value: data[key],
-                enumerable: true
-            });
-        }.bind(this));
-        Object.defineProperty(this, "logger", {
-            enumerable: false,
-            configurable: false,
-            writable: false,
-            value: new global.Logger(name)
-        });
-        Object.defineProperty(this, "success", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: true
-        });
-        Object.defineProperty(this, "err", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: err
-        });
-        Object.defineProperty(this, "status", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: parseInt(response.status)
-        });
-        Object.defineProperty(this, "statusGroup", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: this.status - this.status % 100
-        });
-        switch (this.statusGroup) {
-          case 200:
-            this.success = true;
-            break;
-
-          case 400:
-          case 500:
-          case 300:
-          case 100:
-          default:
-            this.success = false;
-            break;
-        }
-        if (this.success) {
-            p.done(null, this);
-        } else {
-            p.done(UsergridError.fromResponse(data), this);
-        }
-        return p;
-    };
-    Usergrid.Response.prototype.getEntities = function() {
-        var entities;
-        if (this.success) {
-            entities = this.data ? this.data.entities : this.entities;
-        }
-        return entities || [];
-    };
-    Usergrid.Response.prototype.getEntity = function() {
-        var entities = this.getEntities();
-        return entities[0];
-    };
     Usergrid.VERSION = Usergrid.USERGRID_SDK_VERSION = "0.11.0";
     global[name] = Usergrid;
     global[name].noConflict = function() {
@@ -16111,6 +16073,189 @@ function doCallback(callback, params, context) {
     };
     return global[name];
 })(this);
+
+/*
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
+"use strict";
+
+var defaultOptions = {
+    baseUrl: "https://api.usergrid.com",
+    authMode: UsergridAuthMode.USER
+};
+
+var UsergridClient = function(options) {
+    var self = this;
+    var __appAuth;
+    self.tempAuth = undefined;
+    self.isSharedInstance = false;
+    if (arguments.length === 2) {
+        self.orgId = arguments[0];
+        self.appId = arguments[1];
+    }
+    _.defaults(self, options, defaultOptions);
+    if (!self.orgId || !self.appId) {
+        throw new Error('"orgId" and "appId" parameters are required when instantiating UsergridClient');
+    }
+    Object.defineProperty(self, "clientId", {
+        enumerable: false
+    });
+    Object.defineProperty(self, "clientSecret", {
+        enumerable: false
+    });
+    Object.defineProperty(self, "appAuth", {
+        get: function() {
+            return __appAuth;
+        },
+        set: function(options) {
+            if (options instanceof UsergridAppAuth) {
+                __appAuth = options;
+            } else if (typeof options !== "undefined") {
+                __appAuth = new UsergridAppAuth(options);
+            }
+        }
+    });
+    if (self.clientId && self.clientSecret) {
+        self.setAppAuth(self.clientId, self.clientSecret);
+    }
+    return self;
+};
+
+UsergridClient.prototype = {
+    performRequest: function(request, callback) {
+        var self = this;
+        var requestPromise = function() {
+            return request;
+        }.bind(self);
+        var responsePromise = function(xmlRequest) {
+            return new UsergridResponse(xmlRequest);
+        }.bind(self);
+        var p = new Promise();
+        var onComplete = function(response) {
+            p.done(response);
+            doCallback(callback, [ response ]);
+        }.bind(self);
+        /* and a promise to chain them all together */
+        Promise.chain([ requestPromise, responsePromise ]).then(onComplete);
+        return p;
+    },
+    GET: function(options, callback) {
+        var self = this;
+        return self.performRequest(new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.GET,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.GET, options),
+            query: options instanceof UsergridQuery ? options : options.query,
+            body: UsergridHelpers.body(options)
+        }), callback);
+    },
+    PUT: function(options, callback) {
+        var self = this;
+        return self.performRequest(new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.PUT,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.PUT, options),
+            query: options instanceof UsergridQuery ? options : options.query,
+            body: UsergridHelpers.body(options)
+        }), callback);
+    },
+    POST: function(options, callback) {
+        var self = this;
+        return self.performRequest(new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.POST,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.POST, options),
+            query: options instanceof UsergridQuery ? options : options.query,
+            body: UsergridHelpers.body(options)
+        }), callback);
+    },
+    DELETE: function(options, callback) {
+        var self = this;
+        return self.performRequest(new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.DELETE,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.DELETE, options),
+            query: options instanceof UsergridQuery ? options : options.query,
+            body: UsergridHelpers.body(options)
+        }), callback);
+    },
+    connect: function() {
+        var self = this;
+        return self.performRequest(new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.POST,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.POST, options),
+            query: options instanceof UsergridQuery ? options : options.query,
+            body: UsergridHelpers.body(options)
+        }), callback);
+    },
+    disconnect: function() {
+        return this.request(new UsergridRequest(helpers.build.connection(this, "DELETE", helpers.args(arguments))));
+    },
+    getConnections: function() {
+        return this.request(new UsergridRequest(helpers.build.getConnections(this, helpers.args(arguments))));
+    },
+    setAppAuth: function() {
+        this.appAuth = new UsergridAppAuth(helpers.args(arguments));
+    },
+    authenticateApp: function(options) {
+        var self = this;
+        var callback = helpers.cb(helpers.args(arguments));
+        console.log(self.appAuth);
+        var auth = _.first([ options, self.appAuth, new UsergridAppAuth(options), new UsergridAppAuth(self.clientId, self.clientSecret) ].filter(function(p) {
+            return p instanceof UsergridAppAuth;
+        }));
+        if (!(auth instanceof UsergridAppAuth)) {
+            throw new Error("App auth context was not defined when attempting to call .authenticateApp()");
+        } else if (!auth.clientId || !auth.clientSecret) {
+            throw new Error("authenticateApp() failed because clientId or clientSecret are missing");
+        }
+        self.performRequest(new UsergridRequest({
+            client: self,
+            path: "token",
+            method: "POST",
+            body: UsergridHelpers.appLoginBody(auth)
+        }, function(usergridResponse) {
+            if (usergridResponse.ok) {
+                if (!self.appAuth) {
+                    self.appAuth = auth;
+                }
+                self.appAuth.token = usergridResponse.responseJSON.access_token;
+                self.appAuth.expiry = UsergridHelpers.expiry(body.expires_in);
+                self.appAuth.tokenTtl = usergridResponse.responseJSON.expires_in;
+            }
+            callback(error, usergridResponse, usergridResponse.responseJSON.access_token);
+        }));
+    },
+    authenticateUser: function(options) {
+        var self = this;
+        var args = helpers.args(arguments);
+        var callback = helpers.cb(args);
+        var setAsCurrentUser = _.last(args.filter(_.isBoolean)) !== undefined ? _.last(args.filter(_.isBoolean)) : true;
+        var UsergridUser = require("./user");
+        var currentUser = new UsergridUser(options);
+        currentUser.login(self, function(error, usergridResponse, token) {
+            if (usergridResponse.ok && setAsCurrentUser) {
+                self.currentUser = currentUser;
+            }
+            callback(error, usergridResponse, token);
+        });
+    },
+    usingAuth: function(auth) {
+        this.tempAuth = helpers.client.configureTempAuth(auth);
+        return this;
+    }
+};
 
 var defaultOptions = {
     baseUrl: "https://api.usergrid.com",
@@ -16150,80 +16295,6 @@ var defaultOptions = {
         this.logging = options.logging || false;
     };
     /*
-   *  Main function for making requests to the API.  Can be called directly.
-   *
-   *  options object:
-   *  `method` - http method (GET, POST, PUT, or DELETE), defaults to GET
-   *  `qs` - object containing querystring values to be appended to the uri
-   *  `body` - object containing entity body for POST and PUT requests
-   *  `endpoint` - API endpoint, for example 'users/fred'
-   *  `mQuery` - boolean, set to true if running management query, defaults to false
-   *
-   *  @method request
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.request = function(options, callback) {
-        var method = options.method || "GET";
-        var endpoint = options.endpoint;
-        var body = options.body || {};
-        var qs = options.qs || {};
-        var mQuery = options.mQuery || false;
-        var orgId = this.get("orgId");
-        var appId = this.get("appId");
-        var default_qs = this.getObject("default_qs");
-        var uri;
-        /*var logoutCallback=function(){
-        if (typeof(this.logoutCallback) === 'function') {
-            return this.logoutCallback(true, 'no_org_or_app_name_specified');
-        }
-    }.bind(this);*/
-        if (!mQuery && !orgId && !appId) {
-            return logoutCallback();
-        }
-        if (mQuery) {
-            uri = this.baseUrl + "/" + endpoint;
-        } else {
-            uri = this.baseUrl + "/" + orgId + "/" + appId + "/" + endpoint;
-        }
-        if (this.getToken()) {
-            qs.access_token = this.getToken();
-        }
-        if (default_qs) {
-            qs = propCopy(qs, default_qs);
-        }
-        var self = this;
-        var req = new Usergrid.Request(method, uri, qs, body, function(response) {
-            /*if (AUTH_ERRORS.indexOf(response.error) !== -1) {
-            return logoutCallback();
-        }*/
-            doCallback(callback, [ response, self ], self);
-        });
-    };
-    /*
-   *  function for building asset urls
-   *
-   *  @method buildAssetURL
-   *  @public
-   *  @params {string} uuid
-   *  @return {string} assetURL
-   */
-    Usergrid.Client.prototype.buildAssetURL = function(uuid) {
-        var self = this;
-        var qs = {};
-        var assetURL = this.baseUrl + "/" + this.orgId + "/" + this.appId + "/assets/" + uuid + "/data";
-        if (self.getToken()) {
-            qs.access_token = self.getToken();
-        }
-        var encoded_params = encodeParams(qs);
-        if (encoded_params) {
-            assetURL += "?" + encoded_params;
-        }
-        return assetURL;
-    };
-    /*
    *  Main function for creating new groups. Call this directly.
    *
    *  @method createGroup
@@ -16254,10 +16325,7 @@ var defaultOptions = {
    *  @return {callback} callback(err, data)
    */
     Usergrid.Client.prototype.createEntity = function(options, callback) {
-        var entity = new Usergrid.Entity({
-            client: this,
-            data: options
-        });
+        var entity = new UsergridEntity(options);
         entity.save(function(err, response) {
             doCallback(callback, [ err, response, entity ], entity);
         });
@@ -16933,7 +17001,7 @@ var defaultOptions = {
 
 var UsergridRequest = function(options) {
     var self = this;
-    var client = Usergrid.validateAndRetrieveClient(Usergrid.getInstance());
+    var client = Usergrid.validateAndRetrieveClient(options);
     if (!_.isString(options.type) && !_.isString(options.path) && !_.isString(options.uri)) {
         throw new Error('one of "type" (collection name), "path", or "uri" parameters are required when initializing a UsergridRequest');
     }
@@ -16945,13 +17013,16 @@ var UsergridRequest = function(options) {
     self.headers = UsergridHelpers.headers(client, options);
     self.body = options.body || undefined;
     self.encoding = options.encoding || null;
-    self.qs = UsergridHelpers.qs(options);
+    self.query = options.query;
+    if (self.query !== undefined) {
+        self.uri += UsergridHelpers.normalize(self.query.encodedStringValue, {});
+    }
     if (_.isPlainObject(self.body)) {
         self.body = JSON.stringify(self.body);
     }
     var promise = new Promise();
     var request = new XMLHttpRequest();
-    request.open(self.method, self.uri);
+    request.open(self.method.toString(), self.uri);
     request.open = function(m, u) {
         for (var header in self.headers) {
             if (self.headers.hasOwnProperty(header)) {
@@ -17727,6 +17798,21 @@ var UsergridUserAuth = function() {
 
 UsergridHelpers.inherits(UsergridUserAuth, UsergridAuth);
 
+/*
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
+"use strict";
+
 function updateEntityFromRemote(usergridResponse) {
     UsergridHelpers.setWritable(this, [ "uuid", "name", "type", "created" ]);
     _.assign(this, usergridResponse.entity);
@@ -17739,20 +17825,20 @@ var UsergridEntity = function() {
     if (args.length === 0) {
         throw new Error("A UsergridEntity object cannot be initialized without passing one or more arguments");
     }
+    self.asset = undefined;
     if (_.isPlainObject(args[0])) {
         _.assign(self, args[0]);
     } else {
-        self.type = _.isString(args[0]) ? args[0] : undefined;
-        self.name = _.isString(args[1]) ? args[1] : undefined;
+        if (!self.type) {
+            self.type = _.isString(args[0]) ? args[0] : undefined;
+        }
+        if (!self.name) {
+            self.name = _.isString(args[1]) ? args[1] : undefined;
+        }
     }
     if (!_.isString(self.type)) {
         throw new Error('"type" (or "collection") parameter is required when initializing a UsergridEntity object');
     }
-    Object.defineProperty(self, "tempAuth", {
-        enumerable: false,
-        configurable: true,
-        writable: true
-    });
     Object.defineProperty(self, "isUser", {
         get: function() {
             return self.type.toLowerCase() === "user";
@@ -17763,12 +17849,18 @@ var UsergridEntity = function() {
             return _.has(self, "file-metadata");
         }
     });
-    self.asset = undefined;
     UsergridHelpers.setReadOnly(self, [ "uuid", "name", "type", "created" ]);
     return self;
 };
 
 UsergridEntity.prototype = {
+    jsonValue: function() {
+        var jsonValue = {};
+        _.forOwn(this, function(value, key) {
+            jsonValue[key] = value;
+        });
+        return jsonValue;
+    },
     putProperty: function(key, value) {
         this[key] = value;
     },
@@ -17812,30 +17904,34 @@ UsergridEntity.prototype = {
         var callback = UsergridHelpers.callback(args);
         client.tempAuth = this.tempAuth;
         this.tempAuth = undefined;
-        client.GET(this, function(error, usergridResponse) {
+        client.GET(this, function(usergridResponse) {
             updateEntityFromRemote.call(this, usergridResponse);
-            callback(error, usergridResponse, this);
+            callback(usergridResponse, this);
         }.bind(this));
     },
     save: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
-        client.PUT(this, function(error, usergridResponse) {
-            updateEntityFromRemote.call(this, usergridResponse);
-            callback(error, usergridResponse, this);
-        }.bind(this));
+        var uuid = this.uuid;
+        if (uuid === undefined) {
+            client.POST(this, function(usergridResponse) {
+                updateEntityFromRemote.call(this, usergridResponse);
+                callback(usergridResponse, this);
+            }.bind(this));
+        } else {
+            client.PUT(this, function(usergridResponse) {
+                updateEntityFromRemote.call(this, usergridResponse);
+                callback(usergridResponse, this);
+            }.bind(this));
+        }
     },
     remove: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
-        client.DELETE(this, function(error, usergridResponse) {
-            callback(error, usergridResponse, this);
+        client.DELETE(this, function(usergridResponse) {
+            callback(usergridResponse, this);
         }.bind(this));
     },
     attachAsset: function(asset) {
@@ -17845,9 +17941,9 @@ UsergridEntity.prototype = {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.POST(this, this.asset, function(error, usergridResponse) {
+        client.POST(this, this.asset, function(usergridResponse) {
             updateEntityFromRemote.call(this, usergridResponse);
-            callback(error, usergridResponse, this);
+            callback(usergridResponse, this);
         }.bind(this));
     },
     downloadAsset: function() {
@@ -17867,7 +17963,7 @@ UsergridEntity.prototype = {
                 }
             };
             options.uri = helpers.build.uri(client, options);
-            return new UsergridRequest(options, function(error, usergridResponse) {
+            return new UsergridRequest(options, function(usergridResponse) {
                 if (usergridResponse.ok) {
                     self.attachAsset(new UsergridAsset(new Buffer(usergridResponse.body)));
                 }
@@ -17883,33 +17979,167 @@ UsergridEntity.prototype = {
     connect: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
         args[0] = this;
         return client.connect.apply(client, args);
     },
     disconnect: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
         args[0] = this;
         return client.disconnect.apply(client, args);
     },
     getConnections: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = Usergrid.validateAndRetrieveClient(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
         args.shift();
         args.splice(1, 0, this);
         return client.getConnections.apply(client, args);
-    },
-    usingAuth: function(auth) {
-        this.tempAuth = helpers.client.configureTempAuth(auth);
-        return this;
     }
 };
+
+/*
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
+"use strict";
+
+var UsergridUser = function(obj) {
+    if (!_.has(obj, "email") && !_.has(obj, "username")) {
+        throw new Error('"email" or "username" property is required when initializing a UsergridUser object');
+    }
+    var self = this;
+    _.assign(self, obj, UsergridEntity);
+    UsergridEntity.call(self, "user");
+    UsergridHelpers.setWritable(self, "name");
+    return self;
+};
+
+UsergridUser.CheckAvailable = function() {
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = Usergrid.validateAndRetrieveClient(args);
+    if (args[0] instanceof UsergridClient) {
+        args.shift();
+    }
+    var callback = UsergridHelpers.callback(args);
+    var checkQuery;
+    if (args[0].username && args[0].email) {
+        checkQuery = new UsergridQuery("users").eq("username", args[0].username).or.eq("email", args[0].email);
+    } else if (args[0].username) {
+        checkQuery = new UsergridQuery("users").eq("username", args[0].username);
+    } else if (args[0].email) {
+        checkQuery = new UsergridQuery("users").eq("email", args[0].email);
+    } else {
+        throw new Error("'username' or 'email' property is required when checking for available users");
+    }
+    client.GET(checkQuery, function(usergridResponse) {
+        callback(usergridResponse, !(usergridResponse.entities.length > 0));
+    });
+};
+
+UsergridUser.prototype = {
+    uniqueId: function() {
+        var self = this;
+        return _.first([ self.uuid, self.username, self.email ].filter(_.isString));
+    },
+    create: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.flattenArgs(args);
+        var callback = UsergridHelpers.callback(args);
+        client.POST(self, function(usergridResponse) {
+            delete self.password;
+            _.assign(self, usergridResponse.user);
+            callback(usergridResponse);
+        }.bind(self));
+    },
+    login: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var callback = UsergridHelpers.callback(args);
+        var client = Usergrid.validateAndRetrieveClient(args);
+        client.performRequest(new UsergridRequest({
+            client: client,
+            path: "token",
+            method: UsergridHttpMethod.POST,
+            body: UsergridHelpers.userLoginBody(self)
+        }, function(usergridResponse) {
+            delete self.password;
+            if (usergridResponse.ok) {
+                var responseJSON = usergridResponse.responseJSON;
+                self.auth = new UsergridUserAuth(body.user);
+                self.auth.token = responseJSON.access_token;
+                self.auth.expiry = Usergrid.calculateExpiry(responseJSON.expires_in);
+                self.auth.tokenTtl = responseJSON.expires_in;
+            }
+            callback(self.auth, self, usergridResponse.error);
+        }));
+    },
+    logout: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var callback = UsergridHelpers.callback(args);
+        if (!self.auth || !self.auth.isValid) {
+            return callback({
+                name: "no_valid_token",
+                description: "this user does not have a valid token"
+            });
+        }
+        var revokeAll = _.first(args.filter(_.isBoolean)) || false;
+        var revokeTokenPath = [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/");
+        if (!revokeAll) {
+            revokeTokenPath += "?ql=token=" + self.auth.token;
+        }
+        var client = Usergrid.validateAndRetrieveClient(args);
+        client.performRequest(new UsergridRequest({
+            client: client,
+            path: revokeTokenPath,
+            method: "PUT"
+        }, function(usergridResponse) {
+            self.auth.destroy();
+            callback(usergridResponse);
+        }));
+    },
+    logoutAllSessions: function() {
+        var args = UsergridHelpers.flattenArgs(arguments);
+        args = _.concat([ Usergrid.validateAndRetrieveClient(args), true ], args);
+        return this.logout.apply(this, args);
+    },
+    resetPassword: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var callback = UsergridHelpers.callback(args);
+        var client = Usergrid.validateAndRetrieveClient(args);
+        if (args[0] instanceof UsergridClient) {
+            args.shift();
+        }
+        var body = {
+            oldpassword: _.isPlainObject(args[0]) ? args[0].oldPassword : _.isString(args[0]) ? args[0] : undefined,
+            newpassword: _.isPlainObject(args[0]) ? args[0].newPassword : _.isString(args[1]) ? args[1] : undefined
+        };
+        if (!body.oldpassword || !body.newpassword) {
+            throw new Error('"oldPassword" and "newPassword" properties are required when resetting a user password');
+        }
+        return client.performRequest(new UsergridRequest({
+            client: client,
+            path: [ "users", self.uniqueId(), "password" ].join("/"),
+            method: "PUT",
+            body: body
+        }, function(usergridResponse) {
+            callback(usergridResponse);
+        }));
+    }
+};
+
+UsergridHelpers.inherits(UsergridUser, UsergridEntity);
 
 /*
  *  The Collection class models Usergrid Collections.  It essentially
@@ -18910,14 +19140,14 @@ var UsergridResponse = function(request) {
     var p = new Promise();
     var self = this;
     self.ok = false;
+    self.error = undefined;
     if (!request) {
-        return;
+        return p;
     } else {
         self.statusCode = parseInt(request.status);
-        var responseJSON;
         try {
             var responseText = request.responseText;
-            responseJSON = JSON.parse(responseText);
+            var responseJSON = JSON.parse(responseText);
         } catch (e) {
             responseJSON = {};
         }
@@ -18932,35 +19162,29 @@ var UsergridResponse = function(request) {
                     return entity;
                 });
                 _.assign(self, {
-                    metadata: _.cloneDeep(responseJSON),
+                    responseJSON: _.cloneDeep(responseJSON),
                     entities: entities
                 });
-                delete self.metadata.entities;
+                delete self.responseJSON.entities;
                 self.first = _.first(entities) || undefined;
                 self.entity = self.first;
                 self.last = _.last(entities) || undefined;
-                if (_.get(self, "metadata.path") === "/users") {
+                if (_.get(self, "responseJSON.path") === "/users") {
                     self.user = self.first;
                     self.users = self.entities;
                 }
                 Object.defineProperty(self, "hasNextPage", {
                     get: function() {
-                        return _.has(self, "metadata.cursor");
+                        return _.has(self, "responseJSON.cursor");
                     }
                 });
-                UsergridHelpers.setReadOnly(self.metadata);
+                UsergridHelpers.setReadOnly(self.responseJSON);
             }
         } else {
-            _.assign(self, {
-                error: new UsergridResponseError(responseJSON)
-            });
+            self.error = new UsergridResponseError(responseJSON);
         }
     }
-    if (this.success) {
-        p.done(this);
-    } else {
-        p.done(this);
-    }
+    p.done(this);
     return p;
 };
 
@@ -18969,13 +19193,13 @@ UsergridResponse.prototype = {
         var self = this;
         var args = UsergridHelpers.flattenArgs(arguments);
         var callback = UsergridHelpers.callback(args);
-        if (!self.metadata.cursor) {
+        if (!self.responseJSON.cursor) {
             callback();
         }
         var client = Usergrid.validateAndRetrieveClient(args);
-        var type = _.last(_.get(self, "metadata.path").split("/"));
-        var limit = _.first(_.get(this, "metadata.params.limit"));
-        var query = new UsergridQuery(type).cursor(this.metadata.cursor).limit(limit);
+        var type = _.last(_.get(self, "responseJSON.path").split("/"));
+        var limit = _.first(_.get(this, "responseJSON.params.limit"));
+        var query = new UsergridQuery(type).cursor(this.responseJSON.cursor).limit(limit);
         return client.GET(query, callback);
     }
 };

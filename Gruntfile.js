@@ -125,7 +125,7 @@ module.exports = function(grunt) {
                     "urls": [ 'http://localhost:8000/tests/mocha/index.html' ],
                     "reporter": "Spec",
                     "threshold": 70,
-                    "run":false
+                    "run":true
                 }
             }
         }

@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-describe('UsergridQuery', function() {
+describe('Usergrid_Query', function() {
 
     describe('_type', function() {
         it('_type should equal "cats" when passing "type" as a parameter to UsergridQuery', function() {

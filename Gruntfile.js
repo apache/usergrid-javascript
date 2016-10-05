@@ -13,7 +13,7 @@ module.exports = function(grunt) {
         "lib/modules/Client.js",
         "lib/modules/UsergridRequest.js",
         "lib/modules/Entity.js",
-        "lib/modules/Auth.js",
+        "lib/modules/UsergridAuth.js",
         "lib/modules/UsergridEntity.js",
         "lib/modules/UsergridUser.js",
         "lib/modules/Collection.js",
@@ -120,12 +120,13 @@ module.exports = function(grunt) {
             "tasks": ["default"]
         },
         "mocha": {
-            //"all": tests,
-            "options": {
-                urls: [ 'http://localhost:8000/tests/mocha/index.html' ],
-                "dest": "report/coverage.html",
-                "reporter": "Spec",
-                "threshold": 70
+            "test": {
+                "options": {
+                    "urls": [ 'http://localhost:8000/tests/mocha/index.html' ],
+                    "reporter": "Spec",
+                    "threshold": 70,
+                    "run":false
+                }
             }
         }
     });
@@ -145,6 +146,6 @@ module.exports = function(grunt) {
 	]);
 	grunt.registerTask("test", [
 		"connect:test",
-		"mocha"
+		"mocha:test"
 	]);
 };

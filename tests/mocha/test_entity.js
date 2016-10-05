@@ -270,40 +270,40 @@ describe('UsergridEntity', function() {
         })
     })
 
-    describe('reload()', function() {
-        it('should refresh an entity with the latest server copy of itself', function(done) {
-            var client = getClient(),
-                now = Date.now()
-            client.GET("nodejs", function(getResponse) {
-                var entity = new UsergridEntity(getResponse.first)
-                var modified = entity.modified
-                getResponse.first.putProperty('reloadTest', now)
-                client.PUT(getResponse.first, function(putResponse) {
-                    entity.reload(client, function() {
-                        client.isSharedInstance.should.be.false()
-                        entity.reloadTest.should.equal(now)
-                        entity.modified.should.not.equal(modified)
-                        done()
-                    })
-                })
-            })
-        })
-    })
-
-    describe('save()', function() {
-
-        it('should save an updated entity to the server', function(done) {
-            var client = getClient(),
-                now = Date.now()
-            client.GET(config.test.collection, function(getResponse) {
-                var entity = new UsergridEntity(getResponse.first)
-                entity.putProperty('saveTest', now)
-                entity.save(client, function() {
-                    client.isSharedInstance.should.be.false()
-                    entity.saveTest.should.equal(now)
-                    done()
-                })
-            })
-        })
-    })
+    // describe('reload()', function() {
+    //     it('should refresh an entity with the latest server copy of itself', function(done) {
+    //         var client = getClient(),
+    //             now = Date.now()
+    //         client.GET("nodejs", function(getResponse) {
+    //             var entity = new UsergridEntity(getResponse.first)
+    //             var modified = entity.modified
+    //             getResponse.first.putProperty('reloadTest', now)
+    //             client.PUT(getResponse.first, function(putResponse) {
+    //                 entity.reload(client, function() {
+    //                     client.isSharedInstance.should.be.false()
+    //                     entity.reloadTest.should.equal(now)
+    //                     entity.modified.should.not.equal(modified)
+    //                     done()
+    //                 })
+    //             })
+    //         })
+    //     })
+    // })
+    //
+    // describe('save()', function() {
+    //
+    //     it('should save an updated entity to the server', function(done) {
+    //         var client = getClient(),
+    //             now = Date.now()
+    //         client.GET(config.test.collection, function(getResponse) {
+    //             var entity = new UsergridEntity(getResponse.first)
+    //             entity.putProperty('saveTest', now)
+    //             entity.save(client, function() {
+    //                 client.isSharedInstance.should.be.false()
+    //                 entity.saveTest.should.equal(now)
+    //                 done()
+    //             })
+    //         })
+    //     })
+    // })
 })

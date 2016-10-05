@@ -22,7 +22,9 @@
 function getClient() {
 	return Usergrid.initSharedInstance({
         orgId: 'rwalsh',
-		appId: 'sandbox'
+		appId: 'sandbox',
+        clientId: 'b3U6THNcevskEeOQZLcUROUUVA',
+        clientSecret: 'b3U6RZHYznP28xieBzQPackFPmmnevU'
     });
 }
 /*
@@ -49,14 +51,19 @@ describe('Ajax', function() {
     var dogName="dog"+Math.floor(Math.random()*10000);
     var dogData=JSON.stringify({type:"dog",name:dogName});
     var dogURI=client.clientAppURL + '/dogs';
-    client.appAuth = new UsergridAppAuth(['YXA6WMhAuFJTEeWoggrRE9kXrQ','YXA6zZbat7PKgOlN73rpByc36LWaUhw'])
 
-    console.log(client.appAuth instanceof UsergridAuth)
-    console.log("BEFORE DESTROY:" + client.appAuth.expiry)
-    client.appAuth.destroy()
-    console.log("AFTER: DESTROY" + client.appAuth.expiry)
+    // client.authenticateApp(function(response){
+    //     assert(response.ok,"response should be ok")
+    //     assert(client.appAuth.isValid,"client appAuth should be valid")
+    //     done()
+    // })
+    // client.logout().destory()
+    // console.log(client.appAuth instanceof UsergridAuth)
+    // console.log("BEFORE DESTROY:" + client.appAuth.expiry)
+    // client.appAuth.destroy()
+    // console.log("AFTER: DESTROY" + client.appAuth.expiry)
 
-    console.log("Client Id=" + client.appAuth.clientId + " Client Secret=" + client.appAuth.clientSecret)
+    // console.log("Client Id=" + client.appAuth.clientId + " Client Secret=" + client.appAuth.clientSecret)
 
     it('should POST to a URI ' + dogURI, function(done){
         // appAuth.destroy()
@@ -119,15 +126,16 @@ describe('Usergrid', function() {
         var dogURI = client.clientAppURL + '/dogs'
         it('should POST to a URI', function (done) {
             client.POST({path: "dogs", body: dogData}, function (response) {
-                assert(!response.error, response.error);
-                assert(response instanceof UsergridResponse, "Response is not and instance of UsergridResponse");
+                response.should.not.have.property('error')
+                response.should.have.property('entity')
+                response.entity.should.have.property('name').equal(dogName)
                 done();
             })
         })
         it('should GET a URI', function (done) {
             client.GET({ path: "dogs/" + dogName}, function (response) {
-                assert(!response.error, response.error);
-                assert(response instanceof UsergridResponse, "Response is not and instance of UsergridResponse");
+                response.should.not.have.property('error')
+                response.should.have.property('entity')
                 done();
             })
         })
@@ -136,15 +144,15 @@ describe('Usergrid', function() {
                 path: "dogs/" + dogName,
                 body: {favorite: true}
             }, function (response) {
-                assert(!response.error, response.error);
-                assert(response instanceof UsergridResponse, "Response is not and instance of UsergridResponse");
+                response.should.not.have.property('error')
+                response.should.have.property('entity')
+                response.entity.should.have.property('favorite').equal(true)
                 done();
             })
         })
         it('should DELETE a URI', function (done) {
             client.DELETE({path: "dogs/" + dogName}, function (response) {
-                assert(!response.error, response.error);
-                assert(response instanceof UsergridResponse, "Response is not and instance of UsergridResponse");
+                response.should.not.have.property('error')
                 done();
             })
         })

@@ -1,43 +1,16 @@
 'use strict'
 
-var config = {
-    "orgId": "rwalsh",
-    "appId": "jssdktestapp",
-    "clientId": "YXA6KPq8cIsPEea0i-W5Jx8cgw",
-    "clientSecret": "YXA6WaT7qsxh_eRS3ryBresi-HwoQAQ",
-    "test": {
-        "email": "authtest@test.com",
-        "password": "P@ssw0rd",
-        "username": "authtest"
-    }
-}
-
-var baseClientConfig = {
-    orgId: config.orgId,
-    appId: config.appId
-}
-
-function getClient() {
-    return new UsergridClient({
-        orgId: config.orgId,
-        appId: config.appId
-    });
-}
-
-function makeid()  {
-    var text = "";
-    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-    for( var i=0; i < 5; i++ )
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-
-    return text;
-}
-
 describe('Client Auth Tests', function() {
 
+    function getClient() {
+        return new UsergridClient({
+            orgId: config.orgId,
+            appId: config.appId
+        });
+    }
+
     describe('authFallback', function() {
-        var response, token, client = getClient()
+        var token, client = getClient()
         before(function(done) {
             // authenticate app and remove sandbox permissions
             client.setAppAuth(config.clientId, config.clientSecret)
@@ -185,7 +158,7 @@ describe('Client Auth Tests', function() {
 
     describe('authenticateUser()', function() {
 
-        var response, token, email = makeid() + '@' + makeid() + '.com'
+        var response, token, email = randomWord() + '@' + randomWord() + '.com'
         var client = getClient()
         before(function(done) {
             client.authenticateUser({

@@ -1,11 +1,4 @@
 
-function getClient() {
-    return Usergrid.initSharedInstance({
-        orgId: 'rwalsh',
-        appId: 'sandbox'
-    });
-}
-
 describe('UsergridEntity', function() {
 
     describe('putProperty()', function () {
@@ -270,40 +263,258 @@ describe('UsergridEntity', function() {
         })
     })
 
-    // describe('reload()', function() {
-    //     it('should refresh an entity with the latest server copy of itself', function(done) {
-    //         var client = getClient(),
-    //             now = Date.now()
-    //         client.GET("nodejs", function(getResponse) {
-    //             var entity = new UsergridEntity(getResponse.first)
-    //             var modified = entity.modified
-    //             getResponse.first.putProperty('reloadTest', now)
-    //             client.PUT(getResponse.first, function(putResponse) {
-    //                 entity.reload(client, function() {
-    //                     client.isSharedInstance.should.be.false()
-    //                     entity.reloadTest.should.equal(now)
-    //                     entity.modified.should.not.equal(modified)
-    //                     done()
-    //                 })
-    //             })
-    //         })
-    //     })
-    // })
-    //
-    // describe('save()', function() {
-    //
-    //     it('should save an updated entity to the server', function(done) {
-    //         var client = getClient(),
-    //             now = Date.now()
-    //         client.GET(config.test.collection, function(getResponse) {
-    //             var entity = new UsergridEntity(getResponse.first)
-    //             entity.putProperty('saveTest', now)
-    //             entity.save(client, function() {
-    //                 client.isSharedInstance.should.be.false()
-    //                 entity.saveTest.should.equal(now)
-    //                 done()
-    //             })
-    //         })
-    //     })
-    // })
+    var now = Date.now()
+    var entity = new UsergridEntity({type: config.test.collection, name: 'Cosmo'})
+
+    describe('save()', function() {
+        it('should POST an entity without a uuid', function(done) {
+            entity.save(client, function(response){
+                response.entity.should.have.property('uuid')
+                done()
+            })
+        })
+        it('should PUT an entity without a uuid', function(done) {
+            entity.putProperty('saveTest',now)
+            entity.save(client, function(response){
+                response.entity.should.have.property('saveTest').equal(now)
+                done()
+            })
+        })
+    })
+
+    describe('reload()', function() {
+        it('should refresh an entity with the latest server copy of itself', function(done) {
+            var modified = entity.modified
+            entity.putProperty('reloadTest', now)
+            client.PUT(entity, function(putResponse) {
+                entity.modified.should.equal(modified)
+                entity.reload(client, function(reloadResponse) {
+                    entity.reloadTest.should.equal(now)
+                    entity.modified.should.not.equal(modified)
+                    done()
+                })
+            })
+        })
+    })
+
+    describe('remove()', function() {
+
+        it('should remove an entity from the server', function(done) {
+            entity.remove(client, function(deleteResponse) {
+                deleteResponse.ok.should.be.true()
+                // best practice is to destroy the 'entity' instance here, because it no longer exists on the server
+                entity = null
+                done()
+            })
+        })
+    })
+
+    describe('connect()', function() {
+
+        var response,
+            entity1,
+            entity2,
+            query = new UsergridQuery(config.test.collection).eq('name', 'testEntityConnectOne').or.eq('name', 'testEntityConnectTwo').asc('name')
+
+        before(function(done) {
+            // Create the entities we're going to use for connections
+            client.POST({type:config.test.collection, body:[{
+                "name": "testEntityConnectOne"
+            }, {
+                "name": "testEntityConnectTwo"
+            }]}, function() {
+                client.GET(query, function(usergridResponse) {
+                    response = usergridResponse
+                    entity1 = response.first
+                    entity2 = response.last
+                    done()
+                })
+            })
+        })
+
+        it('should connect entities by passing a target UsergridEntity object as a parameter', function(done) {
+            var relationship = "foos"
+
+            entity1.connect(client, relationship, entity2, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
+                        "",
+                        config.test.collection,
+                        entity1.uuid,
+                        relationship,
+                        entity2.uuid,
+                        "connecting",
+                        relationship
+                    ))
+                    done()
+                })
+            })
+        })
+
+        it('should connect entities by passing target uuid as a parameter', function(done) {
+            var relationship = "bars"
+
+            entity1.connect(client, relationship, entity2.uuid, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
+                        "",
+                        config.test.collection,
+                        entity1.uuid,
+                        relationship,
+                        entity2.uuid,
+                        "connecting",
+                        relationship
+                    ))
+                    done()
+                })
+            })
+        })
+
+        it('should connect entities by passing target type and name as parameters', function(done) {
+            var relationship = "bazzes"
+
+            entity1.connect(client, relationship, entity2.type, entity2.name, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
+                        "",
+                        config.test.collection,
+                        entity1.uuid,
+                        relationship,
+                        entity2.uuid,
+                        "connecting",
+                        relationship
+                    ))
+                    done()
+                })
+            })
+        })
+
+        it('should fail to connect entities when specifying target name without type', function() {
+            should(function() {
+                entity1.connect("fails", 'badName', function() {})
+            }).throw()
+        })
+    })
+
+    describe('getConnections()', function() {
+
+        var response,
+            query = new UsergridQuery(config.test.collection).eq('name', 'testEntityConnectOne').or.eq('name', 'testEntityConnectTwo').asc('name')
+
+        before(function(done) {
+            client.GET(query, function(usergridResponse) {
+                response = usergridResponse
+                done()
+            })
+        })
+
+        it('should get an entity\'s outbound connections', function(done) {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            var relationship = "foos"
+
+            entity1.getConnections(client, UsergridDirection.OUT, relationship, function(usergridResponse) {
+                usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
+                    "",
+                    config.test.collection,
+                    entity1.uuid,
+                    relationship,
+                    entity2.uuid,
+                    "connecting",
+                    relationship
+                ))
+                done()
+            })
+        })
+
+        it('should get an entity\'s inbound connections', function(done) {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            var relationship = "foos"
+
+            entity2.getConnections(client, UsergridDirection.IN, relationship, function(usergridResponse) {
+                usergridResponse.first.metadata.connections[relationship].should.equal(UsergridHelpers.urljoin(
+                    "",
+                    config.test.collection,
+                    entity2.uuid,
+                    "connecting",
+                    entity1.uuid,
+                    relationship
+                ))
+                done()
+            })
+        })
+    })
+
+    describe('disconnect()', function() {
+
+        var response,
+            query = new UsergridQuery(config.test.collection).eq('name', 'testEntityConnectOne').or.eq('name', 'testEntityConnectTwo').asc('name')
+
+        before(function(done) {
+            client.GET(query, function(usergridResponse) {
+                response = usergridResponse
+                done()
+            })
+        })
+
+        it('should disconnect entities by passing a target UsergridEntity object as a parameter', function(done) {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            var relationship = "foos"
+
+            entity1.disconnect(client, relationship, entity2, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.entities.should.be.an.Array().with.lengthOf(0)
+                    done()
+                })
+            })
+        })
+
+        it('should disconnect entities by passing target uuid as a parameter', function(done) {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            var relationship = "bars"
+
+            entity1.disconnect(client, relationship, entity2.uuid, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.entities.should.be.an.Array().with.lengthOf(0)
+                    done()
+                })
+            })
+        })
+
+        it('should disconnect entities by passing target type and name as parameters', function(done) {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            var relationship = "bazzes"
+
+            entity1.disconnect(client, relationship, entity2.type, entity2.name, function(usergridResponse) {
+                usergridResponse.ok.should.be.true()
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
+                    usergridResponse.entities.should.be.an.Array().with.lengthOf(0)
+                    done()
+                })
+            })
+        })
+
+        it('should fail to disconnect entities when specifying target name without type', function() {
+            var entity1 = response.first
+            var entity2 = response.last
+
+            should(function() {
+                entity1.disconnect("fails", entity2.name, function() {})
+            }).throw()
+        })
+    })
 })

@@ -17,7 +17,7 @@
  *under the License.
  * 
  * 
- * usergrid@0.11.0 2016-10-05 
+ * usergrid@0.11.0 2016-10-07 
  */
 /*
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15579,6 +15579,12 @@ UsergridEventable.mixin = function(destObject) {
             return obj;
         }
     };
+    UsergridHelpers.assignPrefabOptions = function(args) {
+        if (_.isObject(args[0]) && !_.isFunction(args[0]) && _.has(args, "method")) {
+            _.assign(this, args[0]);
+        }
+        return this;
+    };
     UsergridHelpers.normalize = function(str, options) {
         str = str.replace(/:\//g, "://");
         str = str.replace(/([^:\s])\/+/g, "$1/");
@@ -15604,12 +15610,14 @@ UsergridEventable.mixin = function(destObject) {
             path = options._type;
         } else if (_.isString(options)) {
             path = options;
+        } else if (_.isArray(options)) {
+            path = _.get(options, "0.type") || _.get(options, "0.path");
         } else {
-            path = options.path || options.type || _.get(options, "entity.type") || _.get(options, "query._type");
+            path = options.path || options.type || _.get(options, "entity.type") || _.get(options, "query._type") || _.get(options, "body.type") || _.get(options, "body.path");
         }
         var uuidOrName = "";
         if (method !== UsergridHttpMethod.POST) {
-            uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "entity.name"), "" ].filter(_.isString));
+            uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "entity.name"), _.get(options, "body.uuid"), _.get(options, "body.name"), "" ].filter(_.isString));
         }
         return UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, path, uuidOrName);
     };
@@ -15681,6 +15689,78 @@ UsergridEventable.mixin = function(destObject) {
             });
         }
         return result;
+    };
+    UsergridHelpers.buildConnectionRequest = function(client, method, args) {
+        var options = {
+            client: client,
+            method: method,
+            entity: {},
+            to: {}
+        };
+        UsergridHelpers.assignPrefabOptions.call(options, args);
+        if (_.isObject(options.from)) {
+            options.to = options.from;
+        }
+        if (_.isObject(args[0]) && _.has(args[0], "entity") && _.has(args[0], "to")) {
+            _.assign(options.entity, args[0].entity);
+            options.relationship = _.get(args, "0.relationship");
+            _.assign(options.to, args[0].to);
+        }
+        if (_.isObject(args[0]) && !_.isFunction(args[0]) && _.isString(args[1])) {
+            _.assign(options.entity, args[0]);
+            options.relationship = _.first([ options.relationship, args[1] ].filter(_.isString));
+        }
+        if (_.isObject(args[2]) && !_.isFunction(args[2])) {
+            _.assign(options.to, args[2]);
+        }
+        options.entity.uuidOrName = _.first([ options.entity.uuidOrName, options.entity.uuid, options.entity.name, args[1] ].filter(_.isString));
+        if (!options.entity.type) {
+            options.entity.type = _.first([ options.entity.type, args[0] ].filter(_.isString));
+        }
+        options.relationship = _.first([ options.relationship, args[2] ].filter(_.isString));
+        if (_.isString(args[3]) && !isUUID(args[3]) && _.isString(args[4])) {
+            options.to.type = args[3];
+        } else if (_.isString(args[2]) && !isUUID(args[2]) && _.isString(args[3]) && _.isObject(args[0]) && !_.isFunction(args[0])) {
+            options.to.type = args[2];
+        }
+        options.to.uuidOrName = _.first([ options.to.uuidOrName, options.to.uuid, options.to.name, args[4], args[3], args[2] ].filter(function(property) {
+            return _.isString(options.to.type) && _.isString(property) || isUUID(property);
+        }));
+        if (!_.isString(options.entity.uuidOrName)) {
+            throw new Error('source entity "uuidOrName" is required when connecting or disconnecting entities');
+        }
+        if (!_.isString(options.to.uuidOrName)) {
+            throw new Error('target entity "uuidOrName" is required when connecting or disconnecting entities');
+        }
+        if (!_.isString(options.to.type) && !isUUID(options.to.uuidOrName)) {
+            throw new Error('target "type" (collection name) parameter is required connecting or disconnecting entities by name');
+        }
+        options.uri = UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, _.isString(options.entity.type) ? options.entity.type : "", _.isString(options.entity.uuidOrName) ? options.entity.uuidOrName : "", options.relationship, _.isString(options.to.type) ? options.to.type : "", _.isString(options.to.uuidOrName) ? options.to.uuidOrName : "");
+        return new UsergridRequest(options);
+    };
+    UsergridHelpers.buildGetConnectionRequest = function(client, args) {
+        var options = {
+            client: client,
+            method: "GET"
+        };
+        UsergridHelpers.assignPrefabOptions.call(options, args);
+        if (_.isObject(args[1]) && !_.isFunction(args[1])) {
+            _.assign(options, args[1]);
+        }
+        options.direction = _.first([ options.direction, args[0] ].filter(function(property) {
+            return property === UsergridDirection.IN || property === UsergridDirection.OUT;
+        }));
+        options.relationship = _.first([ options.relationship, args[3], args[2] ].filter(_.isString));
+        options.uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, args[2] ].filter(_.isString));
+        options.type = _.first([ options.type, args[1] ].filter(_.isString));
+        if (!_.isString(options.type)) {
+            throw new Error('"type" (collection name) parameter is required when retrieving connections');
+        }
+        if (!_.isString(options.uuidOrName)) {
+            throw new Error('target entity "uuidOrName" is required when retrieving connections');
+        }
+        options.uri = UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, _.isString(options.type) ? options.type : "", _.isString(options.uuidOrName) ? options.uuidOrName : "", options.direction, options.relationship);
+        return new UsergridRequest(options);
     };
     global[name] = UsergridHelpers;
     global[name].noConflict = function() {
@@ -15810,29 +15890,29 @@ var UsergridQuery = function(type) {
             var cursor = self._cursor;
             var requirementsString = self._ql;
             var encodedStringValue = undefined;
-            if (!_.isEmpty(limit)) {
-                queryString = "limit=" + limit;
+            if (limit !== undefined) {
+                encodedStringValue = "limit=" + limit;
             }
             if (!_.isEmpty(cursor)) {
                 var cursorString = "cursor=" + cursor;
-                if (_.isEmpty(queryString)) {
-                    queryString = cursorString;
+                if (_.isEmpty(encodedStringValue)) {
+                    encodedStringValue = cursorString;
                 } else {
-                    queryString += "&" + cursorString;
+                    encodedStringValue += "&" + cursorString;
                 }
             }
             if (!_.isEmpty(requirementsString)) {
                 var qLString = "ql=" + encodeURIComponent(requirementsString);
-                if (_.isEmpty(queryString)) {
-                    queryString = qLString;
+                if (_.isEmpty(encodedStringValue)) {
+                    encodedStringValue = qLString;
                 } else {
-                    queryString += "&" + qLString;
+                    encodedStringValue += "&" + qLString;
                 }
             }
-            if (!_.isEmpty(queryString)) {
-                queryString = "?" + queryString;
+            if (!_.isEmpty(encodedStringValue)) {
+                encodedStringValue = "?" + encodedStringValue;
             }
-            return !_.isEmpty(queryString) ? queryString : undefined;
+            return !_.isEmpty(encodedStringValue) ? encodedStringValue : undefined;
         }
     });
     Object.defineProperty(self, "and", {
@@ -16202,22 +16282,17 @@ UsergridClient.prototype = {
             body: UsergridHelpers.body(options)
         }), callback);
     },
-    connect: function(options, callback) {
+    connect: function() {
         var self = this;
-        return self.performRequest(new UsergridRequest({
-            client: self,
-            method: UsergridHttpMethod.POST,
-            uri: UsergridHelpers.uri(self, UsergridHttpMethod.POST, options),
-            query: options instanceof UsergridQuery ? options : options.query,
-            queryParams: options.queryParams,
-            body: UsergridHelpers.body(options)
-        }), callback);
+        return self.performRequest(UsergridHelpers.buildConnectionRequest(this, UsergridHttpMethod.POST, UsergridHelpers.flattenArgs(arguments)), UsergridHelpers.callback(arguments));
     },
     disconnect: function() {
-        return this.request(new UsergridRequest(helpers.build.connection(this, "DELETE", UsergridHelpers.flattenArgs(arguments))));
+        var self = this;
+        return self.performRequest(UsergridHelpers.buildConnectionRequest(this, UsergridHttpMethod.DELETE, UsergridHelpers.flattenArgs(arguments)), UsergridHelpers.callback(arguments));
     },
     getConnections: function() {
-        return this.request(new UsergridRequest(helpers.build.getConnections(this, UsergridHelpers.flattenArgs(arguments))));
+        var self = this;
+        return self.performRequest(UsergridHelpers.buildGetConnectionRequest(this, UsergridHelpers.flattenArgs(arguments)), UsergridHelpers.callback(arguments));
     },
     setAppAuth: function() {
         this.appAuth = new UsergridAppAuth(UsergridHelpers.flattenArgs(arguments));
@@ -17034,7 +17109,6 @@ var UsergridRequest = function(options) {
     self.uri = options.uri || UsergridHelpers.uri(client, options);
     self.headers = UsergridHelpers.headers(client, options);
     self.body = options.body || undefined;
-    self.encoding = options.encoding || null;
     self.query = options.query;
     if (self.query !== undefined) {
         self.uri += UsergridHelpers.normalize(self.query.encodedStringValue, {});
@@ -17046,9 +17120,14 @@ var UsergridRequest = function(options) {
         });
         self.uri = UsergridHelpers.normalize(self.uri, {});
     }
-    if (_.isPlainObject(self.body)) {
-        self.body = JSON.stringify(self.body);
-    }
+    try {
+        if (_.isPlainObject(self.body)) {
+            self.body = JSON.stringify(self.body);
+        }
+        if (_.isArray(self.body)) {
+            self.body = JSON.stringify(self.body);
+        }
+    } catch (exception) {}
     return self;
 };
 
@@ -17908,14 +17987,12 @@ UsergridEntity.prototype = {
         }
     },
     reload: function() {
-        var args = helpers.args(arguments);
-        var client = helpers.client.validate(args);
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = Usergrid.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.tempAuth = this.tempAuth;
-        this.tempAuth = undefined;
         client.GET(this, function(usergridResponse) {
             updateEntityFromRemote.call(this, usergridResponse);
-            callback(usergridResponse, this);
+            callback(usergridResponse);
         }.bind(this));
     },
     save: function() {

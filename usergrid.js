@@ -16226,7 +16226,10 @@ UsergridClient.prototype = {
             return promise;
         }.bind(self);
         var responsePromise = function(xmlRequest) {
-            return new UsergridResponse(xmlRequest);
+            var responseP = new Promise();
+            var usergridResponse = new UsergridResponse(xmlRequest);
+            responseP.done(usergridResponse);
+            return responseP;
         }.bind(self);
         var p = new Promise();
         var onComplete = function(response) {
@@ -17818,7 +17821,7 @@ var UsergridAuth = function(token, expiry) {
     var usingToken = token ? true : false;
     Object.defineProperty(self, "hasToken", {
         get: function() {
-            return self.token ? true : false;
+            return self.token !== undefined;
         },
         configurable: true
     });
@@ -18127,7 +18130,7 @@ UsergridUser.CheckAvailable = function() {
         throw new Error("'username' or 'email' property is required when checking for available users");
     }
     client.GET(checkQuery, function(usergridResponse) {
-        callback(usergridResponse, !(usergridResponse.entities.length > 0));
+        callback(usergridResponse, usergridResponse.entities.length > 0);
     });
 };
 
@@ -18141,7 +18144,7 @@ UsergridUser.prototype.uniqueId = function() {
 UsergridUser.prototype.create = function() {
     var self = this;
     var args = UsergridHelpers.flattenArgs(arguments);
-    var client = UsergridHelpers.flattenArgs(args);
+    var client = Usergrid.validateAndRetrieveClient(args);
     var callback = UsergridHelpers.callback(args);
     client.POST(self, function(usergridResponse) {
         delete self.password;
@@ -18176,20 +18179,25 @@ UsergridUser.prototype.logout = function() {
     var args = UsergridHelpers.flattenArgs(arguments);
     var callback = UsergridHelpers.callback(args);
     if (!self.auth || !self.auth.isValid) {
-        return callback({
-            name: "no_valid_token",
+        var response = new UsergridResponse();
+        response.error = new UsergridResponseError({
+            error: "no_valid_token",
             description: "this user does not have a valid token"
         });
+        return callback(response);
     }
     var revokeAll = _.first(args.filter(_.isBoolean)) || false;
     var revokeTokenPath = [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/");
+    var queryParams = undefined;
     if (!revokeAll) {
-        revokeTokenPath += "?ql=token=" + self.auth.token;
+        queryParams = {
+            token: self.auth.token
+        };
     }
     var client = Usergrid.validateAndRetrieveClient(args);
     return client.PUT({
         path: revokeTokenPath,
-        body: body
+        queryParams: queryParams
     }, function(usergridResponse) {
         self.auth.destroy();
         callback(usergridResponse);
@@ -19221,7 +19229,6 @@ var UsergridResponseError = function(responseErrorObject) {
 };
 
 var UsergridResponse = function(request) {
-    var p = new Promise();
     var self = this;
     self.ok = false;
     if (request) {
@@ -19267,8 +19274,7 @@ var UsergridResponse = function(request) {
             self.error = new UsergridResponseError(responseJSON);
         }
     }
-    p.done(this);
-    return p;
+    return self;
 };
 
 UsergridResponse.prototype = {

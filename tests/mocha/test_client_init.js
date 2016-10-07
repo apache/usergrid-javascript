@@ -1,6 +1,6 @@
 'use strict'
 
-describe('initialization', function() {
+describe('Client Initialization', function() {
     it('should fail to initialize without an orgId and appId', function() {
         should(function() {
             var client = new UsergridClient(null, null)

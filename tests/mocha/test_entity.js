@@ -454,21 +454,28 @@ describe('UsergridEntity', function() {
     describe('disconnect()', function() {
 
         var response,
+            entity1,
+            entity2,
             query = new UsergridQuery(config.test.collection).eq('name', 'testEntityConnectOne').or.eq('name', 'testEntityConnectTwo').asc('name')
 
         before(function(done) {
             client.GET(query, function(usergridResponse) {
                 response = usergridResponse
+                entity1 = response.first
+                entity2 = response.last
+                done()
+            })
+        })
+        after(function(done) {
+            var deleteQuery = new UsergridQuery(config.test.collection).eq('uuid', entity1.uuid).or.eq('uuid', entity2.uuid)
+            client.DELETE(deleteQuery, function (delResponse) {
+                delResponse.entities.should.be.an.Array().with.lengthOf(2)
                 done()
             })
         })
 
         it('should disconnect entities by passing a target UsergridEntity object as a parameter', function(done) {
-            var entity1 = response.first
-            var entity2 = response.last
-
             var relationship = "foos"
-
             entity1.disconnect(client, relationship, entity2, function(usergridResponse) {
                 usergridResponse.ok.should.be.true()
                 client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
@@ -479,11 +486,7 @@ describe('UsergridEntity', function() {
         })
 
         it('should disconnect entities by passing target uuid as a parameter', function(done) {
-            var entity1 = response.first
-            var entity2 = response.last
-
             var relationship = "bars"
-
             entity1.disconnect(client, relationship, entity2.uuid, function(usergridResponse) {
                 usergridResponse.ok.should.be.true()
                 client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
@@ -494,11 +497,7 @@ describe('UsergridEntity', function() {
         })
 
         it('should disconnect entities by passing target type and name as parameters', function(done) {
-            var entity1 = response.first
-            var entity2 = response.last
-
             var relationship = "bazzes"
-
             entity1.disconnect(client, relationship, entity2.type, entity2.name, function(usergridResponse) {
                 usergridResponse.ok.should.be.true()
                 client.getConnections(UsergridDirection.OUT, entity1, relationship, function(usergridResponse) {
@@ -509,12 +508,71 @@ describe('UsergridEntity', function() {
         })
 
         it('should fail to disconnect entities when specifying target name without type', function() {
-            var entity1 = response.first
-            var entity2 = response.last
-
             should(function() {
                 entity1.disconnect("fails", entity2.name, function() {})
             }).throw()
+        })
+    })
+
+    var assetEntity = new UsergridEntity({type: config.test.collection, name: "attachAssetTest"})
+
+    describe('attachAsset() and uploadAsset()', function(done) {
+
+        var testFile = 'http://localhost:63343/Javascript/tests/resources/images/apigee.png',
+            expectedContentLength = 6010,
+            expectedContentType = 'image/png',
+            asset
+
+        before(function (done) {
+            assetEntity.save(client, function(response){
+                response.ok.should.be.true()
+                assetEntity.should.have.property('uuid')
+                done()
+            })
+        })
+
+        before(function (done) {
+            var req = new XMLHttpRequest();
+            req.open('GET', testFile, true);
+            req.responseType = 'blob';
+            req.onload = function () {
+                asset = new UsergridAsset(req.response)
+                done();
+            }
+            req.onerror = function (err) {
+                console.error(err);
+                done();
+            };
+            req.send(null);
+        });
+
+        it('should attach a UsergridAsset to the entity', function(done) {
+            assetEntity.attachAsset(asset)
+            assetEntity.should.have.property('asset').equal(asset)
+            done()
+        })
+
+        it('should upload an image asset to the remote entity', function(done) {
+            assetEntity.uploadAsset(client, function(asset, usergridResponse, entity) {
+                entity.should.have.property('file-metadata')
+                entity['file-metadata'].should.have.property('content-length').equal(expectedContentLength)
+                entity['file-metadata'].should.have.property('content-type').equal(expectedContentType)
+                done()
+            })
+        })
+    })
+
+    describe('downloadAsset()', function(done) {
+
+        it('should download a an image from the remote entity', function(done) {
+            assetEntity.downloadAsset(client, function(asset, usergridResponse, entityWithAsset) {
+                entityWithAsset.should.have.property('asset').which.is.an.instanceof(UsergridAsset)
+                entityWithAsset.asset.should.have.property('contentType').equal(assetEntity['file-metadata']['content-type'])
+                entityWithAsset.asset.should.have.property('contentLength').equal(assetEntity['file-metadata']['content-length'])
+                // clean up the now un-needed asset entity
+                entityWithAsset.remove(client)
+                done()
+            })
         })
     })
 })

@@ -5342,7 +5342,7 @@ var UsergridQuerySortOrder = Object.freeze({
         } else if (_.get(args, "client")) {
             client = args.client;
         } else if (Usergrid.isInitialized) {
-            client = Usergrid.getInstance();
+            client = Usergrid;
         } else {
             throw new Error("this method requires either the Usergrid shared instance to be initialized or a UsergridClient instance as the first argument");
         }
@@ -5461,7 +5461,7 @@ var UsergridQuerySortOrder = Object.freeze({
         }
         return this;
     };
-    UsergridHelpers.normalize = function(str, options) {
+    UsergridHelpers.normalize = function(str) {
         str = str.replace(/:\//g, "://");
         str = str.replace(/([^:\s])\/+/g, "$1/");
         str = str.replace(/\/(\?|&|#[^!])/g, "$1");
@@ -5546,7 +5546,7 @@ var UsergridQuerySortOrder = Object.freeze({
     };
     UsergridHelpers.headers = function(client, options) {
         var headers = {
-            "User-Agent": "usergrid-js/v" + Usergrid.USERGRID_SDK_VERSION
+            "User-Agent": "usergrid-js/v" + UsergridSDKVersion
         };
         _.assign(headers, options.headers);
         var authForRequests = UsergridHelpers.authForRequests(client);
@@ -5556,24 +5556,6 @@ var UsergridQuerySortOrder = Object.freeze({
             });
         }
         return headers;
-    };
-    UsergridHelpers.formData = function(options) {
-        if (_.get(options, "asset.data")) {
-            var formData = {};
-            formData.file = {
-                value: options.asset.data,
-                options: {
-                    filename: _.get(options, "asset.filename") || "",
-                    contentType: _.get(options, "asset.contentType") || "application/octet-stream"
-                }
-            };
-            if (_.has(options, "asset.name")) {
-                formData.name = options.asset.name;
-            }
-            return formData;
-        } else {
-            return undefined;
-        }
     };
     UsergridHelpers.encode = function(data) {
         var result = "";
@@ -5714,94 +5696,6 @@ var UsergridClient = function(options) {
 };
 
 UsergridClient.prototype = {
-    performAssetDownloadRequest: function(usergridRequest, entity, callback) {
-        var req = new XMLHttpRequest();
-        req.open("GET", usergridRequest.uri, true);
-        req.setRequestHeader("Accept", _.get(entity, "file-metadata.content-type"));
-        req.responseType = "blob";
-        req.onload = function() {
-            entity.asset = new UsergridAsset(req.response);
-            UsergridHelpers.doCallback(callback, [ entity.asset, null, entity ]);
-        };
-        req.onerror = function(err) {
-            console.error(err);
-        };
-        req.send(null);
-        return usergridRequest;
-    },
-    performAssetUploadRequest: function(usergridRequest, entity, callback) {
-        var self = this;
-        var asset = usergridRequest.asset;
-        var xmlHttpRequest = new XMLHttpRequest();
-        xmlHttpRequest.open(usergridRequest.method, usergridRequest.uri, true);
-        xmlHttpRequest.onload = function(ev) {
-            var response = new UsergridResponse(xmlHttpRequest);
-            UsergridHelpers.updateEntityFromRemote(entity, response);
-            UsergridHelpers.doCallback(callback, [ asset, response, entity ]);
-        };
-        var formData = new FormData();
-        formData.append("file", asset.data);
-        xmlHttpRequest.send(formData);
-        return usergridRequest;
-    },
-    downloadAsset: function(entity, callback) {
-        var self = this;
-        var uploadRequest = new UsergridRequest({
-            client: self,
-            method: UsergridHttpMethod.GET,
-            uri: UsergridHelpers.uri(self, UsergridHttpMethod.GET, entity)
-        });
-        return self.performAssetDownloadRequest(uploadRequest, entity, callback);
-    },
-    uploadAsset: function(entity, asset, callback) {
-        var self = this;
-        var method = UsergridHttpMethod.PUT;
-        var uploadRequest = new UsergridRequest({
-            client: self,
-            method: method,
-            uri: UsergridHelpers.uri(self, method, entity),
-            asset: asset
-        });
-        return self.performAssetUploadRequest(uploadRequest, entity, callback);
-    },
-    performRequest: function(usergridRequest, callback) {
-        var self = this;
-        var requestPromise = function() {
-            var promise = new Promise();
-            var xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open(usergridRequest.method.toString(), usergridRequest.uri);
-            _.forOwn(usergridRequest.headers, function(value, key) {
-                xmlHttpRequest.setRequestHeader(key, value);
-            });
-            xmlHttpRequest.open = function(m, u) {
-                if (usergridRequest.body !== undefined) {
-                    xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
-                    xmlHttpRequest.setRequestHeader("Accept", "application/json");
-                }
-            };
-            xmlHttpRequest.onreadystatechange = function() {
-                if (this.readyState === XMLHttpRequest.DONE) {
-                    promise.done(xmlHttpRequest);
-                }
-            };
-            xmlHttpRequest.send(UsergridHelpers.encode(usergridRequest.body));
-            return promise;
-        }.bind(self);
-        var responsePromise = function(xmlRequest) {
-            var promise = new Promise();
-            var usergridResponse = new UsergridResponse(xmlRequest);
-            promise.done(usergridResponse);
-            return promise;
-        }.bind(self);
-        var onCompletePromise = function(response) {
-            var promise = new Promise();
-            response.request = usergridRequest;
-            promise.done(response);
-            UsergridHelpers.doCallback(callback, [ response ]);
-        }.bind(self);
-        Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
-        return usergridRequest;
-    },
     GET: function(options, callback) {
         var self = this;
         return self.performRequest(new UsergridRequest({
@@ -5877,8 +5771,8 @@ UsergridClient.prototype = {
                 if (!self.appAuth) {
                     self.appAuth = auth;
                 }
-                self.appAuth.token = usergridResponse.responseJSON.access_token;
-                var expiresIn = usergridResponse.responseJSON.expires_in;
+                self.appAuth.token = _.get(usergridResponse.responseJSON, "access_token");
+                var expiresIn = _.get(usergridResponse.responseJSON, "expires_in");
                 self.appAuth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
                 self.appAuth.tokenTtl = expiresIn;
             }
@@ -5915,14 +5809,96 @@ UsergridClient.prototype = {
             this.tempAuth = undefined;
         }
         return this;
+    },
+    downloadAsset: function(entity, callback) {
+        var self = this;
+        var uploadRequest = new UsergridRequest({
+            client: self,
+            method: UsergridHttpMethod.GET,
+            uri: UsergridHelpers.uri(self, UsergridHttpMethod.GET, entity)
+        });
+        return self.performAssetDownloadRequest(uploadRequest, entity, callback);
+    },
+    uploadAsset: function(entity, asset, callback) {
+        var self = this;
+        var method = UsergridHttpMethod.PUT;
+        var uploadRequest = new UsergridRequest({
+            client: self,
+            method: method,
+            uri: UsergridHelpers.uri(self, method, entity),
+            asset: asset
+        });
+        return self.performAssetUploadRequest(uploadRequest, entity, callback);
+    },
+    performRequest: function(usergridRequest, callback) {
+        var self = this;
+        var requestPromise = function() {
+            var promise = new Promise();
+            var xmlHttpRequest = new XMLHttpRequest();
+            xmlHttpRequest.open(usergridRequest.method.toString(), usergridRequest.uri);
+            _.forOwn(usergridRequest.headers, function(value, key) {
+                xmlHttpRequest.setRequestHeader(key, value);
+            });
+            xmlHttpRequest.open = function() {
+                if (usergridRequest.body !== undefined) {
+                    xmlHttpRequest.setRequestHeader("Content-Type", "application/json");
+                    xmlHttpRequest.setRequestHeader("Accept", "application/json");
+                }
+            };
+            xmlHttpRequest.onreadystatechange = function() {
+                if (this.readyState === XMLHttpRequest.DONE) {
+                    promise.done(xmlHttpRequest);
+                }
+            };
+            xmlHttpRequest.send(UsergridHelpers.encode(usergridRequest.body));
+            return promise;
+        }.bind(self);
+        var responsePromise = function(xmlRequest) {
+            var promise = new Promise();
+            var usergridResponse = new UsergridResponse(xmlRequest);
+            promise.done(usergridResponse);
+            return promise;
+        }.bind(self);
+        var onCompletePromise = function(response) {
+            var promise = new Promise();
+            response.request = usergridRequest;
+            promise.done(response);
+            UsergridHelpers.doCallback(callback, [ response ]);
+        }.bind(self);
+        Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
+        return usergridRequest;
+    },
+    performAssetDownloadRequest: function(usergridRequest, entity, callback) {
+        var req = new XMLHttpRequest();
+        req.open("GET", usergridRequest.uri, true);
+        req.setRequestHeader("Accept", _.get(entity, "file-metadata.content-type"));
+        req.responseType = "blob";
+        req.onload = function() {
+            entity.asset = new UsergridAsset(req.response);
+            UsergridHelpers.doCallback(callback, [ entity.asset, null, entity ]);
+        };
+        req.send(null);
+        return usergridRequest;
+    },
+    performAssetUploadRequest: function(usergridRequest, entity, callback) {
+        var asset = usergridRequest.asset;
+        var xmlHttpRequest = new XMLHttpRequest();
+        xmlHttpRequest.open(usergridRequest.method, usergridRequest.uri, true);
+        xmlHttpRequest.onload = function() {
+            var response = new UsergridResponse(xmlHttpRequest);
+            UsergridHelpers.updateEntityFromRemote(entity, response);
+            UsergridHelpers.doCallback(callback, [ asset, response, entity ]);
+        };
+        var formData = new FormData();
+        formData.append("file", asset.data);
+        xmlHttpRequest.send(formData);
+        return usergridRequest;
     }
 };
 
-window.console = window.console || {};
-
-window.console.log = window.console.log || function() {};
-
 "use strict";
+
+var UsergridSDKVersion = "2.0.0";
 
 var UsergridClientSharedInstance = function() {
     var self = this;
@@ -5946,9 +5922,7 @@ Usergrid.initSharedInstance = function(options) {
     return Usergrid;
 };
 
-Usergrid.init = function(options) {
-    return Usergrid.initSharedInstance(options);
-};
+Usergrid.init = Usergrid.initSharedInstance;
 
 "use strict";
 
@@ -6348,7 +6322,6 @@ UsergridEntity.prototype = {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        var self = this;
         client.downloadAsset(this, callback);
     },
     connect: function() {
@@ -6439,9 +6412,10 @@ UsergridUser.prototype.login = function() {
         if (usergridResponse.ok) {
             var responseJSON = usergridResponse.responseJSON;
             self.auth = new UsergridUserAuth(self);
-            self.auth.token = responseJSON.access_token;
-            self.auth.expiry = UsergridHelpers.calculateExpiry(responseJSON.expires_in);
-            self.auth.tokenTtl = responseJSON.expires_in;
+            self.auth.token = _.get(responseJSON, "access_token");
+            var expiresIn = _.get(responseJSON, "expires_in");
+            self.auth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
+            self.auth.tokenTtl = expiresIn;
         }
         callback(self.auth, self, usergridResponse);
     });
@@ -6537,7 +6511,7 @@ var UsergridResponse = function(request) {
                 responseJSON: _.cloneDeep(responseJSON)
             });
             if (_.has(responseJSON, "entities")) {
-                var entities = responseJSON.entities.map(function(en) {
+                var entities = _.map(responseJSON.entities, function(en) {
                     var entity = new UsergridEntity(en);
                     if (entity.isUser) {
                         entity = new UsergridUser(entity);
@@ -6587,13 +6561,15 @@ UsergridResponse.prototype = {
 
 "use strict";
 
+var UsergridAssetDefaultFileName = "file";
+
 var UsergridAsset = function(fileOrBlob) {
     if (!fileOrBlob instanceof File || !fileOrBlob instanceof Blob) {
         throw new Error("UsergridAsset must be initialized with a 'File' or 'Blob'");
     }
     var self = this;
     self.data = fileOrBlob;
-    self.filename = fileOrBlob.name || "file";
+    self.filename = fileOrBlob.name || UsergridAssetDefaultFileName;
     self.contentLength = fileOrBlob.size;
     self.contentType = fileOrBlob.type;
     return self;

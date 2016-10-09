@@ -12,7 +12,7 @@ var config = {
         "username": "authtest"
     }
 };
-var client = new UsergridClient({orgId: config.orgId, appId: config.appId});
+var client = Usergrid.initSharedInstance({orgId: config.orgId, appId: config.appId});
 
 var testFile = {
     uri:'https://raw.githubusercontent.com/apache/usergrid-javascript/master/tests/resources/images/apigee.png',

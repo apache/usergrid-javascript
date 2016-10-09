@@ -111,7 +111,7 @@ module.exports = function(grunt) {
             },
             "test": {
                 "options": {
-                    "port": 63343,
+                    "port": 8000,
                     "base": "."
                 }
             }
@@ -123,7 +123,7 @@ module.exports = function(grunt) {
         "mocha": {
             "test": {
                 "options": {
-                    "urls": [ 'http://localhost:63343/tests/mocha/index.html' ],
+                    "urls": [ 'http://localhost:<%= connect.test.options.port %>/tests/mocha/index.html' ],
                     "reporter": "Spec",
                     "threshold": 70,
                     "run":true

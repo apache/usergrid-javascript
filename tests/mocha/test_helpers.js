@@ -13,9 +13,9 @@ var config = {
     }
 }
 var client = new UsergridClient({orgId: config.orgId, appId: config.appId}),
-    testFile = 'http://localhost:63343/Javascript/tests/resources/images/apigee.png',
-    expectedContentLength = 6010,
-    expectedContentType = 'image/png'
+    testFile = 'http://placekitten.com/160/90',
+    expectedContentLength = 2921,
+    expectedContentType = 'image/jpeg'
 
 function randomWord() {
     var text = "";

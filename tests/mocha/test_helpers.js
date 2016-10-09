@@ -12,7 +12,10 @@ var config = {
         "username": "authtest"
     }
 }
-var client = new UsergridClient({orgId: config.orgId, appId: config.appId})
+var client = new UsergridClient({orgId: config.orgId, appId: config.appId}),
+    testFile = 'http://localhost:63343/Javascript/tests/resources/images/apigee.png',
+    expectedContentLength = 6010,
+    expectedContentType = 'image/png'
 
 function randomWord() {
     var text = "";

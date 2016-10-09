@@ -2,10 +2,7 @@
 
 
 describe('UsergridAsset', function() {
-    var testFile = 'http://localhost:63343/Javascript/tests/resources/images/apigee.png',
-        expectedContentLength = 6010,
-        expectedContentType = 'image/png',
-        asset
+    var asset
 
     describe('init from XMLHTTPRequest', function () {
         before(function (done) {

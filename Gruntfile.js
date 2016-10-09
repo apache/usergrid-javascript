@@ -21,6 +21,7 @@ module.exports = function(grunt) {
 		"lib/modules/Counter.js",
 		"lib/modules/Folder.js",
         "lib/modules/UsergridResponse.js",
+        "lib/modules/UsergridAsset.js",
         "lib/modules/Asset.js",
 		"lib/modules/Error.js"
     ];
@@ -110,7 +111,7 @@ module.exports = function(grunt) {
             },
             "test": {
                 "options": {
-                    "port": 8000,
+                    "port": 63343,
                     "base": "."
                 }
             }
@@ -122,7 +123,7 @@ module.exports = function(grunt) {
         "mocha": {
             "test": {
                 "options": {
-                    "urls": [ 'http://localhost:8000/tests/mocha/index.html' ],
+                    "urls": [ 'http://localhost:63343/tests/mocha/index.html' ],
                     "reporter": "Spec",
                     "threshold": 70,
                     "run":true

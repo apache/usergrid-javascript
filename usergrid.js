@@ -17,7 +17,7 @@
  *under the License.
  * 
  * 
- * usergrid@0.11.0 2016-10-08 
+ * usergrid@0.11.0 2016-10-09 
  */
 /*
  Licensed under the Apache License, Version 2.0 (the "License");

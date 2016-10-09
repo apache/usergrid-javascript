@@ -153,10 +153,7 @@ describe('UsergridResponse', function() {
         var firstResponse
 
         before(function (done) {
-
-            var query = new UsergridQuery(config.test.collection).limit(2)
-
-            client.GET(query, function (usergridResponse) {
+            client.GET({type:config.test.collection}, function (usergridResponse) {
                 firstResponse = usergridResponse
                 done()
             })
@@ -165,7 +162,7 @@ describe('UsergridResponse', function() {
         it('should load a new page of entities by passing an instance of UsergridClient', function (done) {
             firstResponse.loadNextPage(client, function (usergridResponse) {
                 usergridResponse.first.uuid.should.not.equal(firstResponse.first.uuid)
-                usergridResponse.entities.length.should.equal(2)
+                usergridResponse.entities.length.should.equal(10)
                 done()
             })
         })

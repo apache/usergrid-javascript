@@ -518,10 +518,7 @@ describe('UsergridEntity', function() {
 
     describe('attachAsset() and uploadAsset()', function(done) {
 
-        var testFile = 'http://localhost:63343/Javascript/tests/resources/images/apigee.png',
-            expectedContentLength = 6010,
-            expectedContentType = 'image/png',
-            asset
+        var asset
 
         before(function (done) {
             assetEntity.save(client, function(response){

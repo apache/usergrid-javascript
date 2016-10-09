@@ -530,7 +530,7 @@ describe('UsergridEntity', function() {
 
         before(function (done) {
             var req = new XMLHttpRequest();
-            req.open('GET', testFile, true);
+            req.open('GET', testFile.uri, true);
             req.responseType = 'blob';
             req.onload = function () {
                 asset = new UsergridAsset(req.response)
@@ -552,8 +552,8 @@ describe('UsergridEntity', function() {
         it('should upload an image asset to the remote entity', function(done) {
             assetEntity.uploadAsset(client, function(asset, usergridResponse, entity) {
                 entity.should.have.property('file-metadata')
-                entity['file-metadata'].should.have.property('content-length').equal(expectedContentLength)
-                entity['file-metadata'].should.have.property('content-type').equal(expectedContentType)
+                entity['file-metadata'].should.have.property('content-type').equal(testFile.contentType)
+                entity['file-metadata'].should.have.property('content-length').equal(testFile.contentLength)
                 done()
             })
         })

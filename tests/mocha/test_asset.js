@@ -7,7 +7,7 @@ describe('UsergridAsset', function() {
     describe('init from XMLHTTPRequest', function () {
         before(function (done) {
             var req = new XMLHttpRequest();
-            req.open('GET', testFile, true);
+            req.open('GET', testFile.uri, true);
             req.responseType = 'blob';
             req.onload = function () {
                 asset = new UsergridAsset(req.response)
@@ -25,11 +25,11 @@ describe('UsergridAsset', function() {
         })
 
         it('asset.contentType should be inferred from Blob', function () {
-            asset.contentType.should.equal(expectedContentType)
+            asset.contentType.should.equal(testFile.contentType)
         })
 
-        it('asset.contentLength should be ' + expectedContentLength + ' bytes', function () {
-            asset.contentLength.should.equal(expectedContentLength)
+        it('asset.contentLength should be ' + testFile.contentLength + ' bytes', function () {
+            asset.contentLength.should.equal(testFile.contentLength)
         })
     })
 
@@ -51,8 +51,8 @@ describe('UsergridAsset', function() {
                 entityWithAsset.uuid.should.be.equal(entity.uuid)
                 entityWithAsset.name.should.be.equal(entity.name)
                 entityWithAsset.should.have.property('file-metadata')
-                entityWithAsset['file-metadata'].should.have.property('content-type').equal(expectedContentType)
-                entityWithAsset['file-metadata'].should.have.property('content-length').equal(expectedContentLength)
+                entityWithAsset['file-metadata'].should.have.property('content-type').equal(testFile.contentType)
+                entityWithAsset['file-metadata'].should.have.property('content-length').equal(testFile.contentLength)
                 done()
             })
         })
@@ -85,8 +85,8 @@ describe('UsergridAsset', function() {
                 entityWithAsset.uuid.should.be.equal(entity.uuid)
                 entityWithAsset.name.should.be.equal(entity.name)
                 entityWithAsset.should.have.property('file-metadata')
-                entityWithAsset['file-metadata'].should.have.property('content-type').equal(expectedContentType)
-                entityWithAsset['file-metadata'].should.have.property('content-length').equal(expectedContentLength)
+                entityWithAsset['file-metadata'].should.have.property('content-type').equal(testFile.contentType)
+                entityWithAsset['file-metadata'].should.have.property('content-length').equal(testFile.contentLength)
                 done()
             })
         })

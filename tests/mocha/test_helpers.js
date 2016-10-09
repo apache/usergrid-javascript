@@ -11,11 +11,14 @@ var config = {
         "password": "P@ssw0rd",
         "username": "authtest"
     }
-}
-var client = new UsergridClient({orgId: config.orgId, appId: config.appId}),
-    testFile = 'http://placekitten.com/160/90',
-    expectedContentLength = 2921,
-    expectedContentType = 'image/jpeg'
+};
+var client = new UsergridClient({orgId: config.orgId, appId: config.appId});
+
+var testFile = {
+    uri:'https://raw.githubusercontent.com/apache/usergrid-javascript/master/tests/resources/images/apigee.png',
+    contentLength: 6010,
+    contentType: 'image/png'
+};
 
 function randomWord() {
     var text = "";

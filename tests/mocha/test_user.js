@@ -63,7 +63,6 @@ describe('UsergridUser', function() {
                 password: config.test.password
             })
             user.create(client, function (usergridResponse) {
-                client.isSharedInstance.should.be.false()
                 user.username.should.equal(username)
                 user.should.have.property('uuid')//.which.is.a.uuid()
                 user.should.have.property('created')

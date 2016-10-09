@@ -46,66 +46,66 @@ function usergridTestHarness(err, data, done, tests, ignoreError) {
 	}
 	done();
 }
-describe('Ajax', function() {
-    var client = getClient();
-    var dogName="dog"+Math.floor(Math.random()*10000);
-    var dogData=JSON.stringify({type:"dog",name:dogName});
-    var dogURI=client.clientAppURL + '/dogs';
-
-    // client.authenticateApp(function(response){
-    //     assert(response.ok,"response should be ok")
-    //     assert(client.appAuth.isValid,"client appAuth should be valid")
-    //     done()
-    // })
-    // client.logout().destory()
-    // console.log(client.appAuth instanceof UsergridAuth)
-    // console.log("BEFORE DESTROY:" + client.appAuth.expiry)
-    // client.appAuth.destroy()
-    // console.log("AFTER: DESTROY" + client.appAuth.expiry)
-
-    // console.log("Client Id=" + client.appAuth.clientId + " Client Secret=" + client.appAuth.clientSecret)
-
-    it('should POST to a URI ' + dogURI, function(done){
-        // appAuth.destroy()
-        Ajax.post(dogURI, dogData).then(function(data){
-            assert(data, data);
-            done();
-        })
-    })
-    it('should GET a URI',function(done){
-        Ajax.get(dogURI+'/'+dogName).then(function(data){
-            assert(data, data);
-            done();
-        })
-    })
-    it('should PUT to a URI',function(done){
-        Ajax.put(dogURI+'/'+dogName, {"favorite":true}).then(function(data){
-            assert(data, data);
-            done();
-        })
-    })
-    it('should DELETE a URI',function(done){
-        Ajax.delete(dogURI+'/'+dogName, dogData).then(function(data){
-            assert(data, data);
-            done();
-        })
-    })
-});
-describe('UsergridError', function() {
-    var errorResponse={
-        "error":"service_resource_not_found",
-        "timestamp":1392067967144,
-        "duration":0,
-        "exception":"org.usergrid.services.exceptions.ServiceResourceNotFoundException",
-        "error_description":"Service resource not found"
-    };
-    it('should unmarshal a response from Usergrid into a proper Javascript error',function(done){
-        var error = UsergridError.fromResponse(errorResponse);
-        assert(error.name===errorResponse.error, "Error name not set correctly");
-        assert(error.message===errorResponse.error_description, "Error message not set correctly");
-        done();
-    });
-});
+// describe('Ajax', function() {
+//     var client = getClient();
+//     var dogName="dog"+Math.floor(Math.random()*10000);
+//     var dogData=JSON.stringify({type:"dog",name:dogName});
+//     var dogURI=client.clientAppURL + '/dogs';
+//
+//     // client.authenticateApp(function(response){
+//     //     assert(response.ok,"response should be ok")
+//     //     assert(client.appAuth.isValid,"client appAuth should be valid")
+//     //     done()
+//     // })
+//     // client.logout().destory()
+//     // console.log(client.appAuth instanceof UsergridAuth)
+//     // console.log("BEFORE DESTROY:" + client.appAuth.expiry)
+//     // client.appAuth.destroy()
+//     // console.log("AFTER: DESTROY" + client.appAuth.expiry)
+//
+//     // console.log("Client Id=" + client.appAuth.clientId + " Client Secret=" + client.appAuth.clientSecret)
+//
+//     it('should POST to a URI ' + dogURI, function(done){
+//         // appAuth.destroy()
+//         Ajax.post(dogURI, dogData).then(function(data){
+//             assert(data, data);
+//             done();
+//         })
+//     })
+//     it('should GET a URI',function(done){
+//         Ajax.get(dogURI+'/'+dogName).then(function(data){
+//             assert(data, data);
+//             done();
+//         })
+//     })
+//     it('should PUT to a URI',function(done){
+//         Ajax.put(dogURI+'/'+dogName, {"favorite":true}).then(function(data){
+//             assert(data, data);
+//             done();
+//         })
+//     })
+//     it('should DELETE a URI',function(done){
+//         Ajax.delete(dogURI+'/'+dogName, dogData).then(function(data){
+//             assert(data, data);
+//             done();
+//         })
+//     })
+// });
+// describe('UsergridError', function() {
+//     var errorResponse={
+//         "error":"service_resource_not_found",
+//         "timestamp":1392067967144,
+//         "duration":0,
+//         "exception":"org.usergrid.services.exceptions.ServiceResourceNotFoundException",
+//         "error_description":"Service resource not found"
+//     };
+//     it('should unmarshal a response from Usergrid into a proper Javascript error',function(done){
+//         var error = UsergridError.fromResponse(errorResponse);
+//         assert(error.name===errorResponse.error, "Error name not set correctly");
+//         assert(error.message===errorResponse.error_description, "Error message not set correctly");
+//         done();
+//     });
+// });
 describe('Usergrid', function() {
     describe('SDK Version', function () {
         it('should contain a minimum SDK version', function () {

@@ -19,151 +19,6 @@
  * 
  * usergrid@0.11.0 2016-10-09 
  */
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
-var UsergridAuthMode = Object.freeze({
-    NONE: "none",
-    USER: "user",
-    APP: "app"
-});
-
-var UsergridDirection = Object.freeze({
-    IN: "connecting",
-    OUT: "connections"
-});
-
-var UsergridHttpMethod = Object.freeze({
-    GET: "GET",
-    PUT: "PUT",
-    POST: "POST",
-    DELETE: "DELETE"
-});
-
-var UsergridQueryOperator = Object.freeze({
-    EQUAL: "=",
-    GREATER_THAN: ">",
-    GREATER_THAN_EQUAL_TO: ">=",
-    LESS_THAN: "<",
-    LESS_THAN_EQUAL_TO: "<="
-});
-
-var UsergridQuerySortOrder = Object.freeze({
-    ASC: "asc",
-    DESC: "desc"
-});
-
-var UsergridEventable = function() {
-    throw Error("'UsergridEventable' is not intended to be invoked directly");
-};
-
-UsergridEventable.prototype = {
-    bind: function(event, fn) {
-        this._events = this._events || {};
-        this._events[event] = this._events[event] || [];
-        this._events[event].push(fn);
-    },
-    unbind: function(event, fn) {
-        this._events = this._events || {};
-        if (event in this._events === false) return;
-        this._events[event].splice(this._events[event].indexOf(fn), 1);
-    },
-    trigger: function(event) {
-        this._events = this._events || {};
-        if (event in this._events === false) return;
-        for (var i = 0; i < this._events[event].length; i++) {
-            this._events[event][i].apply(this, Array.prototype.slice.call(arguments, 1));
-        }
-    }
-};
-
-UsergridEventable.mixin = function(destObject) {
-    var props = [ "bind", "unbind", "trigger" ];
-    for (var i = 0; i < props.length; i++) {
-        if (props[i] in destObject.prototype) {
-            console.warn("overwriting '" + props[i] + "' on '" + destObject.name + "'.");
-            console.warn("the previous version can be found at '_" + props[i] + "' on '" + destObject.name + "'.");
-            destObject.prototype["_" + props[i]] = destObject.prototype[props[i]];
-        }
-        destObject.prototype[props[i]] = UsergridEventable.prototype[props[i]];
-    }
-};
-
-(function() {
-    var name = "Logger", global = this, overwrittenName = global[name], exports;
-    /* logging */
-    function Logger(name) {
-        this.logEnabled = true;
-        this.init(name, true);
-    }
-    Logger.METHODS = [ "log", "error", "warn", "info", "debug", "assert", "clear", "count", "dir", "dirxml", "exception", "group", "groupCollapsed", "groupEnd", "profile", "profileEnd", "table", "time", "timeEnd", "trace" ];
-    Logger.prototype.init = function(name, logEnabled) {
-        this.name = name || "UNKNOWN";
-        this.logEnabled = logEnabled || true;
-        var addMethod = function(method) {
-            this[method] = this.createLogMethod(method);
-        }.bind(this);
-        Logger.METHODS.forEach(addMethod);
-    };
-    Logger.prototype.createLogMethod = function(method) {
-        return Logger.prototype.log.bind(this, method);
-    };
-    Logger.prototype.prefix = function(method, args) {
-        var prepend = "[" + method.toUpperCase() + "][" + name + "]:	";
-        if ([ "log", "error", "warn", "info" ].indexOf(method) !== -1) {
-            if ("string" === typeof args[0]) {
-                args[0] = prepend + args[0];
-            } else {
-                args.unshift(prepend);
-            }
-        }
-        return args;
-    };
-    Logger.prototype.log = function() {
-        var args = [].slice.call(arguments);
-        var method = args.shift();
-        if (Logger.METHODS.indexOf(method) === -1) {
-            method = "log";
-        }
-        if (!(this.logEnabled && console && console[method])) return;
-        args = this.prefix(method, args);
-        console[method].apply(console, args);
-    };
-    Logger.prototype.setLogEnabled = function(logEnabled) {
-        this.logEnabled = logEnabled || true;
-    };
-    Logger.mixin = function(destObject) {
-        destObject.__logger = new Logger(destObject.name || "UNKNOWN");
-        var addMethod = function(method) {
-            if (method in destObject.prototype) {
-                console.warn("overwriting '" + method + "' on '" + destObject.name + "'.");
-                console.warn("the previous version can be found at '_" + method + "' on '" + destObject.name + "'.");
-                destObject.prototype["_" + method] = destObject.prototype[method];
-            }
-            destObject.prototype[method] = destObject.__logger.createLogMethod(method);
-        };
-        Logger.METHODS.forEach(addMethod);
-    };
-    global[name] = Logger;
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
-        }
-        return Logger;
-    };
-    return global[name];
-})();
-
 (function(global) {
     var name = "Promise", overwrittenName = global[name], exports;
     function Promise() {
@@ -234,193 +89,59 @@ UsergridEventable.mixin = function(destObject) {
 })(this);
 
 (function() {
-    var name = "Ajax", global = this, overwrittenName = global[name], exports;
-    function partial() {
-        var args = Array.prototype.slice.call(arguments);
-        var fn = args.shift();
-        return fn.bind(this, args);
-    }
-    function Ajax() {
-        this.logger = new global.Logger(name);
-        var self = this;
-        function encode(data) {
-            var result = "";
-            if (typeof data === "string") {
-                result = data;
-            } else {
-                var e = encodeURIComponent;
-                for (var i in data) {
-                    if (data.hasOwnProperty(i)) {
-                        result += "&" + e(i) + "=" + e(data[i]);
-                    }
-                }
-            }
-            return result;
-        }
-        function request(m, u, d) {
-            var p = new Promise(), timeout;
-            self.logger.time(m + " " + u);
-            (function(xhr) {
-                xhr.onreadystatechange = function() {
-                    if (this.readyState === 4) {
-                        self.logger.timeEnd(m + " " + u);
-                        clearTimeout(timeout);
-                        p.done(this);
-                    }
-                };
-                xhr.onerror = function(response) {
-                    clearTimeout(timeout);
-                    p.done(response);
-                };
-                xhr.oncomplete = function(response) {
-                    clearTimeout(timeout);
-                    self.logger.timeEnd(m + " " + u);
-                    self.info("%s request to %s returned %s", m, u, this.status);
-                };
-                xhr.open(m, u);
-                if (d) {
-                    if ("object" === typeof d) {
-                        d = JSON.stringify(d);
-                    }
-                    xhr.setRequestHeader("Content-Type", "application/json");
-                    xhr.setRequestHeader("Accept", "application/json");
-                }
-                timeout = setTimeout(function() {
-                    xhr.abort();
-                    p.done("API Call timed out.", null);
-                }, 3e4);
-                xhr.send(encode(d));
-            })(new XMLHttpRequest());
-            return p;
-        }
-        this.request = request;
-        this.get = partial(request, "GET");
-        this.post = partial(request, "POST");
-        this.put = partial(request, "PUT");
-        this.delete = partial(request, "DELETE");
-    }
-    global[name] = new Ajax();
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
-        }
-        return exports;
-    };
-    return global[name];
-})();
-
-(function() {
-    /** Used as a safe reference for `undefined` in pre-ES5 environments. */
     var undefined;
-    /** Used as the semantic version number. */
     var VERSION = "4.16.0";
-    /** Used as the size to enable large array optimizations. */
     var LARGE_ARRAY_SIZE = 200;
-    /** Used as the `TypeError` message for "Functions" methods. */
     var FUNC_ERROR_TEXT = "Expected a function";
-    /** Used to stand-in for `undefined` hash values. */
     var HASH_UNDEFINED = "__lodash_hash_undefined__";
-    /** Used as the maximum memoize cache size. */
     var MAX_MEMOIZE_SIZE = 500;
-    /** Used as the internal argument placeholder. */
     var PLACEHOLDER = "__lodash_placeholder__";
-    /** Used to compose bitmasks for function metadata. */
     var BIND_FLAG = 1, BIND_KEY_FLAG = 2, CURRY_BOUND_FLAG = 4, CURRY_FLAG = 8, CURRY_RIGHT_FLAG = 16, PARTIAL_FLAG = 32, PARTIAL_RIGHT_FLAG = 64, ARY_FLAG = 128, REARG_FLAG = 256, FLIP_FLAG = 512;
-    /** Used to compose bitmasks for comparison styles. */
     var UNORDERED_COMPARE_FLAG = 1, PARTIAL_COMPARE_FLAG = 2;
-    /** Used as default options for `_.truncate`. */
     var DEFAULT_TRUNC_LENGTH = 30, DEFAULT_TRUNC_OMISSION = "...";
-    /** Used to detect hot functions by number of calls within a span of milliseconds. */
     var HOT_COUNT = 500, HOT_SPAN = 16;
-    /** Used to indicate the type of lazy iteratees. */
     var LAZY_FILTER_FLAG = 1, LAZY_MAP_FLAG = 2, LAZY_WHILE_FLAG = 3;
-    /** Used as references for various `Number` constants. */
     var INFINITY = 1 / 0, MAX_SAFE_INTEGER = 9007199254740991, MAX_INTEGER = 1.7976931348623157e308, NAN = 0 / 0;
-    /** Used as references for the maximum length and index of an array. */
     var MAX_ARRAY_LENGTH = 4294967295, MAX_ARRAY_INDEX = MAX_ARRAY_LENGTH - 1, HALF_MAX_ARRAY_LENGTH = MAX_ARRAY_LENGTH >>> 1;
-    /** Used to associate wrap methods with their bit flags. */
     var wrapFlags = [ [ "ary", ARY_FLAG ], [ "bind", BIND_FLAG ], [ "bindKey", BIND_KEY_FLAG ], [ "curry", CURRY_FLAG ], [ "curryRight", CURRY_RIGHT_FLAG ], [ "flip", FLIP_FLAG ], [ "partial", PARTIAL_FLAG ], [ "partialRight", PARTIAL_RIGHT_FLAG ], [ "rearg", REARG_FLAG ] ];
-    /** `Object#toString` result references. */
     var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]", weakSetTag = "[object WeakSet]";
     var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
-    /** Used to match empty string literals in compiled template source. */
     var reEmptyStringLeading = /\b__p \+= '';/g, reEmptyStringMiddle = /\b(__p \+=) '' \+/g, reEmptyStringTrailing = /(__e\(.*?\)|\b__t\)) \+\n'';/g;
-    /** Used to match HTML entities and HTML characters. */
     var reEscapedHtml = /&(?:amp|lt|gt|quot|#39|#96);/g, reUnescapedHtml = /[&<>"'`]/g, reHasEscapedHtml = RegExp(reEscapedHtml.source), reHasUnescapedHtml = RegExp(reUnescapedHtml.source);
-    /** Used to match template delimiters. */
     var reEscape = /<%-([\s\S]+?)%>/g, reEvaluate = /<%([\s\S]+?)%>/g, reInterpolate = /<%=([\s\S]+?)%>/g;
-    /** Used to match property names within property paths. */
     var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/, reLeadingDot = /^\./, rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
-    /**
-   * Used to match `RegExp`
-   * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
-   */
     var reRegExpChar = /[\\^$.*+?()[\]{}|]/g, reHasRegExpChar = RegExp(reRegExpChar.source);
-    /** Used to match leading and trailing whitespace. */
     var reTrim = /^\s+|\s+$/g, reTrimStart = /^\s+/, reTrimEnd = /\s+$/;
-    /** Used to match wrap detail comments. */
     var reWrapComment = /\{(?:\n\/\* \[wrapped with .+\] \*\/)?\n?/, reWrapDetails = /\{\n\/\* \[wrapped with (.+)\] \*/, reSplitDetails = /,? & /;
-    /** Used to match words composed of alphanumeric characters. */
     var reAsciiWord = /[^\x00-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]+/g;
-    /** Used to match backslashes in property paths. */
     var reEscapeChar = /\\(\\)?/g;
-    /**
-   * Used to match
-   * [ES template delimiters](http://ecma-international.org/ecma-262/7.0/#sec-template-literal-lexical-components).
-   */
     var reEsTemplate = /\$\{([^\\}]*(?:\\.[^\\}]*)*)\}/g;
-    /** Used to match `RegExp` flags from their coerced string values. */
     var reFlags = /\w*$/;
-    /** Used to detect bad signed hexadecimal string values. */
     var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
-    /** Used to detect binary string values. */
     var reIsBinary = /^0b[01]+$/i;
-    /** Used to detect host constructors (Safari). */
     var reIsHostCtor = /^\[object .+?Constructor\]$/;
-    /** Used to detect octal string values. */
     var reIsOctal = /^0o[0-7]+$/i;
-    /** Used to detect unsigned integer values. */
     var reIsUint = /^(?:0|[1-9]\d*)$/;
-    /** Used to match Latin Unicode letters (excluding mathematical operators). */
     var reLatin = /[\xc0-\xd6\xd8-\xf6\xf8-\xff\u0100-\u017f]/g;
-    /** Used to ensure capturing order of template delimiters. */
     var reNoMatch = /($^)/;
-    /** Used to match unescaped characters in compiled string literals. */
     var reUnescapedString = /['\n\r\u2028\u2029\\]/g;
-    /** Used to compose unicode character classes. */
     var rsAstralRange = "\\ud800-\\udfff", rsComboMarksRange = "\\u0300-\\u036f\\ufe20-\\ufe23", rsComboSymbolsRange = "\\u20d0-\\u20f0", rsDingbatRange = "\\u2700-\\u27bf", rsLowerRange = "a-z\\xdf-\\xf6\\xf8-\\xff", rsMathOpRange = "\\xac\\xb1\\xd7\\xf7", rsNonCharRange = "\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\xbf", rsPunctuationRange = "\\u2000-\\u206f", rsSpaceRange = " \\t\\x0b\\f\\xa0\\ufeff\\n\\r\\u2028\\u2029\\u1680\\u180e\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u202f\\u205f\\u3000", rsUpperRange = "A-Z\\xc0-\\xd6\\xd8-\\xde", rsVarRange = "\\ufe0e\\ufe0f", rsBreakRange = rsMathOpRange + rsNonCharRange + rsPunctuationRange + rsSpaceRange;
-    /** Used to compose unicode capture groups. */
     var rsApos = "['’]", rsAstral = "[" + rsAstralRange + "]", rsBreak = "[" + rsBreakRange + "]", rsCombo = "[" + rsComboMarksRange + rsComboSymbolsRange + "]", rsDigits = "\\d+", rsDingbat = "[" + rsDingbatRange + "]", rsLower = "[" + rsLowerRange + "]", rsMisc = "[^" + rsAstralRange + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]", rsFitz = "\\ud83c[\\udffb-\\udfff]", rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")", rsNonAstral = "[^" + rsAstralRange + "]", rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsUpper = "[" + rsUpperRange + "]", rsZWJ = "\\u200d";
-    /** Used to compose unicode regexes. */
     var rsLowerMisc = "(?:" + rsLower + "|" + rsMisc + ")", rsUpperMisc = "(?:" + rsUpper + "|" + rsMisc + ")", rsOptLowerContr = "(?:" + rsApos + "(?:d|ll|m|re|s|t|ve))?", rsOptUpperContr = "(?:" + rsApos + "(?:D|LL|M|RE|S|T|VE))?", reOptMod = rsModifier + "?", rsOptVar = "[" + rsVarRange + "]?", rsOptJoin = "(?:" + rsZWJ + "(?:" + [ rsNonAstral, rsRegional, rsSurrPair ].join("|") + ")" + rsOptVar + reOptMod + ")*", rsSeq = rsOptVar + reOptMod + rsOptJoin, rsEmoji = "(?:" + [ rsDingbat, rsRegional, rsSurrPair ].join("|") + ")" + rsSeq, rsSymbol = "(?:" + [ rsNonAstral + rsCombo + "?", rsCombo, rsRegional, rsSurrPair, rsAstral ].join("|") + ")";
-    /** Used to match apostrophes. */
     var reApos = RegExp(rsApos, "g");
-    /**
-   * Used to match [combining diacritical marks](https://en.wikipedia.org/wiki/Combining_Diacritical_Marks) and
-   * [combining diacritical marks for symbols](https://en.wikipedia.org/wiki/Combining_Diacritical_Marks_for_Symbols).
-   */
     var reComboMark = RegExp(rsCombo, "g");
-    /** Used to match [string symbols](https://mathiasbynens.be/notes/javascript-unicode). */
     var reUnicode = RegExp(rsFitz + "(?=" + rsFitz + ")|" + rsSymbol + rsSeq, "g");
-    /** Used to match complex or compound words. */
     var reUnicodeWord = RegExp([ rsUpper + "?" + rsLower + "+" + rsOptLowerContr + "(?=" + [ rsBreak, rsUpper, "$" ].join("|") + ")", rsUpperMisc + "+" + rsOptUpperContr + "(?=" + [ rsBreak, rsUpper + rsLowerMisc, "$" ].join("|") + ")", rsUpper + "?" + rsLowerMisc + "+" + rsOptLowerContr, rsUpper + "+" + rsOptUpperContr, rsDigits, rsEmoji ].join("|"), "g");
-    /** Used to detect strings with [zero-width joiners or code points from the astral planes](http://eev.ee/blog/2015/09/12/dark-corners-of-unicode/). */
     var reHasUnicode = RegExp("[" + rsZWJ + rsAstralRange + rsComboMarksRange + rsComboSymbolsRange + rsVarRange + "]");
-    /** Used to detect strings that need a more robust regexp to match words. */
     var reHasUnicodeWord = /[a-z][A-Z]|[A-Z]{2,}[a-z]|[0-9][a-zA-Z]|[a-zA-Z][0-9]|[^a-zA-Z0-9 ]/;
-    /** Used to assign default `context` object properties. */
     var contextProps = [ "Array", "Buffer", "DataView", "Date", "Error", "Float32Array", "Float64Array", "Function", "Int8Array", "Int16Array", "Int32Array", "Map", "Math", "Object", "Promise", "RegExp", "Set", "String", "Symbol", "TypeError", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "WeakMap", "_", "clearTimeout", "isFinite", "parseInt", "setTimeout" ];
-    /** Used to make template sourceURLs easier to identify. */
     var templateCounter = -1;
-    /** Used to identify `toStringTag` values of typed arrays. */
     var typedArrayTags = {};
     typedArrayTags[float32Tag] = typedArrayTags[float64Tag] = typedArrayTags[int8Tag] = typedArrayTags[int16Tag] = typedArrayTags[int32Tag] = typedArrayTags[uint8Tag] = typedArrayTags[uint8ClampedTag] = typedArrayTags[uint16Tag] = typedArrayTags[uint32Tag] = true;
     typedArrayTags[argsTag] = typedArrayTags[arrayTag] = typedArrayTags[arrayBufferTag] = typedArrayTags[boolTag] = typedArrayTags[dataViewTag] = typedArrayTags[dateTag] = typedArrayTags[errorTag] = typedArrayTags[funcTag] = typedArrayTags[mapTag] = typedArrayTags[numberTag] = typedArrayTags[objectTag] = typedArrayTags[regexpTag] = typedArrayTags[setTag] = typedArrayTags[stringTag] = typedArrayTags[weakMapTag] = false;
-    /** Used to identify `toStringTag` values supported by `_.clone`. */
     var cloneableTags = {};
     cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
     cloneableTags[errorTag] = cloneableTags[funcTag] = cloneableTags[weakMapTag] = false;
-    /** Used to map Latin Unicode letters to basic Latin letters. */
     var deburredLetters = {
         "À": "A",
         "Á": "A",
@@ -613,7 +334,6 @@ UsergridEventable.mixin = function(destObject) {
         "ŉ": "'n",
         "ſ": "s"
     };
-    /** Used to map characters to HTML entities. */
     var htmlEscapes = {
         "&": "&amp;",
         "<": "&lt;",
@@ -621,7 +341,6 @@ UsergridEventable.mixin = function(destObject) {
         '"': "&quot;",
         "'": "&#39;"
     };
-    /** Used to map HTML entities to characters. */
     var htmlUnescapes = {
         "&amp;": "&",
         "&lt;": "<",
@@ -629,7 +348,6 @@ UsergridEventable.mixin = function(destObject) {
         "&quot;": '"',
         "&#39;": "'"
     };
-    /** Used to escape characters for inclusion in compiled string literals. */
     var stringEscapes = {
         "\\": "\\",
         "'": "'",
@@ -638,65 +356,28 @@ UsergridEventable.mixin = function(destObject) {
         "\u2028": "u2028",
         "\u2029": "u2029"
     };
-    /** Built-in method references without a dependency on `root`. */
     var freeParseFloat = parseFloat, freeParseInt = parseInt;
-    /** Detect free variable `global` from Node.js. */
     var freeGlobal = typeof global == "object" && global && global.Object === Object && global;
-    /** Detect free variable `self`. */
     var freeSelf = typeof self == "object" && self && self.Object === Object && self;
-    /** Used as a reference to the global object. */
     var root = freeGlobal || freeSelf || Function("return this")();
-    /** Detect free variable `exports`. */
     var freeExports = typeof exports == "object" && exports && !exports.nodeType && exports;
-    /** Detect free variable `module`. */
     var freeModule = freeExports && typeof module == "object" && module && !module.nodeType && module;
-    /** Detect the popular CommonJS extension `module.exports`. */
     var moduleExports = freeModule && freeModule.exports === freeExports;
-    /** Detect free variable `process` from Node.js. */
     var freeProcess = moduleExports && freeGlobal.process;
-    /** Used to access faster Node.js helpers. */
     var nodeUtil = function() {
         try {
             return freeProcess && freeProcess.binding("util");
         } catch (e) {}
     }();
-    /* Node.js helper references. */
     var nodeIsArrayBuffer = nodeUtil && nodeUtil.isArrayBuffer, nodeIsDate = nodeUtil && nodeUtil.isDate, nodeIsMap = nodeUtil && nodeUtil.isMap, nodeIsRegExp = nodeUtil && nodeUtil.isRegExp, nodeIsSet = nodeUtil && nodeUtil.isSet, nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
-    /*--------------------------------------------------------------------------*/
-    /**
-   * Adds the key-value `pair` to `map`.
-   *
-   * @private
-   * @param {Object} map The map to modify.
-   * @param {Array} pair The key-value pair to add.
-   * @returns {Object} Returns `map`.
-   */
     function addMapEntry(map, pair) {
         map.set(pair[0], pair[1]);
         return map;
     }
-    /**
-   * Adds `value` to `set`.
-   *
-   * @private
-   * @param {Object} set The set to modify.
-   * @param {*} value The value to add.
-   * @returns {Object} Returns `set`.
-   */
     function addSetEntry(set, value) {
         set.add(value);
         return set;
     }
-    /**
-   * A faster alternative to `Function#apply`, this function invokes `func`
-   * with the `this` binding of `thisArg` and the arguments of `args`.
-   *
-   * @private
-   * @param {Function} func The function to invoke.
-   * @param {*} thisArg The `this` binding of `func`.
-   * @param {Array} args The arguments to invoke `func` with.
-   * @returns {*} Returns the result of `func`.
-   */
     function apply(func, thisArg, args) {
         switch (args.length) {
           case 0:
@@ -713,16 +394,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return func.apply(thisArg, args);
     }
-    /**
-   * A specialized version of `baseAggregator` for arrays.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} setter The function to set `accumulator` values.
-   * @param {Function} iteratee The iteratee to transform keys.
-   * @param {Object} accumulator The initial aggregated object.
-   * @returns {Function} Returns `accumulator`.
-   */
     function arrayAggregator(array, setter, iteratee, accumulator) {
         var index = -1, length = array ? array.length : 0;
         while (++index < length) {
@@ -731,15 +402,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return accumulator;
     }
-    /**
-   * A specialized version of `_.forEach` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns `array`.
-   */
     function arrayEach(array, iteratee) {
         var index = -1, length = array ? array.length : 0;
         while (++index < length) {
@@ -749,15 +411,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return array;
     }
-    /**
-   * A specialized version of `_.forEachRight` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns `array`.
-   */
     function arrayEachRight(array, iteratee) {
         var length = array ? array.length : 0;
         while (length--) {
@@ -767,16 +420,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return array;
     }
-    /**
-   * A specialized version of `_.every` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} predicate The function invoked per iteration.
-   * @returns {boolean} Returns `true` if all elements pass the predicate check,
-   *  else `false`.
-   */
     function arrayEvery(array, predicate) {
         var index = -1, length = array ? array.length : 0;
         while (++index < length) {
@@ -786,15 +429,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return true;
     }
-    /**
-   * A specialized version of `_.filter` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} predicate The function invoked per iteration.
-   * @returns {Array} Returns the new filtered array.
-   */
     function arrayFilter(array, predicate) {
         var index = -1, length = array ? array.length : 0, resIndex = 0, result = [];
         while (++index < length) {
@@ -805,28 +439,10 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * A specialized version of `_.includes` for arrays without support for
-   * specifying an index to search from.
-   *
-   * @private
-   * @param {Array} [array] The array to inspect.
-   * @param {*} target The value to search for.
-   * @returns {boolean} Returns `true` if `target` is found, else `false`.
-   */
     function arrayIncludes(array, value) {
         var length = array ? array.length : 0;
         return !!length && baseIndexOf(array, value, 0) > -1;
     }
-    /**
-   * This function is like `arrayIncludes` except that it accepts a comparator.
-   *
-   * @private
-   * @param {Array} [array] The array to inspect.
-   * @param {*} target The value to search for.
-   * @param {Function} comparator The comparator invoked per element.
-   * @returns {boolean} Returns `true` if `target` is found, else `false`.
-   */
     function arrayIncludesWith(array, value, comparator) {
         var index = -1, length = array ? array.length : 0;
         while (++index < length) {
@@ -836,15 +452,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return false;
     }
-    /**
-   * A specialized version of `_.map` for arrays without support for iteratee
-   * shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns the new mapped array.
-   */
     function arrayMap(array, iteratee) {
         var index = -1, length = array ? array.length : 0, result = Array(length);
         while (++index < length) {
@@ -852,14 +459,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * Appends the elements of `values` to `array`.
-   *
-   * @private
-   * @param {Array} array The array to modify.
-   * @param {Array} values The values to append.
-   * @returns {Array} Returns `array`.
-   */
     function arrayPush(array, values) {
         var index = -1, length = values.length, offset = array.length;
         while (++index < length) {
@@ -867,18 +466,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return array;
     }
-    /**
-   * A specialized version of `_.reduce` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @param {*} [accumulator] The initial value.
-   * @param {boolean} [initAccum] Specify using the first element of `array` as
-   *  the initial value.
-   * @returns {*} Returns the accumulated value.
-   */
     function arrayReduce(array, iteratee, accumulator, initAccum) {
         var index = -1, length = array ? array.length : 0;
         if (initAccum && length) {
@@ -889,18 +476,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return accumulator;
     }
-    /**
-   * A specialized version of `_.reduceRight` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @param {*} [accumulator] The initial value.
-   * @param {boolean} [initAccum] Specify using the last element of `array` as
-   *  the initial value.
-   * @returns {*} Returns the accumulated value.
-   */
     function arrayReduceRight(array, iteratee, accumulator, initAccum) {
         var length = array ? array.length : 0;
         if (initAccum && length) {
@@ -911,16 +486,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return accumulator;
     }
-    /**
-   * A specialized version of `_.some` for arrays without support for iteratee
-   * shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} predicate The function invoked per iteration.
-   * @returns {boolean} Returns `true` if any element passes the predicate check,
-   *  else `false`.
-   */
     function arraySome(array, predicate) {
         var index = -1, length = array ? array.length : 0;
         while (++index < length) {
@@ -930,45 +495,13 @@ UsergridEventable.mixin = function(destObject) {
         }
         return false;
     }
-    /**
-   * Gets the size of an ASCII `string`.
-   *
-   * @private
-   * @param {string} string The string inspect.
-   * @returns {number} Returns the string size.
-   */
     var asciiSize = baseProperty("length");
-    /**
-   * Converts an ASCII `string` to an array.
-   *
-   * @private
-   * @param {string} string The string to convert.
-   * @returns {Array} Returns the converted array.
-   */
     function asciiToArray(string) {
         return string.split("");
     }
-    /**
-   * Splits an ASCII `string` into an array of its words.
-   *
-   * @private
-   * @param {string} The string to inspect.
-   * @returns {Array} Returns the words of `string`.
-   */
     function asciiWords(string) {
         return string.match(reAsciiWord) || [];
     }
-    /**
-   * The base implementation of methods like `_.findKey` and `_.findLastKey`,
-   * without support for iteratee shorthands, which iterates over `collection`
-   * using `eachFunc`.
-   *
-   * @private
-   * @param {Array|Object} collection The collection to inspect.
-   * @param {Function} predicate The function invoked per iteration.
-   * @param {Function} eachFunc The function to iterate over `collection`.
-   * @returns {*} Returns the found element or its key, else `undefined`.
-   */
     function baseFindKey(collection, predicate, eachFunc) {
         var result;
         eachFunc(collection, function(value, key, collection) {
@@ -979,17 +512,6 @@ UsergridEventable.mixin = function(destObject) {
         });
         return result;
     }
-    /**
-   * The base implementation of `_.findIndex` and `_.findLastIndex` without
-   * support for iteratee shorthands.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {Function} predicate The function invoked per iteration.
-   * @param {number} fromIndex The index to search from.
-   * @param {boolean} [fromRight] Specify iterating from right to left.
-   * @returns {number} Returns the index of the matched value, else `-1`.
-   */
     function baseFindIndex(array, predicate, fromIndex, fromRight) {
         var length = array.length, index = fromIndex + (fromRight ? 1 : -1);
         while (fromRight ? index-- : ++index < length) {
@@ -999,28 +521,9 @@ UsergridEventable.mixin = function(destObject) {
         }
         return -1;
     }
-    /**
-   * The base implementation of `_.indexOf` without `fromIndex` bounds checks.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {*} value The value to search for.
-   * @param {number} fromIndex The index to search from.
-   * @returns {number} Returns the index of the matched value, else `-1`.
-   */
     function baseIndexOf(array, value, fromIndex) {
         return value === value ? strictIndexOf(array, value, fromIndex) : baseFindIndex(array, baseIsNaN, fromIndex);
     }
-    /**
-   * This function is like `baseIndexOf` except that it accepts a comparator.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {*} value The value to search for.
-   * @param {number} fromIndex The index to search from.
-   * @param {Function} comparator The comparator invoked per element.
-   * @returns {number} Returns the index of the matched value, else `-1`.
-   */
     function baseIndexOfWith(array, value, fromIndex, comparator) {
         var index = fromIndex - 1, length = array.length;
         while (++index < length) {
@@ -1030,82 +533,29 @@ UsergridEventable.mixin = function(destObject) {
         }
         return -1;
     }
-    /**
-   * The base implementation of `_.isNaN` without support for number objects.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is `NaN`, else `false`.
-   */
     function baseIsNaN(value) {
         return value !== value;
     }
-    /**
-   * The base implementation of `_.mean` and `_.meanBy` without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} array The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {number} Returns the mean.
-   */
     function baseMean(array, iteratee) {
         var length = array ? array.length : 0;
         return length ? baseSum(array, iteratee) / length : NAN;
     }
-    /**
-   * The base implementation of `_.property` without support for deep paths.
-   *
-   * @private
-   * @param {string} key The key of the property to get.
-   * @returns {Function} Returns the new accessor function.
-   */
     function baseProperty(key) {
         return function(object) {
             return object == null ? undefined : object[key];
         };
     }
-    /**
-   * The base implementation of `_.propertyOf` without support for deep paths.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @returns {Function} Returns the new accessor function.
-   */
     function basePropertyOf(object) {
         return function(key) {
             return object == null ? undefined : object[key];
         };
     }
-    /**
-   * The base implementation of `_.reduce` and `_.reduceRight`, without support
-   * for iteratee shorthands, which iterates over `collection` using `eachFunc`.
-   *
-   * @private
-   * @param {Array|Object} collection The collection to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @param {*} accumulator The initial value.
-   * @param {boolean} initAccum Specify using the first or last element of
-   *  `collection` as the initial value.
-   * @param {Function} eachFunc The function to iterate over `collection`.
-   * @returns {*} Returns the accumulated value.
-   */
     function baseReduce(collection, iteratee, accumulator, initAccum, eachFunc) {
         eachFunc(collection, function(value, index, collection) {
             accumulator = initAccum ? (initAccum = false, value) : iteratee(accumulator, value, index, collection);
         });
         return accumulator;
     }
-    /**
-   * The base implementation of `_.sortBy` which uses `comparer` to define the
-   * sort order of `array` and replaces criteria objects with their corresponding
-   * values.
-   *
-   * @private
-   * @param {Array} array The array to sort.
-   * @param {Function} comparer The function to define sort order.
-   * @returns {Array} Returns `array`.
-   */
     function baseSortBy(array, comparer) {
         var length = array.length;
         array.sort(comparer);
@@ -1114,15 +564,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return array;
     }
-    /**
-   * The base implementation of `_.sum` and `_.sumBy` without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} array The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {number} Returns the sum.
-   */
     function baseSum(array, iteratee) {
         var result, index = -1, length = array.length;
         while (++index < length) {
@@ -1133,15 +574,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * The base implementation of `_.times` without support for iteratee shorthands
-   * or max array length checks.
-   *
-   * @private
-   * @param {number} n The number of times to invoke `iteratee`.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns the array of results.
-   */
     function baseTimes(n, iteratee) {
         var index = -1, result = Array(n);
         while (++index < n) {
@@ -1149,94 +581,34 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * The base implementation of `_.toPairs` and `_.toPairsIn` which creates an array
-   * of key-value pairs for `object` corresponding to the property names of `props`.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @param {Array} props The property names to get values for.
-   * @returns {Object} Returns the key-value pairs.
-   */
     function baseToPairs(object, props) {
         return arrayMap(props, function(key) {
             return [ key, object[key] ];
         });
     }
-    /**
-   * The base implementation of `_.unary` without support for storing metadata.
-   *
-   * @private
-   * @param {Function} func The function to cap arguments for.
-   * @returns {Function} Returns the new capped function.
-   */
     function baseUnary(func) {
         return function(value) {
             return func(value);
         };
     }
-    /**
-   * The base implementation of `_.values` and `_.valuesIn` which creates an
-   * array of `object` property values corresponding to the property names
-   * of `props`.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @param {Array} props The property names to get values for.
-   * @returns {Object} Returns the array of property values.
-   */
     function baseValues(object, props) {
         return arrayMap(props, function(key) {
             return object[key];
         });
     }
-    /**
-   * Checks if a `cache` value for `key` exists.
-   *
-   * @private
-   * @param {Object} cache The cache to query.
-   * @param {string} key The key of the entry to check.
-   * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
-   */
     function cacheHas(cache, key) {
         return cache.has(key);
     }
-    /**
-   * Used by `_.trim` and `_.trimStart` to get the index of the first string symbol
-   * that is not found in the character symbols.
-   *
-   * @private
-   * @param {Array} strSymbols The string symbols to inspect.
-   * @param {Array} chrSymbols The character symbols to find.
-   * @returns {number} Returns the index of the first unmatched string symbol.
-   */
     function charsStartIndex(strSymbols, chrSymbols) {
         var index = -1, length = strSymbols.length;
         while (++index < length && baseIndexOf(chrSymbols, strSymbols[index], 0) > -1) {}
         return index;
     }
-    /**
-   * Used by `_.trim` and `_.trimEnd` to get the index of the last string symbol
-   * that is not found in the character symbols.
-   *
-   * @private
-   * @param {Array} strSymbols The string symbols to inspect.
-   * @param {Array} chrSymbols The character symbols to find.
-   * @returns {number} Returns the index of the last unmatched string symbol.
-   */
     function charsEndIndex(strSymbols, chrSymbols) {
         var index = strSymbols.length;
         while (index-- && baseIndexOf(chrSymbols, strSymbols[index], 0) > -1) {}
         return index;
     }
-    /**
-   * Gets the number of `placeholder` occurrences in `array`.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {*} placeholder The placeholder to search for.
-   * @returns {number} Returns the placeholder count.
-   */
     function countHolders(array, placeholder) {
         var length = array.length, result = 0;
         while (length--) {
@@ -1246,71 +618,20 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * Used by `_.deburr` to convert Latin-1 Supplement and Latin Extended-A
-   * letters to basic Latin letters.
-   *
-   * @private
-   * @param {string} letter The matched letter to deburr.
-   * @returns {string} Returns the deburred letter.
-   */
     var deburrLetter = basePropertyOf(deburredLetters);
-    /**
-   * Used by `_.escape` to convert characters to HTML entities.
-   *
-   * @private
-   * @param {string} chr The matched character to escape.
-   * @returns {string} Returns the escaped character.
-   */
     var escapeHtmlChar = basePropertyOf(htmlEscapes);
-    /**
-   * Used by `_.template` to escape characters for inclusion in compiled string literals.
-   *
-   * @private
-   * @param {string} chr The matched character to escape.
-   * @returns {string} Returns the escaped character.
-   */
     function escapeStringChar(chr) {
         return "\\" + stringEscapes[chr];
     }
-    /**
-   * Gets the value at `key` of `object`.
-   *
-   * @private
-   * @param {Object} [object] The object to query.
-   * @param {string} key The key of the property to get.
-   * @returns {*} Returns the property value.
-   */
     function getValue(object, key) {
         return object == null ? undefined : object[key];
     }
-    /**
-   * Checks if `string` contains Unicode symbols.
-   *
-   * @private
-   * @param {string} string The string to inspect.
-   * @returns {boolean} Returns `true` if a symbol is found, else `false`.
-   */
     function hasUnicode(string) {
         return reHasUnicode.test(string);
     }
-    /**
-   * Checks if `string` contains a word composed of Unicode symbols.
-   *
-   * @private
-   * @param {string} string The string to inspect.
-   * @returns {boolean} Returns `true` if a word is found, else `false`.
-   */
     function hasUnicodeWord(string) {
         return reHasUnicodeWord.test(string);
     }
-    /**
-   * Converts `iterator` to an array.
-   *
-   * @private
-   * @param {Object} iterator The iterator to convert.
-   * @returns {Array} Returns the converted array.
-   */
     function iteratorToArray(iterator) {
         var data, result = [];
         while (!(data = iterator.next()).done) {
@@ -1318,13 +639,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * Converts `map` to its key-value pairs.
-   *
-   * @private
-   * @param {Object} map The map to convert.
-   * @returns {Array} Returns the key-value pairs.
-   */
     function mapToArray(map) {
         var index = -1, result = Array(map.size);
         map.forEach(function(value, key) {
@@ -1332,28 +646,11 @@ UsergridEventable.mixin = function(destObject) {
         });
         return result;
     }
-    /**
-   * Creates a unary function that invokes `func` with its argument transformed.
-   *
-   * @private
-   * @param {Function} func The function to wrap.
-   * @param {Function} transform The argument transform.
-   * @returns {Function} Returns the new function.
-   */
     function overArg(func, transform) {
         return function(arg) {
             return func(transform(arg));
         };
     }
-    /**
-   * Replaces all `placeholder` elements in `array` with an internal placeholder
-   * and returns an array of their indexes.
-   *
-   * @private
-   * @param {Array} array The array to modify.
-   * @param {*} placeholder The placeholder to replace.
-   * @returns {Array} Returns the new array of placeholder indexes.
-   */
     function replaceHolders(array, placeholder) {
         var index = -1, length = array.length, resIndex = 0, result = [];
         while (++index < length) {
@@ -1365,13 +662,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * Converts `set` to an array of its values.
-   *
-   * @private
-   * @param {Object} set The set to convert.
-   * @returns {Array} Returns the values.
-   */
     function setToArray(set) {
         var index = -1, result = Array(set.size);
         set.forEach(function(value) {
@@ -1379,13 +669,6 @@ UsergridEventable.mixin = function(destObject) {
         });
         return result;
     }
-    /**
-   * Converts `set` to its value-value pairs.
-   *
-   * @private
-   * @param {Object} set The set to convert.
-   * @returns {Array} Returns the value-value pairs.
-   */
     function setToPairs(set) {
         var index = -1, result = Array(set.size);
         set.forEach(function(value) {
@@ -1393,16 +676,6 @@ UsergridEventable.mixin = function(destObject) {
         });
         return result;
     }
-    /**
-   * A specialized version of `_.indexOf` which performs strict equality
-   * comparisons of values, i.e. `===`.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {*} value The value to search for.
-   * @param {number} fromIndex The index to search from.
-   * @returns {number} Returns the index of the matched value, else `-1`.
-   */
     function strictIndexOf(array, value, fromIndex) {
         var index = fromIndex - 1, length = array.length;
         while (++index < length) {
@@ -1412,16 +685,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return -1;
     }
-    /**
-   * A specialized version of `_.lastIndexOf` which performs strict equality
-   * comparisons of values, i.e. `===`.
-   *
-   * @private
-   * @param {Array} array The array to inspect.
-   * @param {*} value The value to search for.
-   * @param {number} fromIndex The index to search from.
-   * @returns {number} Returns the index of the matched value, else `-1`.
-   */
     function strictLastIndexOf(array, value, fromIndex) {
         var index = fromIndex + 1;
         while (index--) {
@@ -1431,41 +694,13 @@ UsergridEventable.mixin = function(destObject) {
         }
         return index;
     }
-    /**
-   * Gets the number of symbols in `string`.
-   *
-   * @private
-   * @param {string} string The string to inspect.
-   * @returns {number} Returns the string size.
-   */
     function stringSize(string) {
         return hasUnicode(string) ? unicodeSize(string) : asciiSize(string);
     }
-    /**
-   * Converts `string` to an array.
-   *
-   * @private
-   * @param {string} string The string to convert.
-   * @returns {Array} Returns the converted array.
-   */
     function stringToArray(string) {
         return hasUnicode(string) ? unicodeToArray(string) : asciiToArray(string);
     }
-    /**
-   * Used by `_.unescape` to convert HTML entities to characters.
-   *
-   * @private
-   * @param {string} chr The matched character to unescape.
-   * @returns {string} Returns the unescaped character.
-   */
     var unescapeHtmlChar = basePropertyOf(htmlUnescapes);
-    /**
-   * Gets the size of a Unicode `string`.
-   *
-   * @private
-   * @param {string} string The string inspect.
-   * @returns {number} Returns the string size.
-   */
     function unicodeSize(string) {
         var result = reUnicode.lastIndex = 0;
         while (reUnicode.test(string)) {
@@ -1473,221 +708,36 @@ UsergridEventable.mixin = function(destObject) {
         }
         return result;
     }
-    /**
-   * Converts a Unicode `string` to an array.
-   *
-   * @private
-   * @param {string} string The string to convert.
-   * @returns {Array} Returns the converted array.
-   */
     function unicodeToArray(string) {
         return string.match(reUnicode) || [];
     }
-    /**
-   * Splits a Unicode `string` into an array of its words.
-   *
-   * @private
-   * @param {string} The string to inspect.
-   * @returns {Array} Returns the words of `string`.
-   */
     function unicodeWords(string) {
         return string.match(reUnicodeWord) || [];
     }
-    /*--------------------------------------------------------------------------*/
-    /**
-   * Create a new pristine `lodash` function using the `context` object.
-   *
-   * @static
-   * @memberOf _
-   * @since 1.1.0
-   * @category Util
-   * @param {Object} [context=root] The context object.
-   * @returns {Function} Returns a new `lodash` function.
-   * @example
-   *
-   * _.mixin({ 'foo': _.constant('foo') });
-   *
-   * var lodash = _.runInContext();
-   * lodash.mixin({ 'bar': lodash.constant('bar') });
-   *
-   * _.isFunction(_.foo);
-   * // => true
-   * _.isFunction(_.bar);
-   * // => false
-   *
-   * lodash.isFunction(lodash.foo);
-   * // => false
-   * lodash.isFunction(lodash.bar);
-   * // => true
-   *
-   * // Create a suped-up `defer` in Node.js.
-   * var defer = _.runInContext({ 'setTimeout': setImmediate }).defer;
-   */
     function runInContext(context) {
         context = context ? _.defaults(root.Object(), context, _.pick(root, contextProps)) : root;
-        /** Built-in constructor references. */
         var Array = context.Array, Date = context.Date, Error = context.Error, Function = context.Function, Math = context.Math, Object = context.Object, RegExp = context.RegExp, String = context.String, TypeError = context.TypeError;
-        /** Used for built-in method references. */
         var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
-        /** Used to detect overreaching core-js shims. */
         var coreJsData = context["__core-js_shared__"];
-        /** Used to detect methods masquerading as native. */
         var maskSrcKey = function() {
             var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
             return uid ? "Symbol(src)_1." + uid : "";
         }();
-        /** Used to resolve the decompiled source of functions. */
         var funcToString = funcProto.toString;
-        /** Used to check objects for own properties. */
         var hasOwnProperty = objectProto.hasOwnProperty;
-        /** Used to generate unique IDs. */
         var idCounter = 0;
-        /** Used to infer the `Object` constructor. */
         var objectCtorString = funcToString.call(Object);
-        /**
-     * Used to resolve the
-     * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
-     * of values.
-     */
         var objectToString = objectProto.toString;
-        /** Used to restore the original `_` reference in `_.noConflict`. */
         var oldDash = root._;
-        /** Used to detect if a method is native. */
         var reIsNative = RegExp("^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$");
-        /** Built-in value references. */
         var Buffer = moduleExports ? context.Buffer : undefined, Symbol = context.Symbol, Uint8Array = context.Uint8Array, defineProperty = Object.defineProperty, getPrototype = overArg(Object.getPrototypeOf, Object), iteratorSymbol = Symbol ? Symbol.iterator : undefined, objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
-        /** Mocked built-ins. */
         var ctxClearTimeout = context.clearTimeout !== root.clearTimeout && context.clearTimeout, ctxNow = Date && Date.now !== root.Date.now && Date.now, ctxSetTimeout = context.setTimeout !== root.setTimeout && context.setTimeout;
-        /* Built-in method references for those with the same name as other `lodash` methods. */
         var nativeCeil = Math.ceil, nativeFloor = Math.floor, nativeGetSymbols = Object.getOwnPropertySymbols, nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined, nativeIsFinite = context.isFinite, nativeJoin = arrayProto.join, nativeKeys = overArg(Object.keys, Object), nativeMax = Math.max, nativeMin = Math.min, nativeNow = Date.now, nativeParseInt = context.parseInt, nativeRandom = Math.random, nativeReverse = arrayProto.reverse;
-        /* Built-in method references that are verified to be native. */
         var DataView = getNative(context, "DataView"), Map = getNative(context, "Map"), Promise = getNative(context, "Promise"), Set = getNative(context, "Set"), WeakMap = getNative(context, "WeakMap"), nativeCreate = getNative(Object, "create"), nativeDefineProperty = getNative(Object, "defineProperty");
-        /** Used to store function metadata. */
         var metaMap = WeakMap && new WeakMap();
-        /** Used to lookup unminified function names. */
         var realNames = {};
-        /** Used to detect maps, sets, and weakmaps. */
         var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map), promiseCtorString = toSource(Promise), setCtorString = toSource(Set), weakMapCtorString = toSource(WeakMap);
-        /** Used to convert symbols to primitives and strings. */
         var symbolProto = Symbol ? Symbol.prototype : undefined, symbolValueOf = symbolProto ? symbolProto.valueOf : undefined, symbolToString = symbolProto ? symbolProto.toString : undefined;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a `lodash` object which wraps `value` to enable implicit method
-     * chain sequences. Methods that operate on and return arrays, collections,
-     * and functions can be chained together. Methods that retrieve a single value
-     * or may return a primitive value will automatically end the chain sequence
-     * and return the unwrapped value. Otherwise, the value must be unwrapped
-     * with `_#value`.
-     *
-     * Explicit chain sequences, which must be unwrapped with `_#value`, may be
-     * enabled using `_.chain`.
-     *
-     * The execution of chained methods is lazy, that is, it's deferred until
-     * `_#value` is implicitly or explicitly called.
-     *
-     * Lazy evaluation allows several methods to support shortcut fusion.
-     * Shortcut fusion is an optimization to merge iteratee calls; this avoids
-     * the creation of intermediate arrays and can greatly reduce the number of
-     * iteratee executions. Sections of a chain sequence qualify for shortcut
-     * fusion if the section is applied to an array of at least `200` elements
-     * and any iteratees accept only one argument. The heuristic for whether a
-     * section qualifies for shortcut fusion is subject to change.
-     *
-     * Chaining is supported in custom builds as long as the `_#value` method is
-     * directly or indirectly included in the build.
-     *
-     * In addition to lodash methods, wrappers have `Array` and `String` methods.
-     *
-     * The wrapper `Array` methods are:
-     * `concat`, `join`, `pop`, `push`, `shift`, `sort`, `splice`, and `unshift`
-     *
-     * The wrapper `String` methods are:
-     * `replace` and `split`
-     *
-     * The wrapper methods that support shortcut fusion are:
-     * `at`, `compact`, `drop`, `dropRight`, `dropWhile`, `filter`, `find`,
-     * `findLast`, `head`, `initial`, `last`, `map`, `reject`, `reverse`, `slice`,
-     * `tail`, `take`, `takeRight`, `takeRightWhile`, `takeWhile`, and `toArray`
-     *
-     * The chainable wrapper methods are:
-     * `after`, `ary`, `assign`, `assignIn`, `assignInWith`, `assignWith`, `at`,
-     * `before`, `bind`, `bindAll`, `bindKey`, `castArray`, `chain`, `chunk`,
-     * `commit`, `compact`, `concat`, `conforms`, `constant`, `countBy`, `create`,
-     * `curry`, `debounce`, `defaults`, `defaultsDeep`, `defer`, `delay`,
-     * `difference`, `differenceBy`, `differenceWith`, `drop`, `dropRight`,
-     * `dropRightWhile`, `dropWhile`, `extend`, `extendWith`, `fill`, `filter`,
-     * `flatMap`, `flatMapDeep`, `flatMapDepth`, `flatten`, `flattenDeep`,
-     * `flattenDepth`, `flip`, `flow`, `flowRight`, `fromPairs`, `functions`,
-     * `functionsIn`, `groupBy`, `initial`, `intersection`, `intersectionBy`,
-     * `intersectionWith`, `invert`, `invertBy`, `invokeMap`, `iteratee`, `keyBy`,
-     * `keys`, `keysIn`, `map`, `mapKeys`, `mapValues`, `matches`, `matchesProperty`,
-     * `memoize`, `merge`, `mergeWith`, `method`, `methodOf`, `mixin`, `negate`,
-     * `nthArg`, `omit`, `omitBy`, `once`, `orderBy`, `over`, `overArgs`,
-     * `overEvery`, `overSome`, `partial`, `partialRight`, `partition`, `pick`,
-     * `pickBy`, `plant`, `property`, `propertyOf`, `pull`, `pullAll`, `pullAllBy`,
-     * `pullAllWith`, `pullAt`, `push`, `range`, `rangeRight`, `rearg`, `reject`,
-     * `remove`, `rest`, `reverse`, `sampleSize`, `set`, `setWith`, `shuffle`,
-     * `slice`, `sort`, `sortBy`, `splice`, `spread`, `tail`, `take`, `takeRight`,
-     * `takeRightWhile`, `takeWhile`, `tap`, `throttle`, `thru`, `toArray`,
-     * `toPairs`, `toPairsIn`, `toPath`, `toPlainObject`, `transform`, `unary`,
-     * `union`, `unionBy`, `unionWith`, `uniq`, `uniqBy`, `uniqWith`, `unset`,
-     * `unshift`, `unzip`, `unzipWith`, `update`, `updateWith`, `values`,
-     * `valuesIn`, `without`, `wrap`, `xor`, `xorBy`, `xorWith`, `zip`,
-     * `zipObject`, `zipObjectDeep`, and `zipWith`
-     *
-     * The wrapper methods that are **not** chainable by default are:
-     * `add`, `attempt`, `camelCase`, `capitalize`, `ceil`, `clamp`, `clone`,
-     * `cloneDeep`, `cloneDeepWith`, `cloneWith`, `conformsTo`, `deburr`,
-     * `defaultTo`, `divide`, `each`, `eachRight`, `endsWith`, `eq`, `escape`,
-     * `escapeRegExp`, `every`, `find`, `findIndex`, `findKey`, `findLast`,
-     * `findLastIndex`, `findLastKey`, `first`, `floor`, `forEach`, `forEachRight`,
-     * `forIn`, `forInRight`, `forOwn`, `forOwnRight`, `get`, `gt`, `gte`, `has`,
-     * `hasIn`, `head`, `identity`, `includes`, `indexOf`, `inRange`, `invoke`,
-     * `isArguments`, `isArray`, `isArrayBuffer`, `isArrayLike`, `isArrayLikeObject`,
-     * `isBoolean`, `isBuffer`, `isDate`, `isElement`, `isEmpty`, `isEqual`,
-     * `isEqualWith`, `isError`, `isFinite`, `isFunction`, `isInteger`, `isLength`,
-     * `isMap`, `isMatch`, `isMatchWith`, `isNaN`, `isNative`, `isNil`, `isNull`,
-     * `isNumber`, `isObject`, `isObjectLike`, `isPlainObject`, `isRegExp`,
-     * `isSafeInteger`, `isSet`, `isString`, `isUndefined`, `isTypedArray`,
-     * `isWeakMap`, `isWeakSet`, `join`, `kebabCase`, `last`, `lastIndexOf`,
-     * `lowerCase`, `lowerFirst`, `lt`, `lte`, `max`, `maxBy`, `mean`, `meanBy`,
-     * `min`, `minBy`, `multiply`, `noConflict`, `noop`, `now`, `nth`, `pad`,
-     * `padEnd`, `padStart`, `parseInt`, `pop`, `random`, `reduce`, `reduceRight`,
-     * `repeat`, `result`, `round`, `runInContext`, `sample`, `shift`, `size`,
-     * `snakeCase`, `some`, `sortedIndex`, `sortedIndexBy`, `sortedLastIndex`,
-     * `sortedLastIndexBy`, `startCase`, `startsWith`, `stubArray`, `stubFalse`,
-     * `stubObject`, `stubString`, `stubTrue`, `subtract`, `sum`, `sumBy`,
-     * `template`, `times`, `toFinite`, `toInteger`, `toJSON`, `toLength`,
-     * `toLower`, `toNumber`, `toSafeInteger`, `toString`, `toUpper`, `trim`,
-     * `trimEnd`, `trimStart`, `truncate`, `unescape`, `uniqueId`, `upperCase`,
-     * `upperFirst`, `value`, and `words`
-     *
-     * @name _
-     * @constructor
-     * @category Seq
-     * @param {*} value The value to wrap in a `lodash` instance.
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * var wrapped = _([1, 2, 3]);
-     *
-     * // Returns an unwrapped value.
-     * wrapped.reduce(_.add);
-     * // => 6
-     *
-     * // Returns a wrapped value.
-     * var squares = wrapped.map(square);
-     *
-     * _.isArray(squares);
-     * // => false
-     *
-     * _.isArray(squares.value());
-     * // => true
-     */
         function lodash(value) {
             if (isObjectLike(value) && !isArray(value) && !(value instanceof LazyWrapper)) {
                 if (value instanceof LodashWrapper) {
@@ -1699,19 +749,7 @@ UsergridEventable.mixin = function(destObject) {
             }
             return new LodashWrapper(value);
         }
-        /**
-     * The function whose prototype chain sequence wrappers inherit from.
-     *
-     * @private
-     */
         function baseLodash() {}
-        /**
-     * The base constructor for creating `lodash` wrapper objects.
-     *
-     * @private
-     * @param {*} value The value to wrap.
-     * @param {boolean} [chainAll] Enable explicit method chain sequences.
-     */
         function LodashWrapper(value, chainAll) {
             this.__wrapped__ = value;
             this.__actions__ = [];
@@ -1719,57 +757,12 @@ UsergridEventable.mixin = function(destObject) {
             this.__index__ = 0;
             this.__values__ = undefined;
         }
-        /**
-     * By default, the template delimiters used by lodash are like those in
-     * embedded Ruby (ERB). Change the following template settings to use
-     * alternative delimiters.
-     *
-     * @static
-     * @memberOf _
-     * @type {Object}
-     */
         lodash.templateSettings = {
-            /**
-       * Used to detect `data` property values to be HTML-escaped.
-       *
-       * @memberOf _.templateSettings
-       * @type {RegExp}
-       */
             escape: reEscape,
-            /**
-       * Used to detect code to be evaluated.
-       *
-       * @memberOf _.templateSettings
-       * @type {RegExp}
-       */
             evaluate: reEvaluate,
-            /**
-       * Used to detect `data` property values to inject.
-       *
-       * @memberOf _.templateSettings
-       * @type {RegExp}
-       */
             interpolate: reInterpolate,
-            /**
-       * Used to reference the data object in the template text.
-       *
-       * @memberOf _.templateSettings
-       * @type {string}
-       */
             variable: "",
-            /**
-       * Used to import variables into the compiled template.
-       *
-       * @memberOf _.templateSettings
-       * @type {Object}
-       */
             imports: {
-                /**
-         * A reference to the `lodash` function.
-         *
-         * @memberOf _.templateSettings.imports
-         * @type {Function}
-         */
                 _: lodash
             }
         };
@@ -1777,14 +770,6 @@ UsergridEventable.mixin = function(destObject) {
         lodash.prototype.constructor = lodash;
         LodashWrapper.prototype = baseCreate(baseLodash.prototype);
         LodashWrapper.prototype.constructor = LodashWrapper;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a lazy wrapper object which wraps `value` to enable lazy evaluation.
-     *
-     * @private
-     * @constructor
-     * @param {*} value The value to wrap.
-     */
         function LazyWrapper(value) {
             this.__wrapped__ = value;
             this.__actions__ = [];
@@ -1794,14 +779,6 @@ UsergridEventable.mixin = function(destObject) {
             this.__takeCount__ = MAX_ARRAY_LENGTH;
             this.__views__ = [];
         }
-        /**
-     * Creates a clone of the lazy wrapper object.
-     *
-     * @private
-     * @name clone
-     * @memberOf LazyWrapper
-     * @returns {Object} Returns the cloned `LazyWrapper` object.
-     */
         function lazyClone() {
             var result = new LazyWrapper(this.__wrapped__);
             result.__actions__ = copyArray(this.__actions__);
@@ -1812,14 +789,6 @@ UsergridEventable.mixin = function(destObject) {
             result.__views__ = copyArray(this.__views__);
             return result;
         }
-        /**
-     * Reverses the direction of lazy iteration.
-     *
-     * @private
-     * @name reverse
-     * @memberOf LazyWrapper
-     * @returns {Object} Returns the new reversed `LazyWrapper` object.
-     */
         function lazyReverse() {
             if (this.__filtered__) {
                 var result = new LazyWrapper(this);
@@ -1831,14 +800,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Extracts the unwrapped value from its lazy wrapper.
-     *
-     * @private
-     * @name value
-     * @memberOf LazyWrapper
-     * @returns {*} Returns the unwrapped value.
-     */
         function lazyValue() {
             var array = this.__wrapped__.value(), dir = this.__dir__, isArr = isArray(array), isRight = dir < 0, arrLength = isArr ? array.length : 0, view = getView(0, arrLength, this.__views__), start = view.start, end = view.end, length = end - start, index = isRight ? end : start - 1, iteratees = this.__iteratees__, iterLength = iteratees.length, resIndex = 0, takeCount = nativeMin(length, this.__takeCount__);
             if (!isArr || arrLength < LARGE_ARRAY_SIZE || arrLength == length && takeCount == length) {
@@ -1866,14 +827,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         LazyWrapper.prototype = baseCreate(baseLodash.prototype);
         LazyWrapper.prototype.constructor = LazyWrapper;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a hash object.
-     *
-     * @private
-     * @constructor
-     * @param {Array} [entries] The key-value pairs to cache.
-     */
         function Hash(entries) {
             var index = -1, length = entries ? entries.length : 0;
             this.clear();
@@ -1882,41 +835,15 @@ UsergridEventable.mixin = function(destObject) {
                 this.set(entry[0], entry[1]);
             }
         }
-        /**
-     * Removes all key-value entries from the hash.
-     *
-     * @private
-     * @name clear
-     * @memberOf Hash
-     */
         function hashClear() {
             this.__data__ = nativeCreate ? nativeCreate(null) : {};
             this.size = 0;
         }
-        /**
-     * Removes `key` and its value from the hash.
-     *
-     * @private
-     * @name delete
-     * @memberOf Hash
-     * @param {Object} hash The hash to modify.
-     * @param {string} key The key of the value to remove.
-     * @returns {boolean} Returns `true` if the entry was removed, else `false`.
-     */
         function hashDelete(key) {
             var result = this.has(key) && delete this.__data__[key];
             this.size -= result ? 1 : 0;
             return result;
         }
-        /**
-     * Gets the hash value for `key`.
-     *
-     * @private
-     * @name get
-     * @memberOf Hash
-     * @param {string} key The key of the value to get.
-     * @returns {*} Returns the entry value.
-     */
         function hashGet(key) {
             var data = this.__data__;
             if (nativeCreate) {
@@ -1925,29 +852,10 @@ UsergridEventable.mixin = function(destObject) {
             }
             return hasOwnProperty.call(data, key) ? data[key] : undefined;
         }
-        /**
-     * Checks if a hash value for `key` exists.
-     *
-     * @private
-     * @name has
-     * @memberOf Hash
-     * @param {string} key The key of the entry to check.
-     * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
-     */
         function hashHas(key) {
             var data = this.__data__;
             return nativeCreate ? data[key] !== undefined : hasOwnProperty.call(data, key);
         }
-        /**
-     * Sets the hash `key` to `value`.
-     *
-     * @private
-     * @name set
-     * @memberOf Hash
-     * @param {string} key The key of the value to set.
-     * @param {*} value The value to set.
-     * @returns {Object} Returns the hash instance.
-     */
         function hashSet(key, value) {
             var data = this.__data__;
             this.size += this.has(key) ? 0 : 1;
@@ -1959,14 +867,6 @@ UsergridEventable.mixin = function(destObject) {
         Hash.prototype.get = hashGet;
         Hash.prototype.has = hashHas;
         Hash.prototype.set = hashSet;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates an list cache object.
-     *
-     * @private
-     * @constructor
-     * @param {Array} [entries] The key-value pairs to cache.
-     */
         function ListCache(entries) {
             var index = -1, length = entries ? entries.length : 0;
             this.clear();
@@ -1975,26 +875,10 @@ UsergridEventable.mixin = function(destObject) {
                 this.set(entry[0], entry[1]);
             }
         }
-        /**
-     * Removes all key-value entries from the list cache.
-     *
-     * @private
-     * @name clear
-     * @memberOf ListCache
-     */
         function listCacheClear() {
             this.__data__ = [];
             this.size = 0;
         }
-        /**
-     * Removes `key` and its value from the list cache.
-     *
-     * @private
-     * @name delete
-     * @memberOf ListCache
-     * @param {string} key The key of the value to remove.
-     * @returns {boolean} Returns `true` if the entry was removed, else `false`.
-     */
         function listCacheDelete(key) {
             var data = this.__data__, index = assocIndexOf(data, key);
             if (index < 0) {
@@ -2009,41 +893,13 @@ UsergridEventable.mixin = function(destObject) {
             --this.size;
             return true;
         }
-        /**
-     * Gets the list cache value for `key`.
-     *
-     * @private
-     * @name get
-     * @memberOf ListCache
-     * @param {string} key The key of the value to get.
-     * @returns {*} Returns the entry value.
-     */
         function listCacheGet(key) {
             var data = this.__data__, index = assocIndexOf(data, key);
             return index < 0 ? undefined : data[index][1];
         }
-        /**
-     * Checks if a list cache value for `key` exists.
-     *
-     * @private
-     * @name has
-     * @memberOf ListCache
-     * @param {string} key The key of the entry to check.
-     * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
-     */
         function listCacheHas(key) {
             return assocIndexOf(this.__data__, key) > -1;
         }
-        /**
-     * Sets the list cache `key` to `value`.
-     *
-     * @private
-     * @name set
-     * @memberOf ListCache
-     * @param {string} key The key of the value to set.
-     * @param {*} value The value to set.
-     * @returns {Object} Returns the list cache instance.
-     */
         function listCacheSet(key, value) {
             var data = this.__data__, index = assocIndexOf(data, key);
             if (index < 0) {
@@ -2059,14 +915,6 @@ UsergridEventable.mixin = function(destObject) {
         ListCache.prototype.get = listCacheGet;
         ListCache.prototype.has = listCacheHas;
         ListCache.prototype.set = listCacheSet;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a map cache object to store key-value pairs.
-     *
-     * @private
-     * @constructor
-     * @param {Array} [entries] The key-value pairs to cache.
-     */
         function MapCache(entries) {
             var index = -1, length = entries ? entries.length : 0;
             this.clear();
@@ -2075,13 +923,6 @@ UsergridEventable.mixin = function(destObject) {
                 this.set(entry[0], entry[1]);
             }
         }
-        /**
-     * Removes all key-value entries from the map.
-     *
-     * @private
-     * @name clear
-     * @memberOf MapCache
-     */
         function mapCacheClear() {
             this.size = 0;
             this.__data__ = {
@@ -2090,54 +931,17 @@ UsergridEventable.mixin = function(destObject) {
                 string: new Hash()
             };
         }
-        /**
-     * Removes `key` and its value from the map.
-     *
-     * @private
-     * @name delete
-     * @memberOf MapCache
-     * @param {string} key The key of the value to remove.
-     * @returns {boolean} Returns `true` if the entry was removed, else `false`.
-     */
         function mapCacheDelete(key) {
             var result = getMapData(this, key)["delete"](key);
             this.size -= result ? 1 : 0;
             return result;
         }
-        /**
-     * Gets the map value for `key`.
-     *
-     * @private
-     * @name get
-     * @memberOf MapCache
-     * @param {string} key The key of the value to get.
-     * @returns {*} Returns the entry value.
-     */
         function mapCacheGet(key) {
             return getMapData(this, key).get(key);
         }
-        /**
-     * Checks if a map value for `key` exists.
-     *
-     * @private
-     * @name has
-     * @memberOf MapCache
-     * @param {string} key The key of the entry to check.
-     * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
-     */
         function mapCacheHas(key) {
             return getMapData(this, key).has(key);
         }
-        /**
-     * Sets the map `key` to `value`.
-     *
-     * @private
-     * @name set
-     * @memberOf MapCache
-     * @param {string} key The key of the value to set.
-     * @param {*} value The value to set.
-     * @returns {Object} Returns the map cache instance.
-     */
         function mapCacheSet(key, value) {
             var data = getMapData(this, key), size = data.size;
             data.set(key, value);
@@ -2149,15 +953,6 @@ UsergridEventable.mixin = function(destObject) {
         MapCache.prototype.get = mapCacheGet;
         MapCache.prototype.has = mapCacheHas;
         MapCache.prototype.set = mapCacheSet;
-        /*------------------------------------------------------------------------*/
-        /**
-     *
-     * Creates an array cache object to store unique values.
-     *
-     * @private
-     * @constructor
-     * @param {Array} [values] The values to cache.
-     */
         function SetCache(values) {
             var index = -1, length = values ? values.length : 0;
             this.__data__ = new MapCache();
@@ -2165,105 +960,34 @@ UsergridEventable.mixin = function(destObject) {
                 this.add(values[index]);
             }
         }
-        /**
-     * Adds `value` to the array cache.
-     *
-     * @private
-     * @name add
-     * @memberOf SetCache
-     * @alias push
-     * @param {*} value The value to cache.
-     * @returns {Object} Returns the cache instance.
-     */
         function setCacheAdd(value) {
             this.__data__.set(value, HASH_UNDEFINED);
             return this;
         }
-        /**
-     * Checks if `value` is in the array cache.
-     *
-     * @private
-     * @name has
-     * @memberOf SetCache
-     * @param {*} value The value to search for.
-     * @returns {number} Returns `true` if `value` is found, else `false`.
-     */
         function setCacheHas(value) {
             return this.__data__.has(value);
         }
         SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
         SetCache.prototype.has = setCacheHas;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a stack cache object to store key-value pairs.
-     *
-     * @private
-     * @constructor
-     * @param {Array} [entries] The key-value pairs to cache.
-     */
         function Stack(entries) {
             var data = this.__data__ = new ListCache(entries);
             this.size = data.size;
         }
-        /**
-     * Removes all key-value entries from the stack.
-     *
-     * @private
-     * @name clear
-     * @memberOf Stack
-     */
         function stackClear() {
             this.__data__ = new ListCache();
             this.size = 0;
         }
-        /**
-     * Removes `key` and its value from the stack.
-     *
-     * @private
-     * @name delete
-     * @memberOf Stack
-     * @param {string} key The key of the value to remove.
-     * @returns {boolean} Returns `true` if the entry was removed, else `false`.
-     */
         function stackDelete(key) {
             var data = this.__data__, result = data["delete"](key);
             this.size = data.size;
             return result;
         }
-        /**
-     * Gets the stack value for `key`.
-     *
-     * @private
-     * @name get
-     * @memberOf Stack
-     * @param {string} key The key of the value to get.
-     * @returns {*} Returns the entry value.
-     */
         function stackGet(key) {
             return this.__data__.get(key);
         }
-        /**
-     * Checks if a stack value for `key` exists.
-     *
-     * @private
-     * @name has
-     * @memberOf Stack
-     * @param {string} key The key of the entry to check.
-     * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
-     */
         function stackHas(key) {
             return this.__data__.has(key);
         }
-        /**
-     * Sets the stack `key` to `value`.
-     *
-     * @private
-     * @name set
-     * @memberOf Stack
-     * @param {string} key The key of the value to set.
-     * @param {*} value The value to set.
-     * @returns {Object} Returns the stack cache instance.
-     */
         function stackSet(key, value) {
             var data = this.__data__;
             if (data instanceof ListCache) {
@@ -2284,15 +1008,6 @@ UsergridEventable.mixin = function(destObject) {
         Stack.prototype.get = stackGet;
         Stack.prototype.has = stackHas;
         Stack.prototype.set = stackSet;
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates an array of the enumerable property names of the array-like `value`.
-     *
-     * @private
-     * @param {*} value The value to query.
-     * @param {boolean} inherited Specify returning inherited property names.
-     * @returns {Array} Returns the array of property names.
-     */
         function arrayLikeKeys(value, inherited) {
             var result = isArray(value) || isArguments(value) ? baseTimes(value.length, String) : [];
             var length = result.length, skipIndexes = !!length;
@@ -2303,95 +1018,35 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * A specialized version of `_.sample` for arrays without support for iteratee
-     * shorthands.
-     *
-     * @private
-     * @param {Array} array The array to sample.
-     * @returns {*} Returns the random element.
-     */
         function arraySample(array) {
             var length = array.length;
             return length ? array[baseRandom(0, length - 1)] : undefined;
         }
-        /**
-     * A specialized version of `_.sampleSize` for arrays.
-     *
-     * @private
-     * @param {Array} array The array to sample.
-     * @param {number} n The number of elements to sample.
-     * @returns {Array} Returns the random elements.
-     */
         function arraySampleSize(array, n) {
             var result = arrayShuffle(array);
             result.length = baseClamp(n, 0, result.length);
             return result;
         }
-        /**
-     * A specialized version of `_.shuffle` for arrays.
-     *
-     * @private
-     * @param {Array} array The array to shuffle.
-     * @returns {Array} Returns the new shuffled array.
-     */
         function arrayShuffle(array) {
             return shuffleSelf(copyArray(array));
         }
-        /**
-     * Used by `_.defaults` to customize its `_.assignIn` use.
-     *
-     * @private
-     * @param {*} objValue The destination value.
-     * @param {*} srcValue The source value.
-     * @param {string} key The key of the property to assign.
-     * @param {Object} object The parent object of `objValue`.
-     * @returns {*} Returns the value to assign.
-     */
         function assignInDefaults(objValue, srcValue, key, object) {
             if (objValue === undefined || eq(objValue, objectProto[key]) && !hasOwnProperty.call(object, key)) {
                 return srcValue;
             }
             return objValue;
         }
-        /**
-     * This function is like `assignValue` except that it doesn't assign
-     * `undefined` values.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {string} key The key of the property to assign.
-     * @param {*} value The value to assign.
-     */
         function assignMergeValue(object, key, value) {
             if (value !== undefined && !eq(object[key], value) || typeof key == "number" && value === undefined && !(key in object)) {
                 baseAssignValue(object, key, value);
             }
         }
-        /**
-     * Assigns `value` to `key` of `object` if the existing value is not equivalent
-     * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {string} key The key of the property to assign.
-     * @param {*} value The value to assign.
-     */
         function assignValue(object, key, value) {
             var objValue = object[key];
             if (!(hasOwnProperty.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
                 baseAssignValue(object, key, value);
             }
         }
-        /**
-     * Gets the index at which the `key` is found in `array` of key-value pairs.
-     *
-     * @private
-     * @param {Array} array The array to inspect.
-     * @param {*} key The key to search for.
-     * @returns {number} Returns the index of the matched value, else `-1`.
-     */
         function assocIndexOf(array, key) {
             var length = array.length;
             while (length--) {
@@ -2401,44 +1056,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return -1;
         }
-        /**
-     * Aggregates elements of `collection` on `accumulator` with keys transformed
-     * by `iteratee` and values set by `setter`.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} setter The function to set `accumulator` values.
-     * @param {Function} iteratee The iteratee to transform keys.
-     * @param {Object} accumulator The initial aggregated object.
-     * @returns {Function} Returns `accumulator`.
-     */
         function baseAggregator(collection, setter, iteratee, accumulator) {
             baseEach(collection, function(value, key, collection) {
                 setter(accumulator, value, iteratee(value), collection);
             });
             return accumulator;
         }
-        /**
-     * The base implementation of `_.assign` without support for multiple sources
-     * or `customizer` functions.
-     *
-     * @private
-     * @param {Object} object The destination object.
-     * @param {Object} source The source object.
-     * @returns {Object} Returns `object`.
-     */
         function baseAssign(object, source) {
             return object && copyObject(source, keys(source), object);
         }
-        /**
-     * The base implementation of `assignValue` and `assignMergeValue` without
-     * value checks.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {string} key The key of the property to assign.
-     * @param {*} value The value to assign.
-     */
         function baseAssignValue(object, key, value) {
             if (key == "__proto__" && defineProperty) {
                 defineProperty(object, key, {
@@ -2451,14 +1077,6 @@ UsergridEventable.mixin = function(destObject) {
                 object[key] = value;
             }
         }
-        /**
-     * The base implementation of `_.at` without support for individual paths.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {string[]} paths The property paths of elements to pick.
-     * @returns {Array} Returns the picked elements.
-     */
         function baseAt(object, paths) {
             var index = -1, isNil = object == null, length = paths.length, result = Array(length);
             while (++index < length) {
@@ -2466,15 +1084,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.clamp` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {number} number The number to clamp.
-     * @param {number} [lower] The lower bound.
-     * @param {number} upper The upper bound.
-     * @returns {number} Returns the clamped number.
-     */
         function baseClamp(number, lower, upper) {
             if (number === number) {
                 if (upper !== undefined) {
@@ -2486,20 +1095,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return number;
         }
-        /**
-     * The base implementation of `_.clone` and `_.cloneDeep` which tracks
-     * traversed objects.
-     *
-     * @private
-     * @param {*} value The value to clone.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @param {boolean} [isFull] Specify a clone including symbols.
-     * @param {Function} [customizer] The function to customize cloning.
-     * @param {string} [key] The key of `value`.
-     * @param {Object} [object] The parent object of `value`.
-     * @param {Object} [stack] Tracks traversed objects and their clone counterparts.
-     * @returns {*} Returns the cloned value.
-     */
         function baseClone(value, isDeep, isFull, customizer, key, object, stack) {
             var result;
             if (customizer) {
@@ -2552,27 +1147,12 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * The base implementation of `_.conforms` which doesn't clone `source`.
-     *
-     * @private
-     * @param {Object} source The object of property predicates to conform to.
-     * @returns {Function} Returns the new spec function.
-     */
         function baseConforms(source) {
             var props = keys(source);
             return function(object) {
                 return baseConformsTo(object, source, props);
             };
         }
-        /**
-     * The base implementation of `_.conformsTo` which accepts `props` to check.
-     *
-     * @private
-     * @param {Object} object The object to inspect.
-     * @param {Object} source The object of property predicates to conform to.
-     * @returns {boolean} Returns `true` if `object` conforms, else `false`.
-     */
         function baseConformsTo(object, source, props) {
             var length = props.length;
             if (object == null) {
@@ -2587,27 +1167,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return true;
         }
-        /**
-     * The base implementation of `_.create` without support for assigning
-     * properties to the created object.
-     *
-     * @private
-     * @param {Object} prototype The object to inherit from.
-     * @returns {Object} Returns the new object.
-     */
         function baseCreate(proto) {
             return isObject(proto) ? objectCreate(proto) : {};
         }
-        /**
-     * The base implementation of `_.delay` and `_.defer` which accepts `args`
-     * to provide to `func`.
-     *
-     * @private
-     * @param {Function} func The function to delay.
-     * @param {number} wait The number of milliseconds to delay invocation.
-     * @param {Array} args The arguments to provide to `func`.
-     * @returns {number|Object} Returns the timer id or timeout object.
-     */
         function baseDelay(func, wait, args) {
             if (typeof func != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -2616,17 +1178,6 @@ UsergridEventable.mixin = function(destObject) {
                 func.apply(undefined, args);
             }, wait);
         }
-        /**
-     * The base implementation of methods like `_.difference` without support
-     * for excluding multiple arrays or iteratee shorthands.
-     *
-     * @private
-     * @param {Array} array The array to inspect.
-     * @param {Array} values The values to exclude.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of filtered values.
-     */
         function baseDifference(array, values, iteratee, comparator) {
             var index = -1, includes = arrayIncludes, isCommon = true, length = array.length, result = [], valuesLength = values.length;
             if (!length) {
@@ -2660,33 +1211,8 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.forEach` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @returns {Array|Object} Returns `collection`.
-     */
         var baseEach = createBaseEach(baseForOwn);
-        /**
-     * The base implementation of `_.forEachRight` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @returns {Array|Object} Returns `collection`.
-     */
         var baseEachRight = createBaseEach(baseForOwnRight, true);
-        /**
-     * The base implementation of `_.every` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} predicate The function invoked per iteration.
-     * @returns {boolean} Returns `true` if all elements pass the predicate check,
-     *  else `false`
-     */
         function baseEvery(collection, predicate) {
             var result = true;
             baseEach(collection, function(value, index, collection) {
@@ -2695,16 +1221,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * The base implementation of methods like `_.max` and `_.min` which accepts a
-     * `comparator` to determine the extremum value.
-     *
-     * @private
-     * @param {Array} array The array to iterate over.
-     * @param {Function} iteratee The iteratee invoked per iteration.
-     * @param {Function} comparator The comparator used to compare values.
-     * @returns {*} Returns the extremum value.
-     */
         function baseExtremum(array, iteratee, comparator) {
             var index = -1, length = array.length;
             while (++index < length) {
@@ -2715,16 +1231,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.fill` without an iteratee call guard.
-     *
-     * @private
-     * @param {Array} array The array to fill.
-     * @param {*} value The value to fill `array` with.
-     * @param {number} [start=0] The start position.
-     * @param {number} [end=array.length] The end position.
-     * @returns {Array} Returns `array`.
-     */
         function baseFill(array, value, start, end) {
             var length = array.length;
             start = toInteger(start);
@@ -2741,14 +1247,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * The base implementation of `_.filter` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} predicate The function invoked per iteration.
-     * @returns {Array} Returns the new filtered array.
-     */
         function baseFilter(collection, predicate) {
             var result = [];
             baseEach(collection, function(value, index, collection) {
@@ -2758,17 +1256,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * The base implementation of `_.flatten` with support for restricting flattening.
-     *
-     * @private
-     * @param {Array} array The array to flatten.
-     * @param {number} depth The maximum recursion depth.
-     * @param {boolean} [predicate=isFlattenable] The function invoked per iteration.
-     * @param {boolean} [isStrict] Restrict to values that pass `predicate` checks.
-     * @param {Array} [result=[]] The initial result value.
-     * @returns {Array} Returns the new flattened array.
-     */
         function baseFlatten(array, depth, predicate, isStrict, result) {
             var index = -1, length = array.length;
             predicate || (predicate = isFlattenable);
@@ -2787,73 +1274,19 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `baseForOwn` which iterates over `object`
-     * properties returned by `keysFunc` and invokes `iteratee` for each property.
-     * Iteratee functions may exit iteration early by explicitly returning `false`.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @param {Function} keysFunc The function to get the keys of `object`.
-     * @returns {Object} Returns `object`.
-     */
         var baseFor = createBaseFor();
-        /**
-     * This function is like `baseFor` except that it iterates over properties
-     * in the opposite order.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @param {Function} keysFunc The function to get the keys of `object`.
-     * @returns {Object} Returns `object`.
-     */
         var baseForRight = createBaseFor(true);
-        /**
-     * The base implementation of `_.forOwn` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     */
         function baseForOwn(object, iteratee) {
             return object && baseFor(object, iteratee, keys);
         }
-        /**
-     * The base implementation of `_.forOwnRight` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     */
         function baseForOwnRight(object, iteratee) {
             return object && baseForRight(object, iteratee, keys);
         }
-        /**
-     * The base implementation of `_.functions` which creates an array of
-     * `object` function property names filtered from `props`.
-     *
-     * @private
-     * @param {Object} object The object to inspect.
-     * @param {Array} props The property names to filter.
-     * @returns {Array} Returns the function names.
-     */
         function baseFunctions(object, props) {
             return arrayFilter(props, function(key) {
                 return isFunction(object[key]);
             });
         }
-        /**
-     * The base implementation of `_.get` without support for default values.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path of the property to get.
-     * @returns {*} Returns the resolved value.
-     */
         function baseGet(object, path) {
             path = isKey(path, object) ? [ path ] : castPath(path);
             var index = 0, length = path.length;
@@ -2862,87 +1295,25 @@ UsergridEventable.mixin = function(destObject) {
             }
             return index && index == length ? object : undefined;
         }
-        /**
-     * The base implementation of `getAllKeys` and `getAllKeysIn` which uses
-     * `keysFunc` and `symbolsFunc` to get the enumerable property names and
-     * symbols of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {Function} keysFunc The function to get the keys of `object`.
-     * @param {Function} symbolsFunc The function to get the symbols of `object`.
-     * @returns {Array} Returns the array of property names and symbols.
-     */
         function baseGetAllKeys(object, keysFunc, symbolsFunc) {
             var result = keysFunc(object);
             return isArray(object) ? result : arrayPush(result, symbolsFunc(object));
         }
-        /**
-     * The base implementation of `getTag`.
-     *
-     * @private
-     * @param {*} value The value to query.
-     * @returns {string} Returns the `toStringTag`.
-     */
         function baseGetTag(value) {
             return objectToString.call(value);
         }
-        /**
-     * The base implementation of `_.gt` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is greater than `other`,
-     *  else `false`.
-     */
         function baseGt(value, other) {
             return value > other;
         }
-        /**
-     * The base implementation of `_.has` without support for deep paths.
-     *
-     * @private
-     * @param {Object} [object] The object to query.
-     * @param {Array|string} key The key to check.
-     * @returns {boolean} Returns `true` if `key` exists, else `false`.
-     */
         function baseHas(object, key) {
             return object != null && hasOwnProperty.call(object, key);
         }
-        /**
-     * The base implementation of `_.hasIn` without support for deep paths.
-     *
-     * @private
-     * @param {Object} [object] The object to query.
-     * @param {Array|string} key The key to check.
-     * @returns {boolean} Returns `true` if `key` exists, else `false`.
-     */
         function baseHasIn(object, key) {
             return object != null && key in Object(object);
         }
-        /**
-     * The base implementation of `_.inRange` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {number} number The number to check.
-     * @param {number} start The start of the range.
-     * @param {number} end The end of the range.
-     * @returns {boolean} Returns `true` if `number` is in the range, else `false`.
-     */
         function baseInRange(number, start, end) {
             return number >= nativeMin(start, end) && number < nativeMax(start, end);
         }
-        /**
-     * The base implementation of methods like `_.intersection`, without support
-     * for iteratee shorthands, that accepts an array of arrays to inspect.
-     *
-     * @private
-     * @param {Array} arrays The arrays to inspect.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of shared values.
-     */
         function baseIntersection(arrays, iteratee, comparator) {
             var includes = comparator ? arrayIncludesWith : arrayIncludes, length = arrays[0].length, othLength = arrays.length, othIndex = othLength, caches = Array(othLength), maxLength = Infinity, result = [];
             while (othIndex--) {
@@ -2974,33 +1345,12 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.invert` and `_.invertBy` which inverts
-     * `object` with values transformed by `iteratee` and set by `setter`.
-     *
-     * @private
-     * @param {Object} object The object to iterate over.
-     * @param {Function} setter The function to set `accumulator` values.
-     * @param {Function} iteratee The iteratee to transform values.
-     * @param {Object} accumulator The initial inverted object.
-     * @returns {Function} Returns `accumulator`.
-     */
         function baseInverter(object, setter, iteratee, accumulator) {
             baseForOwn(object, function(value, key, object) {
                 setter(accumulator, iteratee(value), key, object);
             });
             return accumulator;
         }
-        /**
-     * The base implementation of `_.invoke` without support for individual
-     * method arguments.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path of the method to invoke.
-     * @param {Array} args The arguments to invoke the method with.
-     * @returns {*} Returns the result of the invoked method.
-     */
         function baseInvoke(object, path, args) {
             if (!isKey(path, object)) {
                 path = castPath(path);
@@ -3010,41 +1360,12 @@ UsergridEventable.mixin = function(destObject) {
             var func = object == null ? object : object[toKey(path)];
             return func == null ? undefined : apply(func, object, args);
         }
-        /**
-     * The base implementation of `_.isArrayBuffer` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an array buffer, else `false`.
-     */
         function baseIsArrayBuffer(value) {
             return isObjectLike(value) && objectToString.call(value) == arrayBufferTag;
         }
-        /**
-     * The base implementation of `_.isDate` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a date object, else `false`.
-     */
         function baseIsDate(value) {
             return isObjectLike(value) && objectToString.call(value) == dateTag;
         }
-        /**
-     * The base implementation of `_.isEqual` which supports partial comparisons
-     * and tracks traversed objects.
-     *
-     * @private
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @param {Function} [customizer] The function to customize comparisons.
-     * @param {boolean} [bitmask] The bitmask of comparison flags.
-     *  The bitmask may be composed of the following flags:
-     *     1 - Unordered comparison
-     *     2 - Partial comparison
-     * @param {Object} [stack] Tracks traversed `value` and `other` objects.
-     * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
-     */
         function baseIsEqual(value, other, customizer, bitmask, stack) {
             if (value === other) {
                 return true;
@@ -3054,21 +1375,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseIsEqualDeep(value, other, baseIsEqual, customizer, bitmask, stack);
         }
-        /**
-     * A specialized version of `baseIsEqual` for arrays and objects which performs
-     * deep comparisons and tracks traversed objects enabling objects with circular
-     * references to be compared.
-     *
-     * @private
-     * @param {Object} object The object to compare.
-     * @param {Object} other The other object to compare.
-     * @param {Function} equalFunc The function to determine equivalents of values.
-     * @param {Function} [customizer] The function to customize comparisons.
-     * @param {number} [bitmask] The bitmask of comparison flags. See `baseIsEqual`
-     *  for more details.
-     * @param {Object} [stack] Tracks traversed `object` and `other` objects.
-     * @returns {boolean} Returns `true` if the objects are equivalent, else `false`.
-     */
         function baseIsEqualDeep(object, other, equalFunc, customizer, bitmask, stack) {
             var objIsArr = isArray(object), othIsArr = isArray(other), objTag = arrayTag, othTag = arrayTag;
             if (!objIsArr) {
@@ -3098,26 +1404,9 @@ UsergridEventable.mixin = function(destObject) {
             stack || (stack = new Stack());
             return equalObjects(object, other, equalFunc, customizer, bitmask, stack);
         }
-        /**
-     * The base implementation of `_.isMap` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a map, else `false`.
-     */
         function baseIsMap(value) {
             return isObjectLike(value) && getTag(value) == mapTag;
         }
-        /**
-     * The base implementation of `_.isMatch` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Object} object The object to inspect.
-     * @param {Object} source The object of property values to match.
-     * @param {Array} matchData The property names, values, and compare flags to match.
-     * @param {Function} [customizer] The function to customize comparisons.
-     * @returns {boolean} Returns `true` if `object` is a match, else `false`.
-     */
         function baseIsMatch(object, source, matchData, customizer) {
             var index = matchData.length, length = index, noCustomizer = !customizer;
             if (object == null) {
@@ -3149,14 +1438,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return true;
         }
-        /**
-     * The base implementation of `_.isNative` without bad shim checks.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a native function,
-     *  else `false`.
-     */
         function baseIsNative(value) {
             if (!isObject(value) || isMasked(value)) {
                 return false;
@@ -3164,43 +1445,15 @@ UsergridEventable.mixin = function(destObject) {
             var pattern = isFunction(value) ? reIsNative : reIsHostCtor;
             return pattern.test(toSource(value));
         }
-        /**
-     * The base implementation of `_.isRegExp` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a regexp, else `false`.
-     */
         function baseIsRegExp(value) {
             return isObject(value) && objectToString.call(value) == regexpTag;
         }
-        /**
-     * The base implementation of `_.isSet` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a set, else `false`.
-     */
         function baseIsSet(value) {
             return isObjectLike(value) && getTag(value) == setTag;
         }
-        /**
-     * The base implementation of `_.isTypedArray` without Node.js optimizations.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
-     */
         function baseIsTypedArray(value) {
             return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[objectToString.call(value)];
         }
-        /**
-     * The base implementation of `_.iteratee`.
-     *
-     * @private
-     * @param {*} [value=_.identity] The value to convert to an iteratee.
-     * @returns {Function} Returns the iteratee.
-     */
         function baseIteratee(value) {
             if (typeof value == "function") {
                 return value;
@@ -3213,13 +1466,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return property(value);
         }
-        /**
-     * The base implementation of `_.keys` which doesn't treat sparse arrays as dense.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names.
-     */
         function baseKeys(object) {
             if (!isPrototype(object)) {
                 return nativeKeys(object);
@@ -3232,13 +1478,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.keysIn` which doesn't treat sparse arrays as dense.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names.
-     */
         function baseKeysIn(object) {
             if (!isObject(object)) {
                 return nativeKeysIn(object);
@@ -3251,26 +1490,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.lt` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is less than `other`,
-     *  else `false`.
-     */
         function baseLt(value, other) {
             return value < other;
         }
-        /**
-     * The base implementation of `_.map` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} iteratee The function invoked per iteration.
-     * @returns {Array} Returns the new mapped array.
-     */
         function baseMap(collection, iteratee) {
             var index = -1, result = isArrayLike(collection) ? Array(collection.length) : [];
             baseEach(collection, function(value, key, collection) {
@@ -3278,13 +1500,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * The base implementation of `_.matches` which doesn't clone `source`.
-     *
-     * @private
-     * @param {Object} source The object of property values to match.
-     * @returns {Function} Returns the new spec function.
-     */
         function baseMatches(source) {
             var matchData = getMatchData(source);
             if (matchData.length == 1 && matchData[0][2]) {
@@ -3294,14 +1509,6 @@ UsergridEventable.mixin = function(destObject) {
                 return object === source || baseIsMatch(object, source, matchData);
             };
         }
-        /**
-     * The base implementation of `_.matchesProperty` which doesn't clone `srcValue`.
-     *
-     * @private
-     * @param {string} path The path of the property to get.
-     * @param {*} srcValue The value to match.
-     * @returns {Function} Returns the new spec function.
-     */
         function baseMatchesProperty(path, srcValue) {
             if (isKey(path) && isStrictComparable(srcValue)) {
                 return matchesStrictComparable(toKey(path), srcValue);
@@ -3311,17 +1518,6 @@ UsergridEventable.mixin = function(destObject) {
                 return objValue === undefined && objValue === srcValue ? hasIn(object, path) : baseIsEqual(srcValue, objValue, undefined, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG);
             };
         }
-        /**
-     * The base implementation of `_.merge` without support for multiple sources.
-     *
-     * @private
-     * @param {Object} object The destination object.
-     * @param {Object} source The source object.
-     * @param {number} srcIndex The index of `source`.
-     * @param {Function} [customizer] The function to customize merged values.
-     * @param {Object} [stack] Tracks traversed source values and their merged
-     *  counterparts.
-     */
         function baseMerge(object, source, srcIndex, customizer, stack) {
             if (object === source) {
                 return;
@@ -3346,21 +1542,6 @@ UsergridEventable.mixin = function(destObject) {
                 }
             });
         }
-        /**
-     * A specialized version of `baseMerge` for arrays and objects which performs
-     * deep merges and tracks traversed objects enabling objects with circular
-     * references to be merged.
-     *
-     * @private
-     * @param {Object} object The destination object.
-     * @param {Object} source The source object.
-     * @param {string} key The key of the value to merge.
-     * @param {number} srcIndex The index of `source`.
-     * @param {Function} mergeFunc The function to merge values.
-     * @param {Function} [customizer] The function to customize assigned values.
-     * @param {Object} [stack] Tracks traversed source values and their merged
-     *  counterparts.
-     */
         function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, stack) {
             var objValue = object[key], srcValue = source[key], stacked = stack.get(srcValue);
             if (stacked) {
@@ -3400,14 +1581,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             assignMergeValue(object, key, newValue);
         }
-        /**
-     * The base implementation of `_.nth` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {Array} array The array to query.
-     * @param {number} n The index of the element to return.
-     * @returns {*} Returns the nth element of `array`.
-     */
         function baseNth(array, n) {
             var length = array.length;
             if (!length) {
@@ -3416,15 +1589,6 @@ UsergridEventable.mixin = function(destObject) {
             n += n < 0 ? length : 0;
             return isIndex(n, length) ? array[n] : undefined;
         }
-        /**
-     * The base implementation of `_.orderBy` without param guards.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function[]|Object[]|string[]} iteratees The iteratees to sort by.
-     * @param {string[]} orders The sort orders of `iteratees`.
-     * @returns {Array} Returns the new sorted array.
-     */
         function baseOrderBy(collection, iteratees, orders) {
             var index = -1;
             iteratees = arrayMap(iteratees.length ? iteratees : [ identity ], baseUnary(getIteratee()));
@@ -3442,30 +1606,12 @@ UsergridEventable.mixin = function(destObject) {
                 return compareMultiple(object, other, orders);
             });
         }
-        /**
-     * The base implementation of `_.pick` without support for individual
-     * property identifiers.
-     *
-     * @private
-     * @param {Object} object The source object.
-     * @param {string[]} props The property identifiers to pick.
-     * @returns {Object} Returns the new object.
-     */
         function basePick(object, props) {
             object = Object(object);
             return basePickBy(object, props, function(value, key) {
                 return key in object;
             });
         }
-        /**
-     * The base implementation of  `_.pickBy` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Object} object The source object.
-     * @param {string[]} props The property identifiers to pick from.
-     * @param {Function} predicate The function invoked per property.
-     * @returns {Object} Returns the new object.
-     */
         function basePickBy(object, props, predicate) {
             var index = -1, length = props.length, result = {};
             while (++index < length) {
@@ -3476,29 +1622,11 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * A specialized version of `baseProperty` which supports deep paths.
-     *
-     * @private
-     * @param {Array|string} path The path of the property to get.
-     * @returns {Function} Returns the new accessor function.
-     */
         function basePropertyDeep(path) {
             return function(object) {
                 return baseGet(object, path);
             };
         }
-        /**
-     * The base implementation of `_.pullAllBy` without support for iteratee
-     * shorthands.
-     *
-     * @private
-     * @param {Array} array The array to modify.
-     * @param {Array} values The values to remove.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns `array`.
-     */
         function basePullAll(array, values, iteratee, comparator) {
             var indexOf = comparator ? baseIndexOfWith : baseIndexOf, index = -1, length = values.length, seen = array;
             if (array === values) {
@@ -3518,15 +1646,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * The base implementation of `_.pullAt` without support for individual
-     * indexes or capturing the removed elements.
-     *
-     * @private
-     * @param {Array} array The array to modify.
-     * @param {number[]} indexes The indexes of elements to remove.
-     * @returns {Array} Returns `array`.
-     */
         function basePullAt(array, indexes) {
             var length = array ? indexes.length : 0, lastIndex = length - 1;
             while (length--) {
@@ -3547,29 +1666,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * The base implementation of `_.random` without support for returning
-     * floating-point numbers.
-     *
-     * @private
-     * @param {number} lower The lower bound.
-     * @param {number} upper The upper bound.
-     * @returns {number} Returns the random number.
-     */
         function baseRandom(lower, upper) {
             return lower + nativeFloor(nativeRandom() * (upper - lower + 1));
         }
-        /**
-     * The base implementation of `_.range` and `_.rangeRight` which doesn't
-     * coerce arguments.
-     *
-     * @private
-     * @param {number} start The start of the range.
-     * @param {number} end The end of the range.
-     * @param {number} step The value to increment or decrement by.
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Array} Returns the range of numbers.
-     */
         function baseRange(start, end, step, fromRight) {
             var index = -1, length = nativeMax(nativeCeil((end - start) / (step || 1)), 0), result = Array(length);
             while (length--) {
@@ -3578,14 +1677,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.repeat` which doesn't coerce arguments.
-     *
-     * @private
-     * @param {string} string The string to repeat.
-     * @param {number} n The number of times to repeat the string.
-     * @returns {string} Returns the repeated string.
-     */
         function baseRepeat(string, n) {
             var result = "";
             if (!string || n < 1 || n > MAX_SAFE_INTEGER) {
@@ -3602,27 +1693,9 @@ UsergridEventable.mixin = function(destObject) {
             } while (n);
             return result;
         }
-        /**
-     * The base implementation of `_.rest` which doesn't validate or coerce arguments.
-     *
-     * @private
-     * @param {Function} func The function to apply a rest parameter to.
-     * @param {number} [start=func.length-1] The start position of the rest parameter.
-     * @returns {Function} Returns the new function.
-     */
         function baseRest(func, start) {
             return setToString(overRest(func, start, identity), func + "");
         }
-        /**
-     * The base implementation of `_.set`.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to set.
-     * @param {*} value The value to set.
-     * @param {Function} [customizer] The function to customize path creation.
-     * @returns {Object} Returns `object`.
-     */
         function baseSet(object, path, value, customizer) {
             if (!isObject(object)) {
                 return object;
@@ -3643,26 +1716,10 @@ UsergridEventable.mixin = function(destObject) {
             }
             return object;
         }
-        /**
-     * The base implementation of `setData` without support for hot loop shorting.
-     *
-     * @private
-     * @param {Function} func The function to associate metadata with.
-     * @param {*} data The metadata.
-     * @returns {Function} Returns `func`.
-     */
         var baseSetData = !metaMap ? identity : function(func, data) {
             metaMap.set(func, data);
             return func;
         };
-        /**
-     * The base implementation of `setToString` without support for hot loop shorting.
-     *
-     * @private
-     * @param {Function} func The function to modify.
-     * @param {Function} string The `toString` result.
-     * @returns {Function} Returns `func`.
-     */
         var baseSetToString = !nativeDefineProperty ? identity : function(func, string) {
             return nativeDefineProperty(func, "toString", {
                 configurable: true,
@@ -3671,15 +1728,6 @@ UsergridEventable.mixin = function(destObject) {
                 writable: true
             });
         };
-        /**
-     * The base implementation of `_.slice` without an iteratee call guard.
-     *
-     * @private
-     * @param {Array} array The array to slice.
-     * @param {number} [start=0] The start position.
-     * @param {number} [end=array.length] The end position.
-     * @returns {Array} Returns the slice of `array`.
-     */
         function baseSlice(array, start, end) {
             var index = -1, length = array.length;
             if (start < 0) {
@@ -3697,15 +1745,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.some` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} predicate The function invoked per iteration.
-     * @returns {boolean} Returns `true` if any element passes the predicate check,
-     *  else `false`.
-     */
         function baseSome(collection, predicate) {
             var result;
             baseEach(collection, function(value, index, collection) {
@@ -3714,18 +1753,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return !!result;
         }
-        /**
-     * The base implementation of `_.sortedIndex` and `_.sortedLastIndex` which
-     * performs a binary search of `array` to determine the index at which `value`
-     * should be inserted into `array` in order to maintain its sort order.
-     *
-     * @private
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @param {boolean} [retHighest] Specify returning the highest qualified index.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     */
         function baseSortedIndex(array, value, retHighest) {
             var low = 0, high = array ? array.length : low;
             if (typeof value == "number" && value === value && high <= HALF_MAX_ARRAY_LENGTH) {
@@ -3741,19 +1768,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseSortedIndexBy(array, value, identity, retHighest);
         }
-        /**
-     * The base implementation of `_.sortedIndexBy` and `_.sortedLastIndexBy`
-     * which invokes `iteratee` for `value` and each element of `array` to compute
-     * their sort ranking. The iteratee is invoked with one argument; (value).
-     *
-     * @private
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @param {Function} iteratee The iteratee invoked per element.
-     * @param {boolean} [retHighest] Specify returning the highest qualified index.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     */
         function baseSortedIndexBy(array, value, iteratee, retHighest) {
             value = iteratee(value);
             var low = 0, high = array ? array.length : 0, valIsNaN = value !== value, valIsNull = value === null, valIsSymbol = isSymbol(value), valIsUndefined = value === undefined;
@@ -3780,15 +1794,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return nativeMin(high, MAX_ARRAY_INDEX);
         }
-        /**
-     * The base implementation of `_.sortedUniq` and `_.sortedUniqBy` without
-     * support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array} array The array to inspect.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @returns {Array} Returns the new duplicate free array.
-     */
         function baseSortedUniq(array, iteratee) {
             var index = -1, length = array.length, resIndex = 0, result = [];
             while (++index < length) {
@@ -3800,14 +1805,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.toNumber` which doesn't ensure correct
-     * conversions of binary, hexadecimal, or octal string values.
-     *
-     * @private
-     * @param {*} value The value to process.
-     * @returns {number} Returns the number.
-     */
         function baseToNumber(value) {
             if (typeof value == "number") {
                 return value;
@@ -3817,14 +1814,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return +value;
         }
-        /**
-     * The base implementation of `_.toString` which doesn't convert nullish
-     * values to empty strings.
-     *
-     * @private
-     * @param {*} value The value to process.
-     * @returns {string} Returns the string.
-     */
         function baseToString(value) {
             if (typeof value == "string") {
                 return value;
@@ -3835,15 +1824,6 @@ UsergridEventable.mixin = function(destObject) {
             var result = value + "";
             return result == "0" && 1 / value == -INFINITY ? "-0" : result;
         }
-        /**
-     * The base implementation of `_.uniqBy` without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array} array The array to inspect.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new duplicate free array.
-     */
         function baseUniq(array, iteratee, comparator) {
             var index = -1, includes = arrayIncludes, length = array.length, isCommon = true, result = [], seen = result;
             if (comparator) {
@@ -3883,59 +1863,20 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * The base implementation of `_.unset`.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to unset.
-     * @returns {boolean} Returns `true` if the property is deleted, else `false`.
-     */
         function baseUnset(object, path) {
             path = isKey(path, object) ? [ path ] : castPath(path);
             object = parent(object, path);
             var key = toKey(last(path));
             return !(object != null && hasOwnProperty.call(object, key)) || delete object[key];
         }
-        /**
-     * The base implementation of `_.update`.
-     *
-     * @private
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to update.
-     * @param {Function} updater The function to produce the updated value.
-     * @param {Function} [customizer] The function to customize path creation.
-     * @returns {Object} Returns `object`.
-     */
         function baseUpdate(object, path, updater, customizer) {
             return baseSet(object, path, updater(baseGet(object, path)), customizer);
         }
-        /**
-     * The base implementation of methods like `_.dropWhile` and `_.takeWhile`
-     * without support for iteratee shorthands.
-     *
-     * @private
-     * @param {Array} array The array to query.
-     * @param {Function} predicate The function invoked per iteration.
-     * @param {boolean} [isDrop] Specify dropping elements instead of taking them.
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Array} Returns the slice of `array`.
-     */
         function baseWhile(array, predicate, isDrop, fromRight) {
             var length = array.length, index = fromRight ? length : -1;
             while ((fromRight ? index-- : ++index < length) && predicate(array[index], index, array)) {}
             return isDrop ? baseSlice(array, fromRight ? 0 : index, fromRight ? index + 1 : length) : baseSlice(array, fromRight ? index + 1 : 0, fromRight ? length : index);
         }
-        /**
-     * The base implementation of `wrapperValue` which returns the result of
-     * performing a sequence of actions on the unwrapped `value`, where each
-     * successive action is supplied the return value of the previous.
-     *
-     * @private
-     * @param {*} value The unwrapped value.
-     * @param {Array} actions Actions to perform to resolve the unwrapped value.
-     * @returns {*} Returns the resolved value.
-     */
         function baseWrapperValue(value, actions) {
             var result = value;
             if (result instanceof LazyWrapper) {
@@ -3945,16 +1886,6 @@ UsergridEventable.mixin = function(destObject) {
                 return action.func.apply(action.thisArg, arrayPush([ result ], action.args));
             }, result);
         }
-        /**
-     * The base implementation of methods like `_.xor`, without support for
-     * iteratee shorthands, that accepts an array of arrays to inspect.
-     *
-     * @private
-     * @param {Array} arrays The arrays to inspect.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of values.
-     */
         function baseXor(arrays, iteratee, comparator) {
             var index = -1, length = arrays.length;
             while (++index < length) {
@@ -3962,15 +1893,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result && result.length ? baseUniq(result, iteratee, comparator) : [];
         }
-        /**
-     * This base implementation of `_.zipObject` which assigns values using `assignFunc`.
-     *
-     * @private
-     * @param {Array} props The property identifiers.
-     * @param {Array} values The property values.
-     * @param {Function} assignFunc The function to assign values.
-     * @returns {Object} Returns the new object.
-     */
         function baseZipObject(props, values, assignFunc) {
             var index = -1, length = props.length, valsLength = values.length, result = {};
             while (++index < length) {
@@ -3979,77 +1901,24 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Casts `value` to an empty array if it's not an array like object.
-     *
-     * @private
-     * @param {*} value The value to inspect.
-     * @returns {Array|Object} Returns the cast array-like object.
-     */
         function castArrayLikeObject(value) {
             return isArrayLikeObject(value) ? value : [];
         }
-        /**
-     * Casts `value` to `identity` if it's not a function.
-     *
-     * @private
-     * @param {*} value The value to inspect.
-     * @returns {Function} Returns cast function.
-     */
         function castFunction(value) {
             return typeof value == "function" ? value : identity;
         }
-        /**
-     * Casts `value` to a path array if it's not one.
-     *
-     * @private
-     * @param {*} value The value to inspect.
-     * @returns {Array} Returns the cast property path array.
-     */
         function castPath(value) {
             return isArray(value) ? value : stringToPath(value);
         }
-        /**
-     * A `baseRest` alias which can be replaced with `identity` by module
-     * replacement plugins.
-     *
-     * @private
-     * @type {Function}
-     * @param {Function} func The function to apply a rest parameter to.
-     * @returns {Function} Returns the new function.
-     */
         var castRest = baseRest;
-        /**
-     * Casts `array` to a slice if it's needed.
-     *
-     * @private
-     * @param {Array} array The array to inspect.
-     * @param {number} start The start position.
-     * @param {number} [end=array.length] The end position.
-     * @returns {Array} Returns the cast slice.
-     */
         function castSlice(array, start, end) {
             var length = array.length;
             end = end === undefined ? length : end;
             return !start && end >= length ? array : baseSlice(array, start, end);
         }
-        /**
-     * A simple wrapper around the global [`clearTimeout`](https://mdn.io/clearTimeout).
-     *
-     * @private
-     * @param {number|Object} id The timer id or timeout object of the timer to clear.
-     */
         var clearTimeout = ctxClearTimeout || function(id) {
             return root.clearTimeout(id);
         };
-        /**
-     * Creates a clone of  `buffer`.
-     *
-     * @private
-     * @param {Buffer} buffer The buffer to clone.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Buffer} Returns the cloned buffer.
-     */
         function cloneBuffer(buffer, isDeep) {
             if (isDeep) {
                 return buffer.slice();
@@ -4058,98 +1927,35 @@ UsergridEventable.mixin = function(destObject) {
             buffer.copy(result);
             return result;
         }
-        /**
-     * Creates a clone of `arrayBuffer`.
-     *
-     * @private
-     * @param {ArrayBuffer} arrayBuffer The array buffer to clone.
-     * @returns {ArrayBuffer} Returns the cloned array buffer.
-     */
         function cloneArrayBuffer(arrayBuffer) {
             var result = new arrayBuffer.constructor(arrayBuffer.byteLength);
             new Uint8Array(result).set(new Uint8Array(arrayBuffer));
             return result;
         }
-        /**
-     * Creates a clone of `dataView`.
-     *
-     * @private
-     * @param {Object} dataView The data view to clone.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Object} Returns the cloned data view.
-     */
         function cloneDataView(dataView, isDeep) {
             var buffer = isDeep ? cloneArrayBuffer(dataView.buffer) : dataView.buffer;
             return new dataView.constructor(buffer, dataView.byteOffset, dataView.byteLength);
         }
-        /**
-     * Creates a clone of `map`.
-     *
-     * @private
-     * @param {Object} map The map to clone.
-     * @param {Function} cloneFunc The function to clone values.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Object} Returns the cloned map.
-     */
         function cloneMap(map, isDeep, cloneFunc) {
             var array = isDeep ? cloneFunc(mapToArray(map), true) : mapToArray(map);
             return arrayReduce(array, addMapEntry, new map.constructor());
         }
-        /**
-     * Creates a clone of `regexp`.
-     *
-     * @private
-     * @param {Object} regexp The regexp to clone.
-     * @returns {Object} Returns the cloned regexp.
-     */
         function cloneRegExp(regexp) {
             var result = new regexp.constructor(regexp.source, reFlags.exec(regexp));
             result.lastIndex = regexp.lastIndex;
             return result;
         }
-        /**
-     * Creates a clone of `set`.
-     *
-     * @private
-     * @param {Object} set The set to clone.
-     * @param {Function} cloneFunc The function to clone values.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Object} Returns the cloned set.
-     */
         function cloneSet(set, isDeep, cloneFunc) {
             var array = isDeep ? cloneFunc(setToArray(set), true) : setToArray(set);
             return arrayReduce(array, addSetEntry, new set.constructor());
         }
-        /**
-     * Creates a clone of the `symbol` object.
-     *
-     * @private
-     * @param {Object} symbol The symbol object to clone.
-     * @returns {Object} Returns the cloned symbol object.
-     */
         function cloneSymbol(symbol) {
             return symbolValueOf ? Object(symbolValueOf.call(symbol)) : {};
         }
-        /**
-     * Creates a clone of `typedArray`.
-     *
-     * @private
-     * @param {Object} typedArray The typed array to clone.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Object} Returns the cloned typed array.
-     */
         function cloneTypedArray(typedArray, isDeep) {
             var buffer = isDeep ? cloneArrayBuffer(typedArray.buffer) : typedArray.buffer;
             return new typedArray.constructor(buffer, typedArray.byteOffset, typedArray.length);
         }
-        /**
-     * Compares values to sort them in ascending order.
-     *
-     * @private
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {number} Returns the sort order indicator for `value`.
-     */
         function compareAscending(value, other) {
             if (value !== other) {
                 var valIsDefined = value !== undefined, valIsNull = value === null, valIsReflexive = value === value, valIsSymbol = isSymbol(value);
@@ -4163,20 +1969,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return 0;
         }
-        /**
-     * Used by `_.orderBy` to compare multiple properties of a value to another
-     * and stable sort them.
-     *
-     * If `orders` is unspecified, all values are sorted in ascending order. Otherwise,
-     * specify an order of "desc" for descending or "asc" for ascending sort order
-     * of corresponding values.
-     *
-     * @private
-     * @param {Object} object The object to compare.
-     * @param {Object} other The other object to compare.
-     * @param {boolean[]|string[]} orders The order to sort by for each property.
-     * @returns {number} Returns the sort order indicator for `object`.
-     */
         function compareMultiple(object, other, orders) {
             var index = -1, objCriteria = object.criteria, othCriteria = other.criteria, length = objCriteria.length, ordersLength = orders.length;
             while (++index < length) {
@@ -4191,17 +1983,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return object.index - other.index;
         }
-        /**
-     * Creates an array that is the composition of partially applied arguments,
-     * placeholders, and provided arguments into a single array of arguments.
-     *
-     * @private
-     * @param {Array} args The provided arguments.
-     * @param {Array} partials The arguments to prepend to those provided.
-     * @param {Array} holders The `partials` placeholder indexes.
-     * @params {boolean} [isCurried] Specify composing for a curried function.
-     * @returns {Array} Returns the new array of composed arguments.
-     */
         function composeArgs(args, partials, holders, isCurried) {
             var argsIndex = -1, argsLength = args.length, holdersLength = holders.length, leftIndex = -1, leftLength = partials.length, rangeLength = nativeMax(argsLength - holdersLength, 0), result = Array(leftLength + rangeLength), isUncurried = !isCurried;
             while (++leftIndex < leftLength) {
@@ -4217,17 +1998,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * This function is like `composeArgs` except that the arguments composition
-     * is tailored for `_.partialRight`.
-     *
-     * @private
-     * @param {Array} args The provided arguments.
-     * @param {Array} partials The arguments to append to those provided.
-     * @param {Array} holders The `partials` placeholder indexes.
-     * @params {boolean} [isCurried] Specify composing for a curried function.
-     * @returns {Array} Returns the new array of composed arguments.
-     */
         function composeArgsRight(args, partials, holders, isCurried) {
             var argsIndex = -1, argsLength = args.length, holdersIndex = -1, holdersLength = holders.length, rightIndex = -1, rightLength = partials.length, rangeLength = nativeMax(argsLength - holdersLength, 0), result = Array(rangeLength + rightLength), isUncurried = !isCurried;
             while (++argsIndex < rangeLength) {
@@ -4244,14 +2014,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Copies the values of `source` to `array`.
-     *
-     * @private
-     * @param {Array} source The array to copy values from.
-     * @param {Array} [array=[]] The array to copy values to.
-     * @returns {Array} Returns `array`.
-     */
         function copyArray(source, array) {
             var index = -1, length = source.length;
             array || (array = Array(length));
@@ -4260,16 +2022,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * Copies properties of `source` to `object`.
-     *
-     * @private
-     * @param {Object} source The object to copy properties from.
-     * @param {Array} props The property identifiers to copy.
-     * @param {Object} [object={}] The object to copy properties to.
-     * @param {Function} [customizer] The function to customize copied values.
-     * @returns {Object} Returns `object`.
-     */
         function copyObject(source, props, object, customizer) {
             var isNew = !object;
             object || (object = {});
@@ -4288,38 +2040,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return object;
         }
-        /**
-     * Copies own symbol properties of `source` to `object`.
-     *
-     * @private
-     * @param {Object} source The object to copy symbols from.
-     * @param {Object} [object={}] The object to copy symbols to.
-     * @returns {Object} Returns `object`.
-     */
         function copySymbols(source, object) {
             return copyObject(source, getSymbols(source), object);
         }
-        /**
-     * Creates a function like `_.groupBy`.
-     *
-     * @private
-     * @param {Function} setter The function to set accumulator values.
-     * @param {Function} [initializer] The accumulator object initializer.
-     * @returns {Function} Returns the new aggregator function.
-     */
         function createAggregator(setter, initializer) {
             return function(collection, iteratee) {
                 var func = isArray(collection) ? arrayAggregator : baseAggregator, accumulator = initializer ? initializer() : {};
                 return func(collection, setter, getIteratee(iteratee, 2), accumulator);
             };
         }
-        /**
-     * Creates a function like `_.assign`.
-     *
-     * @private
-     * @param {Function} assigner The function to assign values.
-     * @returns {Function} Returns the new assigner function.
-     */
         function createAssigner(assigner) {
             return baseRest(function(object, sources) {
                 var index = -1, length = sources.length, customizer = length > 1 ? sources[length - 1] : undefined, guard = length > 2 ? sources[2] : undefined;
@@ -4339,14 +2068,6 @@ UsergridEventable.mixin = function(destObject) {
                 return object;
             });
         }
-        /**
-     * Creates a `baseEach` or `baseEachRight` function.
-     *
-     * @private
-     * @param {Function} eachFunc The function to iterate over a collection.
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Function} Returns the new base function.
-     */
         function createBaseEach(eachFunc, fromRight) {
             return function(collection, iteratee) {
                 if (collection == null) {
@@ -4364,13 +2085,6 @@ UsergridEventable.mixin = function(destObject) {
                 return collection;
             };
         }
-        /**
-     * Creates a base function for methods like `_.forIn` and `_.forOwn`.
-     *
-     * @private
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Function} Returns the new base function.
-     */
         function createBaseFor(fromRight) {
             return function(object, iteratee, keysFunc) {
                 var index = -1, iterable = Object(object), props = keysFunc(object), length = props.length;
@@ -4383,16 +2097,6 @@ UsergridEventable.mixin = function(destObject) {
                 return object;
             };
         }
-        /**
-     * Creates a function that wraps `func` to invoke it with the optional `this`
-     * binding of `thisArg`.
-     *
-     * @private
-     * @param {Function} func The function to wrap.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @param {*} [thisArg] The `this` binding of `func`.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createBind(func, bitmask, thisArg) {
             var isBind = bitmask & BIND_FLAG, Ctor = createCtor(func);
             function wrapper() {
@@ -4401,13 +2105,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return wrapper;
         }
-        /**
-     * Creates a function like `_.lowerFirst`.
-     *
-     * @private
-     * @param {string} methodName The name of the `String` case method to use.
-     * @returns {Function} Returns the new case function.
-     */
         function createCaseFirst(methodName) {
             return function(string) {
                 string = toString(string);
@@ -4417,26 +2114,11 @@ UsergridEventable.mixin = function(destObject) {
                 return chr[methodName]() + trailing;
             };
         }
-        /**
-     * Creates a function like `_.camelCase`.
-     *
-     * @private
-     * @param {Function} callback The function to combine each word.
-     * @returns {Function} Returns the new compounder function.
-     */
         function createCompounder(callback) {
             return function(string) {
                 return arrayReduce(words(deburr(string).replace(reApos, "")), callback, "");
             };
         }
-        /**
-     * Creates a function that produces an instance of `Ctor` regardless of
-     * whether it was invoked as part of a `new` expression or by `call` or `apply`.
-     *
-     * @private
-     * @param {Function} Ctor The constructor to wrap.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createCtor(Ctor) {
             return function() {
                 var args = arguments;
@@ -4469,15 +2151,6 @@ UsergridEventable.mixin = function(destObject) {
                 return isObject(result) ? result : thisBinding;
             };
         }
-        /**
-     * Creates a function that wraps `func` to enable currying.
-     *
-     * @private
-     * @param {Function} func The function to wrap.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @param {number} arity The arity of `func`.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createCurry(func, bitmask, arity) {
             var Ctor = createCtor(func);
             function wrapper() {
@@ -4495,13 +2168,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return wrapper;
         }
-        /**
-     * Creates a `_.find` or `_.findLast` function.
-     *
-     * @private
-     * @param {Function} findIndexFunc The function to find the collection index.
-     * @returns {Function} Returns the new find function.
-     */
         function createFind(findIndexFunc) {
             return function(collection, predicate, fromIndex) {
                 var iterable = Object(collection);
@@ -4516,13 +2182,6 @@ UsergridEventable.mixin = function(destObject) {
                 return index > -1 ? iterable[iteratee ? collection[index] : index] : undefined;
             };
         }
-        /**
-     * Creates a `_.flow` or `_.flowRight` function.
-     *
-     * @private
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Function} Returns the new flow function.
-     */
         function createFlow(fromRight) {
             return flatRest(function(funcs) {
                 var length = funcs.length, index = length, prereq = LodashWrapper.prototype.thru;
@@ -4561,25 +2220,6 @@ UsergridEventable.mixin = function(destObject) {
                 };
             });
         }
-        /**
-     * Creates a function that wraps `func` to invoke it with optional `this`
-     * binding of `thisArg`, partial application, and currying.
-     *
-     * @private
-     * @param {Function|string} func The function or method name to wrap.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @param {*} [thisArg] The `this` binding of `func`.
-     * @param {Array} [partials] The arguments to prepend to those provided to
-     *  the new function.
-     * @param {Array} [holders] The `partials` placeholder indexes.
-     * @param {Array} [partialsRight] The arguments to append to those provided
-     *  to the new function.
-     * @param {Array} [holdersRight] The `partialsRight` placeholder indexes.
-     * @param {Array} [argPos] The argument positions of the new function.
-     * @param {number} [ary] The arity cap of `func`.
-     * @param {number} [arity] The arity of `func`.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createHybrid(func, bitmask, thisArg, partials, holders, partialsRight, holdersRight, argPos, ary, arity) {
             var isAry = bitmask & ARY_FLAG, isBind = bitmask & BIND_FLAG, isBindKey = bitmask & BIND_KEY_FLAG, isCurried = bitmask & (CURRY_FLAG | CURRY_RIGHT_FLAG), isFlip = bitmask & FLIP_FLAG, Ctor = isBindKey ? undefined : createCtor(func);
             function wrapper() {
@@ -4618,27 +2258,11 @@ UsergridEventable.mixin = function(destObject) {
             }
             return wrapper;
         }
-        /**
-     * Creates a function like `_.invertBy`.
-     *
-     * @private
-     * @param {Function} setter The function to set accumulator values.
-     * @param {Function} toIteratee The function to resolve iteratees.
-     * @returns {Function} Returns the new inverter function.
-     */
         function createInverter(setter, toIteratee) {
             return function(object, iteratee) {
                 return baseInverter(object, setter, toIteratee(iteratee), {});
             };
         }
-        /**
-     * Creates a function that performs a mathematical operation on two values.
-     *
-     * @private
-     * @param {Function} operator The function to perform the operation.
-     * @param {number} [defaultValue] The value used for `undefined` arguments.
-     * @returns {Function} Returns the new mathematical operation function.
-     */
         function createMathOperation(operator, defaultValue) {
             return function(value, other) {
                 var result;
@@ -4664,13 +2288,6 @@ UsergridEventable.mixin = function(destObject) {
                 return result;
             };
         }
-        /**
-     * Creates a function like `_.over`.
-     *
-     * @private
-     * @param {Function} arrayFunc The function to iterate over iteratees.
-     * @returns {Function} Returns the new over function.
-     */
         function createOver(arrayFunc) {
             return flatRest(function(iteratees) {
                 iteratees = arrayMap(iteratees, baseUnary(getIteratee()));
@@ -4682,15 +2299,6 @@ UsergridEventable.mixin = function(destObject) {
                 });
             });
         }
-        /**
-     * Creates the padding for `string` based on `length`. The `chars` string
-     * is truncated if the number of characters exceeds `length`.
-     *
-     * @private
-     * @param {number} length The padding length.
-     * @param {string} [chars=' '] The string used as padding.
-     * @returns {string} Returns the padding for `string`.
-     */
         function createPadding(length, chars) {
             chars = chars === undefined ? " " : baseToString(chars);
             var charsLength = chars.length;
@@ -4700,18 +2308,6 @@ UsergridEventable.mixin = function(destObject) {
             var result = baseRepeat(chars, nativeCeil(length / stringSize(chars)));
             return hasUnicode(chars) ? castSlice(stringToArray(result), 0, length).join("") : result.slice(0, length);
         }
-        /**
-     * Creates a function that wraps `func` to invoke it with the `this` binding
-     * of `thisArg` and `partials` prepended to the arguments it receives.
-     *
-     * @private
-     * @param {Function} func The function to wrap.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @param {*} thisArg The `this` binding of `func`.
-     * @param {Array} partials The arguments to prepend to those provided to
-     *  the new function.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createPartial(func, bitmask, thisArg, partials) {
             var isBind = bitmask & BIND_FLAG, Ctor = createCtor(func);
             function wrapper() {
@@ -4726,13 +2322,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return wrapper;
         }
-        /**
-     * Creates a `_.range` or `_.rangeRight` function.
-     *
-     * @private
-     * @param {boolean} [fromRight] Specify iterating from right to left.
-     * @returns {Function} Returns the new range function.
-     */
         function createRange(fromRight) {
             return function(start, end, step) {
                 if (step && typeof step != "number" && isIterateeCall(start, end, step)) {
@@ -4749,13 +2338,6 @@ UsergridEventable.mixin = function(destObject) {
                 return baseRange(start, end, step, fromRight);
             };
         }
-        /**
-     * Creates a function that performs a relational operation on two values.
-     *
-     * @private
-     * @param {Function} operator The function to perform the operation.
-     * @returns {Function} Returns the new relational operation function.
-     */
         function createRelationalOperation(operator) {
             return function(value, other) {
                 if (!(typeof value == "string" && typeof other == "string")) {
@@ -4765,23 +2347,6 @@ UsergridEventable.mixin = function(destObject) {
                 return operator(value, other);
             };
         }
-        /**
-     * Creates a function that wraps `func` to continue currying.
-     *
-     * @private
-     * @param {Function} func The function to wrap.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @param {Function} wrapFunc The function to create the `func` wrapper.
-     * @param {*} placeholder The placeholder value.
-     * @param {*} [thisArg] The `this` binding of `func`.
-     * @param {Array} [partials] The arguments to prepend to those provided to
-     *  the new function.
-     * @param {Array} [holders] The `partials` placeholder indexes.
-     * @param {Array} [argPos] The argument positions of the new function.
-     * @param {number} [ary] The arity cap of `func`.
-     * @param {number} [arity] The arity of `func`.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createRecurry(func, bitmask, wrapFunc, placeholder, thisArg, partials, holders, argPos, ary, arity) {
             var isCurry = bitmask & CURRY_FLAG, newHolders = isCurry ? holders : undefined, newHoldersRight = isCurry ? undefined : holders, newPartials = isCurry ? partials : undefined, newPartialsRight = isCurry ? undefined : partials;
             bitmask |= isCurry ? PARTIAL_FLAG : PARTIAL_RIGHT_FLAG;
@@ -4797,13 +2362,6 @@ UsergridEventable.mixin = function(destObject) {
             result.placeholder = placeholder;
             return setWrapToString(result, func, bitmask);
         }
-        /**
-     * Creates a function like `_.round`.
-     *
-     * @private
-     * @param {string} methodName The name of the `Math` method to use when rounding.
-     * @returns {Function} Returns the new round function.
-     */
         function createRound(methodName) {
             var func = Math[methodName];
             return function(number, precision) {
@@ -4817,23 +2375,9 @@ UsergridEventable.mixin = function(destObject) {
                 return func(number);
             };
         }
-        /**
-     * Creates a set object of `values`.
-     *
-     * @private
-     * @param {Array} values The values to add to the set.
-     * @returns {Object} Returns the new set.
-     */
         var createSet = !(Set && 1 / setToArray(new Set([ , -0 ]))[1] == INFINITY) ? noop : function(values) {
             return new Set(values);
         };
-        /**
-     * Creates a `_.toPairs` or `_.toPairsIn` function.
-     *
-     * @private
-     * @param {Function} keysFunc The function to get the keys of a given object.
-     * @returns {Function} Returns the new pairs function.
-     */
         function createToPairs(keysFunc) {
             return function(object) {
                 var tag = getTag(object);
@@ -4846,32 +2390,6 @@ UsergridEventable.mixin = function(destObject) {
                 return baseToPairs(object, keysFunc(object));
             };
         }
-        /**
-     * Creates a function that either curries or invokes `func` with optional
-     * `this` binding and partially applied arguments.
-     *
-     * @private
-     * @param {Function|string} func The function or method name to wrap.
-     * @param {number} bitmask The bitmask flags.
-     *  The bitmask may be composed of the following flags:
-     *     1 - `_.bind`
-     *     2 - `_.bindKey`
-     *     4 - `_.curry` or `_.curryRight` of a bound function
-     *     8 - `_.curry`
-     *    16 - `_.curryRight`
-     *    32 - `_.partial`
-     *    64 - `_.partialRight`
-     *   128 - `_.rearg`
-     *   256 - `_.ary`
-     *   512 - `_.flip`
-     * @param {*} [thisArg] The `this` binding of `func`.
-     * @param {Array} [partials] The arguments to be partially applied.
-     * @param {Array} [holders] The `partials` placeholder indexes.
-     * @param {Array} [argPos] The argument positions of the new function.
-     * @param {number} [ary] The arity cap of `func`.
-     * @param {number} [arity] The arity of `func`.
-     * @returns {Function} Returns the new wrapped function.
-     */
         function createWrap(func, bitmask, thisArg, partials, holders, argPos, ary, arity) {
             var isBindKey = bitmask & BIND_KEY_FLAG;
             if (!isBindKey && typeof func != "function") {
@@ -4915,20 +2433,6 @@ UsergridEventable.mixin = function(destObject) {
             var setter = data ? baseSetData : setData;
             return setWrapToString(setter(result, newData), func, bitmask);
         }
-        /**
-     * A specialized version of `baseIsEqualDeep` for arrays with support for
-     * partial deep comparisons.
-     *
-     * @private
-     * @param {Array} array The array to compare.
-     * @param {Array} other The other array to compare.
-     * @param {Function} equalFunc The function to determine equivalents of values.
-     * @param {Function} customizer The function to customize comparisons.
-     * @param {number} bitmask The bitmask of comparison flags. See `baseIsEqual`
-     *  for more details.
-     * @param {Object} stack Tracks traversed `array` and `other` objects.
-     * @returns {boolean} Returns `true` if the arrays are equivalent, else `false`.
-     */
         function equalArrays(array, other, equalFunc, customizer, bitmask, stack) {
             var isPartial = bitmask & PARTIAL_COMPARE_FLAG, arrLength = array.length, othLength = other.length;
             if (arrLength != othLength && !(isPartial && othLength > arrLength)) {
@@ -4971,24 +2475,6 @@ UsergridEventable.mixin = function(destObject) {
             stack["delete"](other);
             return result;
         }
-        /**
-     * A specialized version of `baseIsEqualDeep` for comparing objects of
-     * the same `toStringTag`.
-     *
-     * **Note:** This function only supports comparing values with tags of
-     * `Boolean`, `Date`, `Error`, `Number`, `RegExp`, or `String`.
-     *
-     * @private
-     * @param {Object} object The object to compare.
-     * @param {Object} other The other object to compare.
-     * @param {string} tag The `toStringTag` of the objects to compare.
-     * @param {Function} equalFunc The function to determine equivalents of values.
-     * @param {Function} customizer The function to customize comparisons.
-     * @param {number} bitmask The bitmask of comparison flags. See `baseIsEqual`
-     *  for more details.
-     * @param {Object} stack Tracks traversed `object` and `other` objects.
-     * @returns {boolean} Returns `true` if the objects are equivalent, else `false`.
-     */
         function equalByTag(object, other, tag, equalFunc, customizer, bitmask, stack) {
             switch (tag) {
               case dataViewTag:
@@ -5042,20 +2528,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return false;
         }
-        /**
-     * A specialized version of `baseIsEqualDeep` for objects with support for
-     * partial deep comparisons.
-     *
-     * @private
-     * @param {Object} object The object to compare.
-     * @param {Object} other The other object to compare.
-     * @param {Function} equalFunc The function to determine equivalents of values.
-     * @param {Function} customizer The function to customize comparisons.
-     * @param {number} bitmask The bitmask of comparison flags. See `baseIsEqual`
-     *  for more details.
-     * @param {Object} stack Tracks traversed `object` and `other` objects.
-     * @returns {boolean} Returns `true` if the objects are equivalent, else `false`.
-     */
         function equalObjects(object, other, equalFunc, customizer, bitmask, stack) {
             var isPartial = bitmask & PARTIAL_COMPARE_FLAG, objProps = keys(object), objLength = objProps.length, othProps = keys(other), othLength = othProps.length;
             if (objLength != othLength && !isPartial) {
@@ -5098,54 +2570,18 @@ UsergridEventable.mixin = function(destObject) {
             stack["delete"](other);
             return result;
         }
-        /**
-     * A specialized version of `baseRest` which flattens the rest array.
-     *
-     * @private
-     * @param {Function} func The function to apply a rest parameter to.
-     * @returns {Function} Returns the new function.
-     */
         function flatRest(func) {
             return setToString(overRest(func, undefined, flatten), func + "");
         }
-        /**
-     * Creates an array of own enumerable property names and symbols of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names and symbols.
-     */
         function getAllKeys(object) {
             return baseGetAllKeys(object, keys, getSymbols);
         }
-        /**
-     * Creates an array of own and inherited enumerable property names and
-     * symbols of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names and symbols.
-     */
         function getAllKeysIn(object) {
             return baseGetAllKeys(object, keysIn, getSymbolsIn);
         }
-        /**
-     * Gets metadata for `func`.
-     *
-     * @private
-     * @param {Function} func The function to query.
-     * @returns {*} Returns the metadata for `func`.
-     */
         var getData = !metaMap ? noop : function(func) {
             return metaMap.get(func);
         };
-        /**
-     * Gets the name of `func`.
-     *
-     * @private
-     * @param {Function} func The function to query.
-     * @returns {string} Returns the function name.
-     */
         function getFuncName(func) {
             var result = func.name + "", array = realNames[result], length = hasOwnProperty.call(realNames, result) ? array.length : 0;
             while (length--) {
@@ -5156,52 +2592,19 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Gets the argument placeholder value for `func`.
-     *
-     * @private
-     * @param {Function} func The function to inspect.
-     * @returns {*} Returns the placeholder value.
-     */
         function getHolder(func) {
             var object = hasOwnProperty.call(lodash, "placeholder") ? lodash : func;
             return object.placeholder;
         }
-        /**
-     * Gets the appropriate "iteratee" function. If `_.iteratee` is customized,
-     * this function returns the custom method, otherwise it returns `baseIteratee`.
-     * If arguments are provided, the chosen function is invoked with them and
-     * its result is returned.
-     *
-     * @private
-     * @param {*} [value] The value to convert to an iteratee.
-     * @param {number} [arity] The arity of the created iteratee.
-     * @returns {Function} Returns the chosen function or its result.
-     */
         function getIteratee() {
             var result = lodash.iteratee || iteratee;
             result = result === iteratee ? baseIteratee : result;
             return arguments.length ? result(arguments[0], arguments[1]) : result;
         }
-        /**
-     * Gets the data for `map`.
-     *
-     * @private
-     * @param {Object} map The map to query.
-     * @param {string} key The reference key.
-     * @returns {*} Returns the map data.
-     */
         function getMapData(map, key) {
             var data = map.__data__;
             return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
         }
-        /**
-     * Gets the property names, values, and compare flags of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the match data of `object`.
-     */
         function getMatchData(object) {
             var result = keys(object), length = result.length;
             while (length--) {
@@ -5210,34 +2613,11 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Gets the native function at `key` of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {string} key The key of the method to get.
-     * @returns {*} Returns the function if it's native, else `undefined`.
-     */
         function getNative(object, key) {
             var value = getValue(object, key);
             return baseIsNative(value) ? value : undefined;
         }
-        /**
-     * Creates an array of the own enumerable symbol properties of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of symbols.
-     */
         var getSymbols = nativeGetSymbols ? overArg(nativeGetSymbols, Object) : stubArray;
-        /**
-     * Creates an array of the own and inherited enumerable symbol properties
-     * of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of symbols.
-     */
         var getSymbolsIn = !nativeGetSymbols ? stubArray : function(object) {
             var result = [];
             while (object) {
@@ -5246,13 +2626,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         };
-        /**
-     * Gets the `toStringTag` of `value`.
-     *
-     * @private
-     * @param {*} value The value to query.
-     * @returns {string} Returns the `toStringTag`.
-     */
         var getTag = baseGetTag;
         if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag || Map && getTag(new Map()) != mapTag || Promise && getTag(Promise.resolve()) != promiseTag || Set && getTag(new Set()) != setTag || WeakMap && getTag(new WeakMap()) != weakMapTag) {
             getTag = function(value) {
@@ -5278,16 +2651,6 @@ UsergridEventable.mixin = function(destObject) {
                 return result;
             };
         }
-        /**
-     * Gets the view, applying any `transforms` to the `start` and `end` positions.
-     *
-     * @private
-     * @param {number} start The start of the view.
-     * @param {number} end The end of the view.
-     * @param {Array} transforms The transformations to apply to the view.
-     * @returns {Object} Returns an object containing the `start` and `end`
-     *  positions of the view.
-     */
         function getView(start, end, transforms) {
             var index = -1, length = transforms.length;
             while (++index < length) {
@@ -5315,26 +2678,10 @@ UsergridEventable.mixin = function(destObject) {
                 end: end
             };
         }
-        /**
-     * Extracts wrapper details from the `source` body comment.
-     *
-     * @private
-     * @param {string} source The source to inspect.
-     * @returns {Array} Returns the wrapper details.
-     */
         function getWrapDetails(source) {
             var match = source.match(reWrapDetails);
             return match ? match[1].split(reSplitDetails) : [];
         }
-        /**
-     * Checks if `path` exists on `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path to check.
-     * @param {Function} hasFunc The function to check properties.
-     * @returns {boolean} Returns `true` if `path` exists, else `false`.
-     */
         function hasPath(object, path, hasFunc) {
             path = isKey(path, object) ? [ path ] : castPath(path);
             var index = -1, length = path.length, result = false;
@@ -5351,13 +2698,6 @@ UsergridEventable.mixin = function(destObject) {
             length = object ? object.length : 0;
             return !!length && isLength(length) && isIndex(key, length) && (isArray(object) || isArguments(object));
         }
-        /**
-     * Initializes an array clone.
-     *
-     * @private
-     * @param {Array} array The array to clone.
-     * @returns {Array} Returns the initialized clone.
-     */
         function initCloneArray(array) {
             var length = array.length, result = array.constructor(length);
             if (length && typeof array[0] == "string" && hasOwnProperty.call(array, "index")) {
@@ -5366,29 +2706,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Initializes an object clone.
-     *
-     * @private
-     * @param {Object} object The object to clone.
-     * @returns {Object} Returns the initialized clone.
-     */
         function initCloneObject(object) {
             return typeof object.constructor == "function" && !isPrototype(object) ? baseCreate(getPrototype(object)) : {};
         }
-        /**
-     * Initializes an object clone based on its `toStringTag`.
-     *
-     * **Note:** This function only supports cloning values with tags of
-     * `Boolean`, `Date`, `Error`, `Number`, `RegExp`, or `String`.
-     *
-     * @private
-     * @param {Object} object The object to clone.
-     * @param {string} tag The `toStringTag` of the object to clone.
-     * @param {Function} cloneFunc The function to clone values.
-     * @param {boolean} [isDeep] Specify a deep clone.
-     * @returns {Object} Returns the initialized clone.
-     */
         function initCloneByTag(object, tag, cloneFunc, isDeep) {
             var Ctor = object.constructor;
             switch (tag) {
@@ -5430,14 +2750,6 @@ UsergridEventable.mixin = function(destObject) {
                 return cloneSymbol(object);
             }
         }
-        /**
-     * Inserts wrapper `details` in a comment at the top of the `source` body.
-     *
-     * @private
-     * @param {string} source The source to modify.
-     * @returns {Array} details The details to insert.
-     * @returns {string} Returns the modified source.
-     */
         function insertWrapDetails(source, details) {
             var length = details.length;
             if (!length) {
@@ -5448,38 +2760,13 @@ UsergridEventable.mixin = function(destObject) {
             details = details.join(length > 2 ? ", " : " ");
             return source.replace(reWrapComment, "{\n/* [wrapped with " + details + "] */\n");
         }
-        /**
-     * Checks if `value` is a flattenable `arguments` object or array.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is flattenable, else `false`.
-     */
         function isFlattenable(value) {
             return isArray(value) || isArguments(value) || !!(spreadableSymbol && value && value[spreadableSymbol]);
         }
-        /**
-     * Checks if `value` is a valid array-like index.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
-     * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
-     */
         function isIndex(value, length) {
             length = length == null ? MAX_SAFE_INTEGER : length;
             return !!length && (typeof value == "number" || reIsUint.test(value)) && (value > -1 && value % 1 == 0 && value < length);
         }
-        /**
-     * Checks if the given arguments are from an iteratee call.
-     *
-     * @private
-     * @param {*} value The potential iteratee value argument.
-     * @param {*} index The potential iteratee index or key argument.
-     * @param {*} object The potential iteratee object argument.
-     * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
-     *  else `false`.
-     */
         function isIterateeCall(value, index, object) {
             if (!isObject(object)) {
                 return false;
@@ -5490,14 +2777,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return false;
         }
-        /**
-     * Checks if `value` is a property name and not a property path.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @param {Object} [object] The object to query keys on.
-     * @returns {boolean} Returns `true` if `value` is a property name, else `false`.
-     */
         function isKey(value, object) {
             if (isArray(value)) {
                 return false;
@@ -5508,25 +2787,10 @@ UsergridEventable.mixin = function(destObject) {
             }
             return reIsPlainProp.test(value) || !reIsDeepProp.test(value) || object != null && value in Object(object);
         }
-        /**
-     * Checks if `value` is suitable for use as unique object key.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is suitable, else `false`.
-     */
         function isKeyable(value) {
             var type = typeof value;
             return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
         }
-        /**
-     * Checks if `func` has a lazy counterpart.
-     *
-     * @private
-     * @param {Function} func The function to check.
-     * @returns {boolean} Returns `true` if `func` has a lazy counterpart,
-     *  else `false`.
-     */
         function isLaziable(func) {
             var funcName = getFuncName(func), other = lodash[funcName];
             if (typeof other != "function" || !(funcName in LazyWrapper.prototype)) {
@@ -5538,55 +2802,17 @@ UsergridEventable.mixin = function(destObject) {
             var data = getData(other);
             return !!data && func === data[0];
         }
-        /**
-     * Checks if `func` has its source masked.
-     *
-     * @private
-     * @param {Function} func The function to check.
-     * @returns {boolean} Returns `true` if `func` is masked, else `false`.
-     */
         function isMasked(func) {
             return !!maskSrcKey && maskSrcKey in func;
         }
-        /**
-     * Checks if `func` is capable of being masked.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `func` is maskable, else `false`.
-     */
         var isMaskable = coreJsData ? isFunction : stubFalse;
-        /**
-     * Checks if `value` is likely a prototype object.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a prototype, else `false`.
-     */
         function isPrototype(value) {
             var Ctor = value && value.constructor, proto = typeof Ctor == "function" && Ctor.prototype || objectProto;
             return value === proto;
         }
-        /**
-     * Checks if `value` is suitable for strict equality comparisons, i.e. `===`.
-     *
-     * @private
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` if suitable for strict
-     *  equality comparisons, else `false`.
-     */
         function isStrictComparable(value) {
             return value === value && !isObject(value);
         }
-        /**
-     * A specialized version of `matchesProperty` for source values suitable
-     * for strict equality comparisons, i.e. `===`.
-     *
-     * @private
-     * @param {string} key The key of the property to get.
-     * @param {*} srcValue The value to match.
-     * @returns {Function} Returns the new spec function.
-     */
         function matchesStrictComparable(key, srcValue) {
             return function(object) {
                 if (object == null) {
@@ -5595,14 +2821,6 @@ UsergridEventable.mixin = function(destObject) {
                 return object[key] === srcValue && (srcValue !== undefined || key in Object(object));
             };
         }
-        /**
-     * A specialized version of `_.memoize` which clears the memoized function's
-     * cache when it exceeds `MAX_MEMOIZE_SIZE`.
-     *
-     * @private
-     * @param {Function} func The function to have its output memoized.
-     * @returns {Function} Returns the new memoized function.
-     */
         function memoizeCapped(func) {
             var result = memoize(func, function(key) {
                 if (cache.size === MAX_MEMOIZE_SIZE) {
@@ -5613,22 +2831,6 @@ UsergridEventable.mixin = function(destObject) {
             var cache = result.cache;
             return result;
         }
-        /**
-     * Merges the function metadata of `source` into `data`.
-     *
-     * Merging metadata reduces the number of wrappers used to invoke a function.
-     * This is possible because methods like `_.bind`, `_.curry`, and `_.partial`
-     * may be applied regardless of execution order. Methods like `_.ary` and
-     * `_.rearg` modify function arguments, making the order in which they are
-     * executed important, preventing the merging of metadata. However, we make
-     * an exception for a safe combined case where curried functions have `_.ary`
-     * and or `_.rearg` applied.
-     *
-     * @private
-     * @param {Array} data The destination metadata.
-     * @param {Array} source The source metadata.
-     * @returns {Array} Returns `data`.
-     */
         function mergeData(data, source) {
             var bitmask = data[1], srcBitmask = source[1], newBitmask = bitmask | srcBitmask, isCommon = newBitmask < (BIND_FLAG | BIND_KEY_FLAG | ARY_FLAG);
             var isCombo = srcBitmask == ARY_FLAG && bitmask == CURRY_FLAG || srcBitmask == ARY_FLAG && bitmask == REARG_FLAG && data[7].length <= source[8] || srcBitmask == (ARY_FLAG | REARG_FLAG) && source[7].length <= source[8] && bitmask == CURRY_FLAG;
@@ -5665,19 +2867,6 @@ UsergridEventable.mixin = function(destObject) {
             data[1] = newBitmask;
             return data;
         }
-        /**
-     * Used by `_.defaultsDeep` to customize its `_.merge` use.
-     *
-     * @private
-     * @param {*} objValue The destination value.
-     * @param {*} srcValue The source value.
-     * @param {string} key The key of the property to merge.
-     * @param {Object} object The parent object of `objValue`.
-     * @param {Object} source The parent object of `srcValue`.
-     * @param {Object} [stack] Tracks traversed source values and their merged
-     *  counterparts.
-     * @returns {*} Returns the value to assign.
-     */
         function mergeDefaults(objValue, srcValue, key, object, source, stack) {
             if (isObject(objValue) && isObject(srcValue)) {
                 stack.set(srcValue, objValue);
@@ -5686,15 +2875,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return objValue;
         }
-        /**
-     * This function is like
-     * [`Object.keys`](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
-     * except that it includes inherited enumerable properties.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names.
-     */
         function nativeKeysIn(object) {
             var result = [];
             if (object != null) {
@@ -5704,15 +2884,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * A specialized version of `baseRest` which transforms the rest array.
-     *
-     * @private
-     * @param {Function} func The function to apply a rest parameter to.
-     * @param {number} [start=func.length-1] The start position of the rest parameter.
-     * @param {Function} transform The rest array transform.
-     * @returns {Function} Returns the new function.
-     */
         function overRest(func, start, transform) {
             start = nativeMax(start === undefined ? func.length - 1 : start, 0);
             return function() {
@@ -5729,27 +2900,9 @@ UsergridEventable.mixin = function(destObject) {
                 return apply(func, this, otherArgs);
             };
         }
-        /**
-     * Gets the parent value at `path` of `object`.
-     *
-     * @private
-     * @param {Object} object The object to query.
-     * @param {Array} path The path to get the parent value of.
-     * @returns {*} Returns the parent value.
-     */
         function parent(object, path) {
             return path.length == 1 ? object : baseGet(object, baseSlice(path, 0, -1));
         }
-        /**
-     * Reorder `array` according to the specified indexes where the element at
-     * the first index is assigned as the first element, the element at
-     * the second index is assigned as the second element, and so on.
-     *
-     * @private
-     * @param {Array} array The array to reorder.
-     * @param {Array} indexes The arranged array indexes.
-     * @returns {Array} Returns `array`.
-     */
         function reorder(array, indexes) {
             var arrLength = array.length, length = nativeMin(indexes.length, arrLength), oldArray = copyArray(array);
             while (length--) {
@@ -5758,64 +2911,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * Sets metadata for `func`.
-     *
-     * **Note:** If this function becomes hot, i.e. is invoked a lot in a short
-     * period of time, it will trip its breaker and transition to an identity
-     * function to avoid garbage collection pauses in V8. See
-     * [V8 issue 2070](https://bugs.chromium.org/p/v8/issues/detail?id=2070)
-     * for more details.
-     *
-     * @private
-     * @param {Function} func The function to associate metadata with.
-     * @param {*} data The metadata.
-     * @returns {Function} Returns `func`.
-     */
         var setData = shortOut(baseSetData);
-        /**
-     * A simple wrapper around the global [`setTimeout`](https://mdn.io/setTimeout).
-     *
-     * @private
-     * @param {Function} func The function to delay.
-     * @param {number} wait The number of milliseconds to delay invocation.
-     * @returns {number|Object} Returns the timer id or timeout object.
-     */
         var setTimeout = ctxSetTimeout || function(func, wait) {
             return root.setTimeout(func, wait);
         };
-        /**
-     * Sets the `toString` method of `func` to return `string`.
-     *
-     * @private
-     * @param {Function} func The function to modify.
-     * @param {Function} string The `toString` result.
-     * @returns {Function} Returns `func`.
-     */
         var setToString = shortOut(baseSetToString);
-        /**
-     * Sets the `toString` method of `wrapper` to mimic the source of `reference`
-     * with wrapper details in a comment at the top of the source body.
-     *
-     * @private
-     * @param {Function} wrapper The function to modify.
-     * @param {Function} reference The reference function.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @returns {Function} Returns `wrapper`.
-     */
         function setWrapToString(wrapper, reference, bitmask) {
             var source = reference + "";
             return setToString(wrapper, insertWrapDetails(source, updateWrapDetails(getWrapDetails(source), bitmask)));
         }
-        /**
-     * Creates a function that'll short out and invoke `identity` instead
-     * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
-     * milliseconds.
-     *
-     * @private
-     * @param {Function} func The function to restrict.
-     * @returns {Function} Returns the new shortable function.
-     */
         function shortOut(func) {
             var count = 0, lastCalled = 0;
             return function() {
@@ -5831,13 +2935,6 @@ UsergridEventable.mixin = function(destObject) {
                 return func.apply(undefined, arguments);
             };
         }
-        /**
-     * A specialized version of `arrayShuffle` which mutates `array`.
-     *
-     * @private
-     * @param {Array} array The array to shuffle.
-     * @returns {Array} Returns `array`.
-     */
         function shuffleSelf(array) {
             var index = -1, length = array.length, lastIndex = length - 1;
             while (++index < length) {
@@ -5847,13 +2944,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return array;
         }
-        /**
-     * Converts `string` to a property path array.
-     *
-     * @private
-     * @param {string} string The string to convert.
-     * @returns {Array} Returns the property path array.
-     */
         var stringToPath = memoizeCapped(function(string) {
             string = toString(string);
             var result = [];
@@ -5865,13 +2955,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         });
-        /**
-     * Converts `value` to a string key if it's not a string or symbol.
-     *
-     * @private
-     * @param {*} value The value to inspect.
-     * @returns {string|symbol} Returns the key.
-     */
         function toKey(value) {
             if (typeof value == "string" || isSymbol(value)) {
                 return value;
@@ -5879,13 +2962,6 @@ UsergridEventable.mixin = function(destObject) {
             var result = value + "";
             return result == "0" && 1 / value == -INFINITY ? "-0" : result;
         }
-        /**
-     * Converts `func` to its source code.
-     *
-     * @private
-     * @param {Function} func The function to process.
-     * @returns {string} Returns the source code.
-     */
         function toSource(func) {
             if (func != null) {
                 try {
@@ -5897,14 +2973,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return "";
         }
-        /**
-     * Updates wrapper `details` based on `bitmask` flags.
-     *
-     * @private
-     * @returns {Array} details The details to modify.
-     * @param {number} bitmask The bitmask flags. See `createWrap` for more details.
-     * @returns {Array} Returns `details`.
-     */
         function updateWrapDetails(details, bitmask) {
             arrayEach(wrapFlags, function(pair) {
                 var value = "_." + pair[0];
@@ -5914,13 +2982,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return details.sort();
         }
-        /**
-     * Creates a clone of `wrapper`.
-     *
-     * @private
-     * @param {Object} wrapper The wrapper to clone.
-     * @returns {Object} Returns the cloned wrapper.
-     */
         function wrapperClone(wrapper) {
             if (wrapper instanceof LazyWrapper) {
                 return wrapper.clone();
@@ -5931,28 +2992,6 @@ UsergridEventable.mixin = function(destObject) {
             result.__values__ = wrapper.__values__;
             return result;
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates an array of elements split into groups the length of `size`.
-     * If `array` can't be split evenly, the final chunk will be the remaining
-     * elements.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to process.
-     * @param {number} [size=1] The length of each chunk
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the new array of chunks.
-     * @example
-     *
-     * _.chunk(['a', 'b', 'c', 'd'], 2);
-     * // => [['a', 'b'], ['c', 'd']]
-     *
-     * _.chunk(['a', 'b', 'c', 'd'], 3);
-     * // => [['a', 'b', 'c'], ['d']]
-     */
         function chunk(array, size, guard) {
             if (guard ? isIterateeCall(array, size, guard) : size === undefined) {
                 size = 1;
@@ -5969,21 +3008,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Creates an array with all falsey values removed. The values `false`, `null`,
-     * `0`, `""`, `undefined`, and `NaN` are falsey.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to compact.
-     * @returns {Array} Returns the new array of filtered values.
-     * @example
-     *
-     * _.compact([0, 1, false, 2, '', 3]);
-     * // => [1, 2, 3]
-     */
         function compact(array) {
             var index = -1, length = array ? array.length : 0, resIndex = 0, result = [];
             while (++index < length) {
@@ -5994,28 +3018,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Creates a new array concatenating `array` with any additional arrays
-     * and/or values.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to concatenate.
-     * @param {...*} [values] The values to concatenate.
-     * @returns {Array} Returns the new concatenated array.
-     * @example
-     *
-     * var array = [1];
-     * var other = _.concat(array, 2, [3], [[4]]);
-     *
-     * console.log(other);
-     * // => [1, 2, 3, [4]]
-     *
-     * console.log(array);
-     * // => [1]
-     */
         function concat() {
             var length = arguments.length;
             if (!length) {
@@ -6027,56 +3029,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return arrayPush(isArray(array) ? copyArray(array) : [ array ], baseFlatten(args, 1));
         }
-        /**
-     * Creates an array of `array` values not included in the other given arrays
-     * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons. The order and references of result values are
-     * determined by the first array.
-     *
-     * **Note:** Unlike `_.pullAll`, this method returns a new array.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {...Array} [values] The values to exclude.
-     * @returns {Array} Returns the new array of filtered values.
-     * @see _.without, _.xor
-     * @example
-     *
-     * _.difference([2, 1], [2, 3]);
-     * // => [1]
-     */
         var difference = baseRest(function(array, values) {
             return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true)) : [];
         });
-        /**
-     * This method is like `_.difference` except that it accepts `iteratee` which
-     * is invoked for each element of `array` and `values` to generate the criterion
-     * by which they're compared. The order and references of result values are
-     * determined by the first array. The iteratee is invoked with one argument:
-     * (value).
-     *
-     * **Note:** Unlike `_.pullAllBy`, this method returns a new array.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {...Array} [values] The values to exclude.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {Array} Returns the new array of filtered values.
-     * @example
-     *
-     * _.differenceBy([2.1, 1.2], [2.3, 3.4], Math.floor);
-     * // => [1.2]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.differenceBy([{ 'x': 2 }, { 'x': 1 }], [{ 'x': 1 }], 'x');
-     * // => [{ 'x': 2 }]
-     */
         var differenceBy = baseRest(function(array, values) {
             var iteratee = last(values);
             if (isArrayLikeObject(iteratee)) {
@@ -6084,29 +3039,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true), getIteratee(iteratee, 2)) : [];
         });
-        /**
-     * This method is like `_.difference` except that it accepts `comparator`
-     * which is invoked to compare elements of `array` to `values`. The order and
-     * references of result values are determined by the first array. The comparator
-     * is invoked with two arguments: (arrVal, othVal).
-     *
-     * **Note:** Unlike `_.pullAllWith`, this method returns a new array.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {...Array} [values] The values to exclude.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of filtered values.
-     * @example
-     *
-     * var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }];
-     *
-     * _.differenceWith(objects, [{ 'x': 1, 'y': 2 }], _.isEqual);
-     * // => [{ 'x': 2, 'y': 1 }]
-     */
         var differenceWith = baseRest(function(array, values) {
             var comparator = last(values);
             if (isArrayLikeObject(comparator)) {
@@ -6114,31 +3046,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true), undefined, comparator) : [];
         });
-        /**
-     * Creates a slice of `array` with `n` elements dropped from the beginning.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.5.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {number} [n=1] The number of elements to drop.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.drop([1, 2, 3]);
-     * // => [2, 3]
-     *
-     * _.drop([1, 2, 3], 2);
-     * // => [3]
-     *
-     * _.drop([1, 2, 3], 5);
-     * // => []
-     *
-     * _.drop([1, 2, 3], 0);
-     * // => [1, 2, 3]
-     */
         function drop(array, n, guard) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6147,31 +3054,6 @@ UsergridEventable.mixin = function(destObject) {
             n = guard || n === undefined ? 1 : toInteger(n);
             return baseSlice(array, n < 0 ? 0 : n, length);
         }
-        /**
-     * Creates a slice of `array` with `n` elements dropped from the end.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {number} [n=1] The number of elements to drop.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.dropRight([1, 2, 3]);
-     * // => [1, 2]
-     *
-     * _.dropRight([1, 2, 3], 2);
-     * // => [1]
-     *
-     * _.dropRight([1, 2, 3], 5);
-     * // => []
-     *
-     * _.dropRight([1, 2, 3], 0);
-     * // => [1, 2, 3]
-     */
         function dropRight(array, n, guard) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6181,112 +3063,12 @@ UsergridEventable.mixin = function(destObject) {
             n = length - n;
             return baseSlice(array, 0, n < 0 ? 0 : n);
         }
-        /**
-     * Creates a slice of `array` excluding elements dropped from the end.
-     * Elements are dropped until `predicate` returns falsey. The predicate is
-     * invoked with three arguments: (value, index, array).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': true },
-     *   { 'user': 'fred',    'active': false },
-     *   { 'user': 'pebbles', 'active': false }
-     * ];
-     *
-     * _.dropRightWhile(users, function(o) { return !o.active; });
-     * // => objects for ['barney']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.dropRightWhile(users, { 'user': 'pebbles', 'active': false });
-     * // => objects for ['barney', 'fred']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.dropRightWhile(users, ['active', false]);
-     * // => objects for ['barney']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.dropRightWhile(users, 'active');
-     * // => objects for ['barney', 'fred', 'pebbles']
-     */
         function dropRightWhile(array, predicate) {
             return array && array.length ? baseWhile(array, getIteratee(predicate, 3), true, true) : [];
         }
-        /**
-     * Creates a slice of `array` excluding elements dropped from the beginning.
-     * Elements are dropped until `predicate` returns falsey. The predicate is
-     * invoked with three arguments: (value, index, array).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': false },
-     *   { 'user': 'fred',    'active': false },
-     *   { 'user': 'pebbles', 'active': true }
-     * ];
-     *
-     * _.dropWhile(users, function(o) { return !o.active; });
-     * // => objects for ['pebbles']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.dropWhile(users, { 'user': 'barney', 'active': false });
-     * // => objects for ['fred', 'pebbles']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.dropWhile(users, ['active', false]);
-     * // => objects for ['pebbles']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.dropWhile(users, 'active');
-     * // => objects for ['barney', 'fred', 'pebbles']
-     */
         function dropWhile(array, predicate) {
             return array && array.length ? baseWhile(array, getIteratee(predicate, 3), true) : [];
         }
-        /**
-     * Fills elements of `array` with `value` from `start` up to, but not
-     * including, `end`.
-     *
-     * **Note:** This method mutates `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.2.0
-     * @category Array
-     * @param {Array} array The array to fill.
-     * @param {*} value The value to fill `array` with.
-     * @param {number} [start=0] The start position.
-     * @param {number} [end=array.length] The end position.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = [1, 2, 3];
-     *
-     * _.fill(array, 'a');
-     * console.log(array);
-     * // => ['a', 'a', 'a']
-     *
-     * _.fill(Array(3), 2);
-     * // => [2, 2, 2]
-     *
-     * _.fill([4, 6, 8, 10], '*', 1, 3);
-     * // => [4, '*', '*', 10]
-     */
         function fill(array, value, start, end) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6298,42 +3080,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseFill(array, value, start, end);
         }
-        /**
-     * This method is like `_.find` except that it returns the index of the first
-     * element `predicate` returns truthy for instead of the element itself.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @param {number} [fromIndex=0] The index to search from.
-     * @returns {number} Returns the index of the found element, else `-1`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': false },
-     *   { 'user': 'fred',    'active': false },
-     *   { 'user': 'pebbles', 'active': true }
-     * ];
-     *
-     * _.findIndex(users, function(o) { return o.user == 'barney'; });
-     * // => 0
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.findIndex(users, { 'user': 'fred', 'active': false });
-     * // => 1
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.findIndex(users, ['active', false]);
-     * // => 0
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.findIndex(users, 'active');
-     * // => 2
-     */
         function findIndex(array, predicate, fromIndex) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6345,42 +3091,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseFindIndex(array, getIteratee(predicate, 3), index);
         }
-        /**
-     * This method is like `_.findIndex` except that it iterates over elements
-     * of `collection` from right to left.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @param {number} [fromIndex=array.length-1] The index to search from.
-     * @returns {number} Returns the index of the found element, else `-1`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': true },
-     *   { 'user': 'fred',    'active': false },
-     *   { 'user': 'pebbles', 'active': false }
-     * ];
-     *
-     * _.findLastIndex(users, function(o) { return o.user == 'pebbles'; });
-     * // => 2
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.findLastIndex(users, { 'user': 'barney', 'active': true });
-     * // => 0
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.findLastIndex(users, ['active', false]);
-     * // => 2
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.findLastIndex(users, 'active');
-     * // => 0
-     */
         function findLastIndex(array, predicate, fromIndex) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6393,62 +3103,14 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseFindIndex(array, getIteratee(predicate, 3), index, true);
         }
-        /**
-     * Flattens `array` a single level deep.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to flatten.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * _.flatten([1, [2, [3, [4]], 5]]);
-     * // => [1, 2, [3, [4]], 5]
-     */
         function flatten(array) {
             var length = array ? array.length : 0;
             return length ? baseFlatten(array, 1) : [];
         }
-        /**
-     * Recursively flattens `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to flatten.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * _.flattenDeep([1, [2, [3, [4]], 5]]);
-     * // => [1, 2, 3, 4, 5]
-     */
         function flattenDeep(array) {
             var length = array ? array.length : 0;
             return length ? baseFlatten(array, INFINITY) : [];
         }
-        /**
-     * Recursively flatten `array` up to `depth` times.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.4.0
-     * @category Array
-     * @param {Array} array The array to flatten.
-     * @param {number} [depth=1] The maximum recursion depth.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * var array = [1, [2, [3, [4]], 5]];
-     *
-     * _.flattenDepth(array, 1);
-     * // => [1, 2, [3, [4]], 5]
-     *
-     * _.flattenDepth(array, 2);
-     * // => [1, 2, 3, [4], 5]
-     */
         function flattenDepth(array, depth) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6457,21 +3119,6 @@ UsergridEventable.mixin = function(destObject) {
             depth = depth === undefined ? 1 : toInteger(depth);
             return baseFlatten(array, depth);
         }
-        /**
-     * The inverse of `_.toPairs`; this method returns an object composed
-     * from key-value `pairs`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} pairs The key-value pairs.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * _.fromPairs([['a', 1], ['b', 2]]);
-     * // => { 'a': 1, 'b': 2 }
-     */
         function fromPairs(pairs) {
             var index = -1, length = pairs ? pairs.length : 0, result = {};
             while (++index < length) {
@@ -6480,50 +3127,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Gets the first element of `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @alias first
-     * @category Array
-     * @param {Array} array The array to query.
-     * @returns {*} Returns the first element of `array`.
-     * @example
-     *
-     * _.head([1, 2, 3]);
-     * // => 1
-     *
-     * _.head([]);
-     * // => undefined
-     */
         function head(array) {
             return array && array.length ? array[0] : undefined;
         }
-        /**
-     * Gets the index at which the first occurrence of `value` is found in `array`
-     * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons. If `fromIndex` is negative, it's used as the
-     * offset from the end of `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {*} value The value to search for.
-     * @param {number} [fromIndex=0] The index to search from.
-     * @returns {number} Returns the index of the matched value, else `-1`.
-     * @example
-     *
-     * _.indexOf([1, 2, 1, 2], 2);
-     * // => 1
-     *
-     * // Search from the `fromIndex`.
-     * _.indexOf([1, 2, 1, 2], 2, 2);
-     * // => 3
-     */
         function indexOf(array, value, fromIndex) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6535,68 +3141,14 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseIndexOf(array, value, index);
         }
-        /**
-     * Gets all but the last element of `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.initial([1, 2, 3]);
-     * // => [1, 2]
-     */
         function initial(array) {
             var length = array ? array.length : 0;
             return length ? baseSlice(array, 0, -1) : [];
         }
-        /**
-     * Creates an array of unique values that are included in all given arrays
-     * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons. The order and references of result values are
-     * determined by the first array.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @returns {Array} Returns the new array of intersecting values.
-     * @example
-     *
-     * _.intersection([2, 1], [2, 3]);
-     * // => [2]
-     */
         var intersection = baseRest(function(arrays) {
             var mapped = arrayMap(arrays, castArrayLikeObject);
             return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped) : [];
         });
-        /**
-     * This method is like `_.intersection` except that it accepts `iteratee`
-     * which is invoked for each element of each `arrays` to generate the criterion
-     * by which they're compared. The order and references of result values are
-     * determined by the first array. The iteratee is invoked with one argument:
-     * (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {Array} Returns the new array of intersecting values.
-     * @example
-     *
-     * _.intersectionBy([2.1, 1.2], [2.3, 3.4], Math.floor);
-     * // => [2.1]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.intersectionBy([{ 'x': 1 }], [{ 'x': 2 }, { 'x': 1 }], 'x');
-     * // => [{ 'x': 1 }]
-     */
         var intersectionBy = baseRest(function(arrays) {
             var iteratee = last(arrays), mapped = arrayMap(arrays, castArrayLikeObject);
             if (iteratee === last(mapped)) {
@@ -6606,27 +3158,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped, getIteratee(iteratee, 2)) : [];
         });
-        /**
-     * This method is like `_.intersection` except that it accepts `comparator`
-     * which is invoked to compare elements of `arrays`. The order and references
-     * of result values are determined by the first array. The comparator is
-     * invoked with two arguments: (arrVal, othVal).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of intersecting values.
-     * @example
-     *
-     * var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }];
-     * var others = [{ 'x': 1, 'y': 1 }, { 'x': 1, 'y': 2 }];
-     *
-     * _.intersectionWith(objects, others, _.isEqual);
-     * // => [{ 'x': 1, 'y': 2 }]
-     */
         var intersectionWith = baseRest(function(arrays) {
             var comparator = last(arrays), mapped = arrayMap(arrays, castArrayLikeObject);
             if (comparator === last(mapped)) {
@@ -6636,63 +3167,13 @@ UsergridEventable.mixin = function(destObject) {
             }
             return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped, undefined, comparator) : [];
         });
-        /**
-     * Converts all elements in `array` into a string separated by `separator`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to convert.
-     * @param {string} [separator=','] The element separator.
-     * @returns {string} Returns the joined string.
-     * @example
-     *
-     * _.join(['a', 'b', 'c'], '~');
-     * // => 'a~b~c'
-     */
         function join(array, separator) {
             return array ? nativeJoin.call(array, separator) : "";
         }
-        /**
-     * Gets the last element of `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @returns {*} Returns the last element of `array`.
-     * @example
-     *
-     * _.last([1, 2, 3]);
-     * // => 3
-     */
         function last(array) {
             var length = array ? array.length : 0;
             return length ? array[length - 1] : undefined;
         }
-        /**
-     * This method is like `_.indexOf` except that it iterates over elements of
-     * `array` from right to left.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {*} value The value to search for.
-     * @param {number} [fromIndex=array.length-1] The index to search from.
-     * @returns {number} Returns the index of the matched value, else `-1`.
-     * @example
-     *
-     * _.lastIndexOf([1, 2, 1, 2], 2);
-     * // => 3
-     *
-     * // Search from the `fromIndex`.
-     * _.lastIndexOf([1, 2, 1, 2], 2, 2);
-     * // => 1
-     */
         function lastIndexOf(array, value, fromIndex) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6705,154 +3186,19 @@ UsergridEventable.mixin = function(destObject) {
             }
             return value === value ? strictLastIndexOf(array, value, index) : baseFindIndex(array, baseIsNaN, index, true);
         }
-        /**
-     * Gets the element at index `n` of `array`. If `n` is negative, the nth
-     * element from the end is returned.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.11.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {number} [n=0] The index of the element to return.
-     * @returns {*} Returns the nth element of `array`.
-     * @example
-     *
-     * var array = ['a', 'b', 'c', 'd'];
-     *
-     * _.nth(array, 1);
-     * // => 'b'
-     *
-     * _.nth(array, -2);
-     * // => 'c';
-     */
         function nth(array, n) {
             return array && array.length ? baseNth(array, toInteger(n)) : undefined;
         }
-        /**
-     * Removes all given values from `array` using
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons.
-     *
-     * **Note:** Unlike `_.without`, this method mutates `array`. Use `_.remove`
-     * to remove elements from an array by predicate.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {...*} [values] The values to remove.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = ['a', 'b', 'c', 'a', 'b', 'c'];
-     *
-     * _.pull(array, 'a', 'c');
-     * console.log(array);
-     * // => ['b', 'b']
-     */
         var pull = baseRest(pullAll);
-        /**
-     * This method is like `_.pull` except that it accepts an array of values to remove.
-     *
-     * **Note:** Unlike `_.difference`, this method mutates `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {Array} values The values to remove.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = ['a', 'b', 'c', 'a', 'b', 'c'];
-     *
-     * _.pullAll(array, ['a', 'c']);
-     * console.log(array);
-     * // => ['b', 'b']
-     */
         function pullAll(array, values) {
             return array && array.length && values && values.length ? basePullAll(array, values) : array;
         }
-        /**
-     * This method is like `_.pullAll` except that it accepts `iteratee` which is
-     * invoked for each element of `array` and `values` to generate the criterion
-     * by which they're compared. The iteratee is invoked with one argument: (value).
-     *
-     * **Note:** Unlike `_.differenceBy`, this method mutates `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {Array} values The values to remove.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = [{ 'x': 1 }, { 'x': 2 }, { 'x': 3 }, { 'x': 1 }];
-     *
-     * _.pullAllBy(array, [{ 'x': 1 }, { 'x': 3 }], 'x');
-     * console.log(array);
-     * // => [{ 'x': 2 }]
-     */
         function pullAllBy(array, values, iteratee) {
             return array && array.length && values && values.length ? basePullAll(array, values, getIteratee(iteratee, 2)) : array;
         }
-        /**
-     * This method is like `_.pullAll` except that it accepts `comparator` which
-     * is invoked to compare elements of `array` to `values`. The comparator is
-     * invoked with two arguments: (arrVal, othVal).
-     *
-     * **Note:** Unlike `_.differenceWith`, this method mutates `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.6.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {Array} values The values to remove.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = [{ 'x': 1, 'y': 2 }, { 'x': 3, 'y': 4 }, { 'x': 5, 'y': 6 }];
-     *
-     * _.pullAllWith(array, [{ 'x': 3, 'y': 4 }], _.isEqual);
-     * console.log(array);
-     * // => [{ 'x': 1, 'y': 2 }, { 'x': 5, 'y': 6 }]
-     */
         function pullAllWith(array, values, comparator) {
             return array && array.length && values && values.length ? basePullAll(array, values, undefined, comparator) : array;
         }
-        /**
-     * Removes elements from `array` corresponding to `indexes` and returns an
-     * array of removed elements.
-     *
-     * **Note:** Unlike `_.at`, this method mutates `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {...(number|number[])} [indexes] The indexes of elements to remove.
-     * @returns {Array} Returns the new array of removed elements.
-     * @example
-     *
-     * var array = ['a', 'b', 'c', 'd'];
-     * var pulled = _.pullAt(array, [1, 3]);
-     *
-     * console.log(array);
-     * // => ['a', 'c']
-     *
-     * console.log(pulled);
-     * // => ['b', 'd']
-     */
         var pullAt = flatRest(function(array, indexes) {
             var length = array ? array.length : 0, result = baseAt(array, indexes);
             basePullAt(array, arrayMap(indexes, function(index) {
@@ -6860,35 +3206,6 @@ UsergridEventable.mixin = function(destObject) {
             }).sort(compareAscending));
             return result;
         });
-        /**
-     * Removes all elements from `array` that `predicate` returns truthy for
-     * and returns an array of the removed elements. The predicate is invoked
-     * with three arguments: (value, index, array).
-     *
-     * **Note:** Unlike `_.filter`, this method mutates `array`. Use `_.pull`
-     * to pull elements from an array by value.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the new array of removed elements.
-     * @example
-     *
-     * var array = [1, 2, 3, 4];
-     * var evens = _.remove(array, function(n) {
-     *   return n % 2 == 0;
-     * });
-     *
-     * console.log(array);
-     * // => [1, 3]
-     *
-     * console.log(evens);
-     * // => [2, 4]
-     */
         function remove(array, predicate) {
             var result = [];
             if (!(array && array.length)) {
@@ -6906,48 +3223,9 @@ UsergridEventable.mixin = function(destObject) {
             basePullAt(array, indexes);
             return result;
         }
-        /**
-     * Reverses `array` so that the first element becomes the last, the second
-     * element becomes the second to last, and so on.
-     *
-     * **Note:** This method mutates `array` and is based on
-     * [`Array#reverse`](https://mdn.io/Array/reverse).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to modify.
-     * @returns {Array} Returns `array`.
-     * @example
-     *
-     * var array = [1, 2, 3];
-     *
-     * _.reverse(array);
-     * // => [3, 2, 1]
-     *
-     * console.log(array);
-     * // => [3, 2, 1]
-     */
         function reverse(array) {
             return array ? nativeReverse.call(array) : array;
         }
-        /**
-     * Creates a slice of `array` from `start` up to, but not including, `end`.
-     *
-     * **Note:** This method is used instead of
-     * [`Array#slice`](https://mdn.io/Array/slice) to ensure dense arrays are
-     * returned.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to slice.
-     * @param {number} [start=0] The start position.
-     * @param {number} [end=array.length] The end position.
-     * @returns {Array} Returns the slice of `array`.
-     */
         function slice(array, start, end) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -6962,71 +3240,12 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseSlice(array, start, end);
         }
-        /**
-     * Uses a binary search to determine the lowest index at which `value`
-     * should be inserted into `array` in order to maintain its sort order.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     * @example
-     *
-     * _.sortedIndex([30, 50], 40);
-     * // => 1
-     */
         function sortedIndex(array, value) {
             return baseSortedIndex(array, value);
         }
-        /**
-     * This method is like `_.sortedIndex` except that it accepts `iteratee`
-     * which is invoked for `value` and each element of `array` to compute their
-     * sort ranking. The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     * @example
-     *
-     * var objects = [{ 'x': 4 }, { 'x': 5 }];
-     *
-     * _.sortedIndexBy(objects, { 'x': 4 }, function(o) { return o.x; });
-     * // => 0
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.sortedIndexBy(objects, { 'x': 4 }, 'x');
-     * // => 0
-     */
         function sortedIndexBy(array, value, iteratee) {
             return baseSortedIndexBy(array, value, getIteratee(iteratee, 2));
         }
-        /**
-     * This method is like `_.indexOf` except that it performs a binary
-     * search on a sorted `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {*} value The value to search for.
-     * @returns {number} Returns the index of the matched value, else `-1`.
-     * @example
-     *
-     * _.sortedIndexOf([4, 5, 5, 5, 6], 5);
-     * // => 1
-     */
         function sortedIndexOf(array, value) {
             var length = array ? array.length : 0;
             if (length) {
@@ -7037,72 +3256,12 @@ UsergridEventable.mixin = function(destObject) {
             }
             return -1;
         }
-        /**
-     * This method is like `_.sortedIndex` except that it returns the highest
-     * index at which `value` should be inserted into `array` in order to
-     * maintain its sort order.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     * @example
-     *
-     * _.sortedLastIndex([4, 5, 5, 5, 6], 5);
-     * // => 4
-     */
         function sortedLastIndex(array, value) {
             return baseSortedIndex(array, value, true);
         }
-        /**
-     * This method is like `_.sortedLastIndex` except that it accepts `iteratee`
-     * which is invoked for `value` and each element of `array` to compute their
-     * sort ranking. The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The sorted array to inspect.
-     * @param {*} value The value to evaluate.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {number} Returns the index at which `value` should be inserted
-     *  into `array`.
-     * @example
-     *
-     * var objects = [{ 'x': 4 }, { 'x': 5 }];
-     *
-     * _.sortedLastIndexBy(objects, { 'x': 4 }, function(o) { return o.x; });
-     * // => 1
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.sortedLastIndexBy(objects, { 'x': 4 }, 'x');
-     * // => 1
-     */
         function sortedLastIndexBy(array, value, iteratee) {
             return baseSortedIndexBy(array, value, getIteratee(iteratee, 2), true);
         }
-        /**
-     * This method is like `_.lastIndexOf` except that it performs a binary
-     * search on a sorted `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {*} value The value to search for.
-     * @returns {number} Returns the index of the matched value, else `-1`.
-     * @example
-     *
-     * _.sortedLastIndexOf([4, 5, 5, 5, 6], 5);
-     * // => 3
-     */
         function sortedLastIndexOf(array, value) {
             var length = array ? array.length : 0;
             if (length) {
@@ -7113,86 +3272,16 @@ UsergridEventable.mixin = function(destObject) {
             }
             return -1;
         }
-        /**
-     * This method is like `_.uniq` except that it's designed and optimized
-     * for sorted arrays.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @returns {Array} Returns the new duplicate free array.
-     * @example
-     *
-     * _.sortedUniq([1, 1, 2]);
-     * // => [1, 2]
-     */
         function sortedUniq(array) {
             return array && array.length ? baseSortedUniq(array) : [];
         }
-        /**
-     * This method is like `_.uniqBy` except that it's designed and optimized
-     * for sorted arrays.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {Function} [iteratee] The iteratee invoked per element.
-     * @returns {Array} Returns the new duplicate free array.
-     * @example
-     *
-     * _.sortedUniqBy([1.1, 1.2, 2.3, 2.4], Math.floor);
-     * // => [1.1, 2.3]
-     */
         function sortedUniqBy(array, iteratee) {
             return array && array.length ? baseSortedUniq(array, getIteratee(iteratee, 2)) : [];
         }
-        /**
-     * Gets all but the first element of `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.tail([1, 2, 3]);
-     * // => [2, 3]
-     */
         function tail(array) {
             var length = array ? array.length : 0;
             return length ? baseSlice(array, 1, length) : [];
         }
-        /**
-     * Creates a slice of `array` with `n` elements taken from the beginning.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {number} [n=1] The number of elements to take.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.take([1, 2, 3]);
-     * // => [1]
-     *
-     * _.take([1, 2, 3], 2);
-     * // => [1, 2]
-     *
-     * _.take([1, 2, 3], 5);
-     * // => [1, 2, 3]
-     *
-     * _.take([1, 2, 3], 0);
-     * // => []
-     */
         function take(array, n, guard) {
             if (!(array && array.length)) {
                 return [];
@@ -7200,31 +3289,6 @@ UsergridEventable.mixin = function(destObject) {
             n = guard || n === undefined ? 1 : toInteger(n);
             return baseSlice(array, 0, n < 0 ? 0 : n);
         }
-        /**
-     * Creates a slice of `array` with `n` elements taken from the end.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {number} [n=1] The number of elements to take.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * _.takeRight([1, 2, 3]);
-     * // => [3]
-     *
-     * _.takeRight([1, 2, 3], 2);
-     * // => [2, 3]
-     *
-     * _.takeRight([1, 2, 3], 5);
-     * // => [1, 2, 3]
-     *
-     * _.takeRight([1, 2, 3], 0);
-     * // => []
-     */
         function takeRight(array, n, guard) {
             var length = array ? array.length : 0;
             if (!length) {
@@ -7234,127 +3298,15 @@ UsergridEventable.mixin = function(destObject) {
             n = length - n;
             return baseSlice(array, n < 0 ? 0 : n, length);
         }
-        /**
-     * Creates a slice of `array` with elements taken from the end. Elements are
-     * taken until `predicate` returns falsey. The predicate is invoked with
-     * three arguments: (value, index, array).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': true },
-     *   { 'user': 'fred',    'active': false },
-     *   { 'user': 'pebbles', 'active': false }
-     * ];
-     *
-     * _.takeRightWhile(users, function(o) { return !o.active; });
-     * // => objects for ['fred', 'pebbles']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.takeRightWhile(users, { 'user': 'pebbles', 'active': false });
-     * // => objects for ['pebbles']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.takeRightWhile(users, ['active', false]);
-     * // => objects for ['fred', 'pebbles']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.takeRightWhile(users, 'active');
-     * // => []
-     */
         function takeRightWhile(array, predicate) {
             return array && array.length ? baseWhile(array, getIteratee(predicate, 3), false, true) : [];
         }
-        /**
-     * Creates a slice of `array` with elements taken from the beginning. Elements
-     * are taken until `predicate` returns falsey. The predicate is invoked with
-     * three arguments: (value, index, array).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Array
-     * @param {Array} array The array to query.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the slice of `array`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'active': false },
-     *   { 'user': 'fred',    'active': false},
-     *   { 'user': 'pebbles', 'active': true }
-     * ];
-     *
-     * _.takeWhile(users, function(o) { return !o.active; });
-     * // => objects for ['barney', 'fred']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.takeWhile(users, { 'user': 'barney', 'active': false });
-     * // => objects for ['barney']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.takeWhile(users, ['active', false]);
-     * // => objects for ['barney', 'fred']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.takeWhile(users, 'active');
-     * // => []
-     */
         function takeWhile(array, predicate) {
             return array && array.length ? baseWhile(array, getIteratee(predicate, 3)) : [];
         }
-        /**
-     * Creates an array of unique values, in order, from all given arrays using
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @returns {Array} Returns the new array of combined values.
-     * @example
-     *
-     * _.union([2], [1, 2]);
-     * // => [2, 1]
-     */
         var union = baseRest(function(arrays) {
             return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true));
         });
-        /**
-     * This method is like `_.union` except that it accepts `iteratee` which is
-     * invoked for each element of each `arrays` to generate the criterion by
-     * which uniqueness is computed. Result values are chosen from the first
-     * array in which the value occurs. The iteratee is invoked with one argument:
-     * (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {Array} Returns the new array of combined values.
-     * @example
-     *
-     * _.unionBy([2.1], [1.2, 2.3], Math.floor);
-     * // => [2.1, 1.2]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.unionBy([{ 'x': 1 }], [{ 'x': 2 }, { 'x': 1 }], 'x');
-     * // => [{ 'x': 1 }, { 'x': 2 }]
-     */
         var unionBy = baseRest(function(arrays) {
             var iteratee = last(arrays);
             if (isArrayLikeObject(iteratee)) {
@@ -7362,27 +3314,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true), getIteratee(iteratee, 2));
         });
-        /**
-     * This method is like `_.union` except that it accepts `comparator` which
-     * is invoked to compare elements of `arrays`. Result values are chosen from
-     * the first array in which the value occurs. The comparator is invoked
-     * with two arguments: (arrVal, othVal).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of combined values.
-     * @example
-     *
-     * var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }];
-     * var others = [{ 'x': 1, 'y': 1 }, { 'x': 1, 'y': 2 }];
-     *
-     * _.unionWith(objects, others, _.isEqual);
-     * // => [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }, { 'x': 1, 'y': 1 }]
-     */
         var unionWith = baseRest(function(arrays) {
             var comparator = last(arrays);
             if (isArrayLikeObject(comparator)) {
@@ -7390,96 +3321,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true), undefined, comparator);
         });
-        /**
-     * Creates a duplicate-free version of an array, using
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons, in which only the first occurrence of each element
-     * is kept. The order of result values is determined by the order they occur
-     * in the array.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @returns {Array} Returns the new duplicate free array.
-     * @example
-     *
-     * _.uniq([2, 1, 2]);
-     * // => [2, 1]
-     */
         function uniq(array) {
             return array && array.length ? baseUniq(array) : [];
         }
-        /**
-     * This method is like `_.uniq` except that it accepts `iteratee` which is
-     * invoked for each element in `array` to generate the criterion by which
-     * uniqueness is computed. The order of result values is determined by the
-     * order they occur in the array. The iteratee is invoked with one argument:
-     * (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {Array} Returns the new duplicate free array.
-     * @example
-     *
-     * _.uniqBy([2.1, 1.2, 2.3], Math.floor);
-     * // => [2.1, 1.2]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.uniqBy([{ 'x': 1 }, { 'x': 2 }, { 'x': 1 }], 'x');
-     * // => [{ 'x': 1 }, { 'x': 2 }]
-     */
         function uniqBy(array, iteratee) {
             return array && array.length ? baseUniq(array, getIteratee(iteratee, 2)) : [];
         }
-        /**
-     * This method is like `_.uniq` except that it accepts `comparator` which
-     * is invoked to compare elements of `array`. The order of result values is
-     * determined by the order they occur in the array.The comparator is invoked
-     * with two arguments: (arrVal, othVal).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new duplicate free array.
-     * @example
-     *
-     * var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }, { 'x': 1, 'y': 2 }];
-     *
-     * _.uniqWith(objects, _.isEqual);
-     * // => [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }]
-     */
         function uniqWith(array, comparator) {
             return array && array.length ? baseUniq(array, undefined, comparator) : [];
         }
-        /**
-     * This method is like `_.zip` except that it accepts an array of grouped
-     * elements and creates an array regrouping the elements to their pre-zip
-     * configuration.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.2.0
-     * @category Array
-     * @param {Array} array The array of grouped elements to process.
-     * @returns {Array} Returns the new array of regrouped elements.
-     * @example
-     *
-     * var zipped = _.zip(['a', 'b'], [1, 2], [true, false]);
-     * // => [['a', 1, true], ['b', 2, false]]
-     *
-     * _.unzip(zipped);
-     * // => [['a', 'b'], [1, 2], [true, false]]
-     */
         function unzip(array) {
             if (!(array && array.length)) {
                 return [];
@@ -7495,27 +3345,6 @@ UsergridEventable.mixin = function(destObject) {
                 return arrayMap(array, baseProperty(index));
             });
         }
-        /**
-     * This method is like `_.unzip` except that it accepts `iteratee` to specify
-     * how regrouped values should be combined. The iteratee is invoked with the
-     * elements of each group: (...group).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.8.0
-     * @category Array
-     * @param {Array} array The array of grouped elements to process.
-     * @param {Function} [iteratee=_.identity] The function to combine
-     *  regrouped values.
-     * @returns {Array} Returns the new array of regrouped elements.
-     * @example
-     *
-     * var zipped = _.zip([1, 2], [10, 20], [100, 200]);
-     * // => [[1, 10, 100], [2, 20, 200]]
-     *
-     * _.unzipWith(zipped, _.add);
-     * // => [3, 30, 300]
-     */
         function unzipWith(array, iteratee) {
             if (!(array && array.length)) {
                 return [];
@@ -7528,74 +3357,12 @@ UsergridEventable.mixin = function(destObject) {
                 return apply(iteratee, undefined, group);
             });
         }
-        /**
-     * Creates an array excluding all given values using
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * for equality comparisons.
-     *
-     * **Note:** Unlike `_.pull`, this method returns a new array.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {Array} array The array to inspect.
-     * @param {...*} [values] The values to exclude.
-     * @returns {Array} Returns the new array of filtered values.
-     * @see _.difference, _.xor
-     * @example
-     *
-     * _.without([2, 1, 2, 3], 1, 2);
-     * // => [3]
-     */
         var without = baseRest(function(array, values) {
             return isArrayLikeObject(array) ? baseDifference(array, values) : [];
         });
-        /**
-     * Creates an array of unique values that is the
-     * [symmetric difference](https://en.wikipedia.org/wiki/Symmetric_difference)
-     * of the given arrays. The order of result values is determined by the order
-     * they occur in the arrays.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.4.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @returns {Array} Returns the new array of filtered values.
-     * @see _.difference, _.without
-     * @example
-     *
-     * _.xor([2, 1], [2, 3]);
-     * // => [1, 3]
-     */
         var xor = baseRest(function(arrays) {
             return baseXor(arrayFilter(arrays, isArrayLikeObject));
         });
-        /**
-     * This method is like `_.xor` except that it accepts `iteratee` which is
-     * invoked for each element of each `arrays` to generate the criterion by
-     * which by which they're compared. The order of result values is determined
-     * by the order they occur in the arrays. The iteratee is invoked with one
-     * argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee invoked per element.
-     * @returns {Array} Returns the new array of filtered values.
-     * @example
-     *
-     * _.xorBy([2.1, 1.2], [2.3, 3.4], Math.floor);
-     * // => [1.2, 3.4]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.xorBy([{ 'x': 1 }], [{ 'x': 2 }, { 'x': 1 }], 'x');
-     * // => [{ 'x': 2 }]
-     */
         var xorBy = baseRest(function(arrays) {
             var iteratee = last(arrays);
             if (isArrayLikeObject(iteratee)) {
@@ -7603,27 +3370,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseXor(arrayFilter(arrays, isArrayLikeObject), getIteratee(iteratee, 2));
         });
-        /**
-     * This method is like `_.xor` except that it accepts `comparator` which is
-     * invoked to compare elements of `arrays`. The order of result values is
-     * determined by the order they occur in the arrays. The comparator is invoked
-     * with two arguments: (arrVal, othVal).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to inspect.
-     * @param {Function} [comparator] The comparator invoked per element.
-     * @returns {Array} Returns the new array of filtered values.
-     * @example
-     *
-     * var objects = [{ 'x': 1, 'y': 2 }, { 'x': 2, 'y': 1 }];
-     * var others = [{ 'x': 1, 'y': 1 }, { 'x': 1, 'y': 2 }];
-     *
-     * _.xorWith(objects, others, _.isEqual);
-     * // => [{ 'x': 2, 'y': 1 }, { 'x': 1, 'y': 1 }]
-     */
         var xorWith = baseRest(function(arrays) {
             var comparator = last(arrays);
             if (isArrayLikeObject(comparator)) {
@@ -7631,188 +3377,30 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseXor(arrayFilter(arrays, isArrayLikeObject), undefined, comparator);
         });
-        /**
-     * Creates an array of grouped elements, the first of which contains the
-     * first elements of the given arrays, the second of which contains the
-     * second elements of the given arrays, and so on.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to process.
-     * @returns {Array} Returns the new array of grouped elements.
-     * @example
-     *
-     * _.zip(['a', 'b'], [1, 2], [true, false]);
-     * // => [['a', 1, true], ['b', 2, false]]
-     */
         var zip = baseRest(unzip);
-        /**
-     * This method is like `_.fromPairs` except that it accepts two arrays,
-     * one of property identifiers and one of corresponding values.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.4.0
-     * @category Array
-     * @param {Array} [props=[]] The property identifiers.
-     * @param {Array} [values=[]] The property values.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * _.zipObject(['a', 'b'], [1, 2]);
-     * // => { 'a': 1, 'b': 2 }
-     */
         function zipObject(props, values) {
             return baseZipObject(props || [], values || [], assignValue);
         }
-        /**
-     * This method is like `_.zipObject` except that it supports property paths.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.1.0
-     * @category Array
-     * @param {Array} [props=[]] The property identifiers.
-     * @param {Array} [values=[]] The property values.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * _.zipObjectDeep(['a.b[0].c', 'a.b[1].d'], [1, 2]);
-     * // => { 'a': { 'b': [{ 'c': 1 }, { 'd': 2 }] } }
-     */
         function zipObjectDeep(props, values) {
             return baseZipObject(props || [], values || [], baseSet);
         }
-        /**
-     * This method is like `_.zip` except that it accepts `iteratee` to specify
-     * how grouped values should be combined. The iteratee is invoked with the
-     * elements of each group: (...group).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.8.0
-     * @category Array
-     * @param {...Array} [arrays] The arrays to process.
-     * @param {Function} [iteratee=_.identity] The function to combine grouped values.
-     * @returns {Array} Returns the new array of grouped elements.
-     * @example
-     *
-     * _.zipWith([1, 2], [10, 20], [100, 200], function(a, b, c) {
-     *   return a + b + c;
-     * });
-     * // => [111, 222]
-     */
         var zipWith = baseRest(function(arrays) {
             var length = arrays.length, iteratee = length > 1 ? arrays[length - 1] : undefined;
             iteratee = typeof iteratee == "function" ? (arrays.pop(), iteratee) : undefined;
             return unzipWith(arrays, iteratee);
         });
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates a `lodash` wrapper instance that wraps `value` with explicit method
-     * chain sequences enabled. The result of such sequences must be unwrapped
-     * with `_#value`.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.3.0
-     * @category Seq
-     * @param {*} value The value to wrap.
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'age': 36 },
-     *   { 'user': 'fred',    'age': 40 },
-     *   { 'user': 'pebbles', 'age': 1 }
-     * ];
-     *
-     * var youngest = _
-     *   .chain(users)
-     *   .sortBy('age')
-     *   .map(function(o) {
-     *     return o.user + ' is ' + o.age;
-     *   })
-     *   .head()
-     *   .value();
-     * // => 'pebbles is 1'
-     */
         function chain(value) {
             var result = lodash(value);
             result.__chain__ = true;
             return result;
         }
-        /**
-     * This method invokes `interceptor` and returns `value`. The interceptor
-     * is invoked with one argument; (value). The purpose of this method is to
-     * "tap into" a method chain sequence in order to modify intermediate results.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Seq
-     * @param {*} value The value to provide to `interceptor`.
-     * @param {Function} interceptor The function to invoke.
-     * @returns {*} Returns `value`.
-     * @example
-     *
-     * _([1, 2, 3])
-     *  .tap(function(array) {
-     *    // Mutate input array.
-     *    array.pop();
-     *  })
-     *  .reverse()
-     *  .value();
-     * // => [2, 1]
-     */
         function tap(value, interceptor) {
             interceptor(value);
             return value;
         }
-        /**
-     * This method is like `_.tap` except that it returns the result of `interceptor`.
-     * The purpose of this method is to "pass thru" values replacing intermediate
-     * results in a method chain sequence.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Seq
-     * @param {*} value The value to provide to `interceptor`.
-     * @param {Function} interceptor The function to invoke.
-     * @returns {*} Returns the result of `interceptor`.
-     * @example
-     *
-     * _('  abc  ')
-     *  .chain()
-     *  .trim()
-     *  .thru(function(value) {
-     *    return [value];
-     *  })
-     *  .value();
-     * // => ['abc']
-     */
         function thru(value, interceptor) {
             return interceptor(value);
         }
-        /**
-     * This method is the wrapper version of `_.at`.
-     *
-     * @name at
-     * @memberOf _
-     * @since 1.0.0
-     * @category Seq
-     * @param {...(string|string[])} [paths] The property paths of elements to pick.
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 3 } }, 4] };
-     *
-     * _(object).at(['a[0].b.c', 'a[1]']).value();
-     * // => [3, 4]
-     */
         var wrapperAt = flatRest(function(paths) {
             var length = paths.length, start = length ? paths[0] : 0, value = this.__wrapped__, interceptor = function(object) {
                 return baseAt(object, paths);
@@ -7833,87 +3421,12 @@ UsergridEventable.mixin = function(destObject) {
                 return array;
             });
         });
-        /**
-     * Creates a `lodash` wrapper instance with explicit method chain sequences enabled.
-     *
-     * @name chain
-     * @memberOf _
-     * @since 0.1.0
-     * @category Seq
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney', 'age': 36 },
-     *   { 'user': 'fred',   'age': 40 }
-     * ];
-     *
-     * // A sequence without explicit chaining.
-     * _(users).head();
-     * // => { 'user': 'barney', 'age': 36 }
-     *
-     * // A sequence with explicit chaining.
-     * _(users)
-     *   .chain()
-     *   .head()
-     *   .pick('user')
-     *   .value();
-     * // => { 'user': 'barney' }
-     */
         function wrapperChain() {
             return chain(this);
         }
-        /**
-     * Executes the chain sequence and returns the wrapped result.
-     *
-     * @name commit
-     * @memberOf _
-     * @since 3.2.0
-     * @category Seq
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * var array = [1, 2];
-     * var wrapped = _(array).push(3);
-     *
-     * console.log(array);
-     * // => [1, 2]
-     *
-     * wrapped = wrapped.commit();
-     * console.log(array);
-     * // => [1, 2, 3]
-     *
-     * wrapped.last();
-     * // => 3
-     *
-     * console.log(array);
-     * // => [1, 2, 3]
-     */
         function wrapperCommit() {
             return new LodashWrapper(this.value(), this.__chain__);
         }
-        /**
-     * Gets the next value on a wrapped object following the
-     * [iterator protocol](https://mdn.io/iteration_protocols#iterator).
-     *
-     * @name next
-     * @memberOf _
-     * @since 4.0.0
-     * @category Seq
-     * @returns {Object} Returns the next iterator value.
-     * @example
-     *
-     * var wrapped = _([1, 2]);
-     *
-     * wrapped.next();
-     * // => { 'done': false, 'value': 1 }
-     *
-     * wrapped.next();
-     * // => { 'done': false, 'value': 2 }
-     *
-     * wrapped.next();
-     * // => { 'done': true, 'value': undefined }
-     */
         function wrapperNext() {
             if (this.__values__ === undefined) {
                 this.__values__ = toArray(this.value());
@@ -7924,51 +3437,9 @@ UsergridEventable.mixin = function(destObject) {
                 value: value
             };
         }
-        /**
-     * Enables the wrapper to be iterable.
-     *
-     * @name Symbol.iterator
-     * @memberOf _
-     * @since 4.0.0
-     * @category Seq
-     * @returns {Object} Returns the wrapper object.
-     * @example
-     *
-     * var wrapped = _([1, 2]);
-     *
-     * wrapped[Symbol.iterator]() === wrapped;
-     * // => true
-     *
-     * Array.from(wrapped);
-     * // => [1, 2]
-     */
         function wrapperToIterator() {
             return this;
         }
-        /**
-     * Creates a clone of the chain sequence planting `value` as the wrapped value.
-     *
-     * @name plant
-     * @memberOf _
-     * @since 3.2.0
-     * @category Seq
-     * @param {*} value The value to plant.
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * var wrapped = _([1, 2]).map(square);
-     * var other = wrapped.plant([3, 4]);
-     *
-     * other.value();
-     * // => [9, 16]
-     *
-     * wrapped.value();
-     * // => [1, 4]
-     */
         function wrapperPlant(value) {
             var result, parent = this;
             while (parent instanceof baseLodash) {
@@ -7986,26 +3457,6 @@ UsergridEventable.mixin = function(destObject) {
             previous.__wrapped__ = value;
             return result;
         }
-        /**
-     * This method is the wrapper version of `_.reverse`.
-     *
-     * **Note:** This method mutates the wrapped array.
-     *
-     * @name reverse
-     * @memberOf _
-     * @since 0.1.0
-     * @category Seq
-     * @returns {Object} Returns the new `lodash` wrapper instance.
-     * @example
-     *
-     * var array = [1, 2, 3];
-     *
-     * _(array).reverse().value()
-     * // => [3, 2, 1]
-     *
-     * console.log(array);
-     * // => [3, 2, 1]
-     */
         function wrapperReverse() {
             var value = this.__wrapped__;
             if (value instanceof LazyWrapper) {
@@ -8023,47 +3474,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return this.thru(reverse);
         }
-        /**
-     * Executes the chain sequence to resolve the unwrapped value.
-     *
-     * @name value
-     * @memberOf _
-     * @since 0.1.0
-     * @alias toJSON, valueOf
-     * @category Seq
-     * @returns {*} Returns the resolved unwrapped value.
-     * @example
-     *
-     * _([1, 2, 3]).value();
-     * // => [1, 2, 3]
-     */
         function wrapperValue() {
             return baseWrapperValue(this.__wrapped__, this.__actions__);
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Creates an object composed of keys generated from the results of running
-     * each element of `collection` thru `iteratee`. The corresponding value of
-     * each key is the number of times the key was returned by `iteratee`. The
-     * iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.5.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee to transform keys.
-     * @returns {Object} Returns the composed aggregate object.
-     * @example
-     *
-     * _.countBy([6.1, 4.2, 6.3], Math.floor);
-     * // => { '4': 1, '6': 2 }
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.countBy(['one', 'two', 'three'], 'length');
-     * // => { '3': 2, '5': 1 }
-     */
         var countBy = createAggregator(function(result, value, key) {
             if (hasOwnProperty.call(result, key)) {
                 ++result[key];
@@ -8071,48 +3484,6 @@ UsergridEventable.mixin = function(destObject) {
                 baseAssignValue(result, key, 1);
             }
         });
-        /**
-     * Checks if `predicate` returns truthy for **all** elements of `collection`.
-     * Iteration is stopped once `predicate` returns falsey. The predicate is
-     * invoked with three arguments: (value, index|key, collection).
-     *
-     * **Note:** This method returns `true` for
-     * [empty collections](https://en.wikipedia.org/wiki/Empty_set) because
-     * [everything is true](https://en.wikipedia.org/wiki/Vacuous_truth) of
-     * elements of empty collections.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {boolean} Returns `true` if all elements pass the predicate check,
-     *  else `false`.
-     * @example
-     *
-     * _.every([true, 1, null, 'yes'], Boolean);
-     * // => false
-     *
-     * var users = [
-     *   { 'user': 'barney', 'age': 36, 'active': false },
-     *   { 'user': 'fred',   'age': 40, 'active': false }
-     * ];
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.every(users, { 'user': 'barney', 'active': false });
-     * // => false
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.every(users, ['active', false]);
-     * // => true
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.every(users, 'active');
-     * // => false
-     */
         function every(collection, predicate, guard) {
             var func = isArray(collection) ? arrayEvery : baseEvery;
             if (guard && isIterateeCall(collection, predicate, guard)) {
@@ -8120,264 +3491,30 @@ UsergridEventable.mixin = function(destObject) {
             }
             return func(collection, getIteratee(predicate, 3));
         }
-        /**
-     * Iterates over elements of `collection`, returning an array of all elements
-     * `predicate` returns truthy for. The predicate is invoked with three
-     * arguments: (value, index|key, collection).
-     *
-     * **Note:** Unlike `_.remove`, this method returns a new array.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the new filtered array.
-     * @see _.reject
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney', 'age': 36, 'active': true },
-     *   { 'user': 'fred',   'age': 40, 'active': false }
-     * ];
-     *
-     * _.filter(users, function(o) { return !o.active; });
-     * // => objects for ['fred']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.filter(users, { 'age': 36, 'active': true });
-     * // => objects for ['barney']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.filter(users, ['active', false]);
-     * // => objects for ['fred']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.filter(users, 'active');
-     * // => objects for ['barney']
-     */
         function filter(collection, predicate) {
             var func = isArray(collection) ? arrayFilter : baseFilter;
             return func(collection, getIteratee(predicate, 3));
         }
-        /**
-     * Iterates over elements of `collection`, returning the first element
-     * `predicate` returns truthy for. The predicate is invoked with three
-     * arguments: (value, index|key, collection).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to inspect.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @param {number} [fromIndex=0] The index to search from.
-     * @returns {*} Returns the matched element, else `undefined`.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'age': 36, 'active': true },
-     *   { 'user': 'fred',    'age': 40, 'active': false },
-     *   { 'user': 'pebbles', 'age': 1,  'active': true }
-     * ];
-     *
-     * _.find(users, function(o) { return o.age < 40; });
-     * // => object for 'barney'
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.find(users, { 'age': 1, 'active': true });
-     * // => object for 'pebbles'
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.find(users, ['active', false]);
-     * // => object for 'fred'
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.find(users, 'active');
-     * // => object for 'barney'
-     */
         var find = createFind(findIndex);
-        /**
-     * This method is like `_.find` except that it iterates over elements of
-     * `collection` from right to left.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to inspect.
-     * @param {Function} [predicate=_.identity]
-     *  The function invoked per iteration.
-     * @param {number} [fromIndex=collection.length-1] The index to search from.
-     * @returns {*} Returns the matched element, else `undefined`.
-     * @example
-     *
-     * _.findLast([1, 2, 3, 4], function(n) {
-     *   return n % 2 == 1;
-     * });
-     * // => 3
-     */
         var findLast = createFind(findLastIndex);
-        /**
-     * Creates a flattened array of values by running each element in `collection`
-     * thru `iteratee` and flattening the mapped results. The iteratee is invoked
-     * with three arguments: (value, index|key, collection).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * function duplicate(n) {
-     *   return [n, n];
-     * }
-     *
-     * _.flatMap([1, 2], duplicate);
-     * // => [1, 1, 2, 2]
-     */
         function flatMap(collection, iteratee) {
             return baseFlatten(map(collection, iteratee), 1);
         }
-        /**
-     * This method is like `_.flatMap` except that it recursively flattens the
-     * mapped results.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.7.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The function invoked per iteration.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * function duplicate(n) {
-     *   return [[[n, n]]];
-     * }
-     *
-     * _.flatMapDeep([1, 2], duplicate);
-     * // => [1, 1, 2, 2]
-     */
         function flatMapDeep(collection, iteratee) {
             return baseFlatten(map(collection, iteratee), INFINITY);
         }
-        /**
-     * This method is like `_.flatMap` except that it recursively flattens the
-     * mapped results up to `depth` times.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.7.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The function invoked per iteration.
-     * @param {number} [depth=1] The maximum recursion depth.
-     * @returns {Array} Returns the new flattened array.
-     * @example
-     *
-     * function duplicate(n) {
-     *   return [[[n, n]]];
-     * }
-     *
-     * _.flatMapDepth([1, 2], duplicate, 2);
-     * // => [[1, 1], [2, 2]]
-     */
         function flatMapDepth(collection, iteratee, depth) {
             depth = depth === undefined ? 1 : toInteger(depth);
             return baseFlatten(map(collection, iteratee), depth);
         }
-        /**
-     * Iterates over elements of `collection` and invokes `iteratee` for each element.
-     * The iteratee is invoked with three arguments: (value, index|key, collection).
-     * Iteratee functions may exit iteration early by explicitly returning `false`.
-     *
-     * **Note:** As with other "Collections" methods, objects with a "length"
-     * property are iterated like arrays. To avoid this behavior use `_.forIn`
-     * or `_.forOwn` for object iteration.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @alias each
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Array|Object} Returns `collection`.
-     * @see _.forEachRight
-     * @example
-     *
-     * _.forEach([1, 2], function(value) {
-     *   console.log(value);
-     * });
-     * // => Logs `1` then `2`.
-     *
-     * _.forEach({ 'a': 1, 'b': 2 }, function(value, key) {
-     *   console.log(key);
-     * });
-     * // => Logs 'a' then 'b' (iteration order is not guaranteed).
-     */
         function forEach(collection, iteratee) {
             var func = isArray(collection) ? arrayEach : baseEach;
             return func(collection, getIteratee(iteratee, 3));
         }
-        /**
-     * This method is like `_.forEach` except that it iterates over elements of
-     * `collection` from right to left.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @alias eachRight
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Array|Object} Returns `collection`.
-     * @see _.forEach
-     * @example
-     *
-     * _.forEachRight([1, 2], function(value) {
-     *   console.log(value);
-     * });
-     * // => Logs `2` then `1`.
-     */
         function forEachRight(collection, iteratee) {
             var func = isArray(collection) ? arrayEachRight : baseEachRight;
             return func(collection, getIteratee(iteratee, 3));
         }
-        /**
-     * Creates an object composed of keys generated from the results of running
-     * each element of `collection` thru `iteratee`. The order of grouped values
-     * is determined by the order they occur in `collection`. The corresponding
-     * value of each key is an array of elements responsible for generating the
-     * key. The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee to transform keys.
-     * @returns {Object} Returns the composed aggregate object.
-     * @example
-     *
-     * _.groupBy([6.1, 4.2, 6.3], Math.floor);
-     * // => { '4': [4.2], '6': [6.1, 6.3] }
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.groupBy(['one', 'two', 'three'], 'length');
-     * // => { '3': ['one', 'two'], '5': ['three'] }
-     */
         var groupBy = createAggregator(function(result, value, key) {
             if (hasOwnProperty.call(result, key)) {
                 result[key].push(value);
@@ -8385,36 +3522,6 @@ UsergridEventable.mixin = function(destObject) {
                 baseAssignValue(result, key, [ value ]);
             }
         });
-        /**
-     * Checks if `value` is in `collection`. If `collection` is a string, it's
-     * checked for a substring of `value`, otherwise
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * is used for equality comparisons. If `fromIndex` is negative, it's used as
-     * the offset from the end of `collection`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object|string} collection The collection to inspect.
-     * @param {*} value The value to search for.
-     * @param {number} [fromIndex=0] The index to search from.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.reduce`.
-     * @returns {boolean} Returns `true` if `value` is found, else `false`.
-     * @example
-     *
-     * _.includes([1, 2, 3], 1);
-     * // => true
-     *
-     * _.includes([1, 2, 3], 1, 2);
-     * // => false
-     *
-     * _.includes({ 'a': 1, 'b': 2 }, 1);
-     * // => true
-     *
-     * _.includes('abcd', 'bc');
-     * // => true
-     */
         function includes(collection, value, fromIndex, guard) {
             collection = isArrayLike(collection) ? collection : values(collection);
             fromIndex = fromIndex && !guard ? toInteger(fromIndex) : 0;
@@ -8424,29 +3531,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return isString(collection) ? fromIndex <= length && collection.indexOf(value, fromIndex) > -1 : !!length && baseIndexOf(collection, value, fromIndex) > -1;
         }
-        /**
-     * Invokes the method at `path` of each element in `collection`, returning
-     * an array of the results of each invoked method. Any additional arguments
-     * are provided to each invoked method. If `path` is a function, it's invoked
-     * for, and `this` bound to, each element in `collection`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Array|Function|string} path The path of the method to invoke or
-     *  the function invoked per iteration.
-     * @param {...*} [args] The arguments to invoke each method with.
-     * @returns {Array} Returns the array of results.
-     * @example
-     *
-     * _.invokeMap([[5, 1, 7], [3, 2, 1]], 'sort');
-     * // => [[1, 5, 7], [1, 2, 3]]
-     *
-     * _.invokeMap([123, 456], String.prototype.split, '');
-     * // => [['1', '2', '3'], ['4', '5', '6']]
-     */
         var invokeMap = baseRest(function(collection, path, args) {
             var index = -1, isFunc = typeof path == "function", isProp = isKey(path), result = isArrayLike(collection) ? Array(collection.length) : [];
             baseEach(collection, function(value) {
@@ -8455,113 +3539,13 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         });
-        /**
-     * Creates an object composed of keys generated from the results of running
-     * each element of `collection` thru `iteratee`. The corresponding value of
-     * each key is the last element responsible for generating the key. The
-     * iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity]
-     *  The iteratee to transform keys.
-     * @returns {Object} Returns the composed aggregate object.
-     * @example
-     *
-     * var array = [
-     *   { 'dir': 'left', 'code': 97 },
-     *   { 'dir': 'right', 'code': 100 }
-     * ];
-     *
-     * _.keyBy(array, function(o) {
-     *   return String.fromCharCode(o.code);
-     * });
-     * // => { 'a': { 'dir': 'left', 'code': 97 }, 'd': { 'dir': 'right', 'code': 100 } }
-     *
-     * _.keyBy(array, 'dir');
-     * // => { 'left': { 'dir': 'left', 'code': 97 }, 'right': { 'dir': 'right', 'code': 100 } }
-     */
         var keyBy = createAggregator(function(result, value, key) {
             baseAssignValue(result, key, value);
         });
-        /**
-     * Creates an array of values by running each element in `collection` thru
-     * `iteratee`. The iteratee is invoked with three arguments:
-     * (value, index|key, collection).
-     *
-     * Many lodash methods are guarded to work as iteratees for methods like
-     * `_.every`, `_.filter`, `_.map`, `_.mapValues`, `_.reject`, and `_.some`.
-     *
-     * The guarded methods are:
-     * `ary`, `chunk`, `curry`, `curryRight`, `drop`, `dropRight`, `every`,
-     * `fill`, `invert`, `parseInt`, `random`, `range`, `rangeRight`, `repeat`,
-     * `sampleSize`, `slice`, `some`, `sortBy`, `split`, `take`, `takeRight`,
-     * `template`, `trim`, `trimEnd`, `trimStart`, and `words`
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Array} Returns the new mapped array.
-     * @example
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * _.map([4, 8], square);
-     * // => [16, 64]
-     *
-     * _.map({ 'a': 4, 'b': 8 }, square);
-     * // => [16, 64] (iteration order is not guaranteed)
-     *
-     * var users = [
-     *   { 'user': 'barney' },
-     *   { 'user': 'fred' }
-     * ];
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.map(users, 'user');
-     * // => ['barney', 'fred']
-     */
         function map(collection, iteratee) {
             var func = isArray(collection) ? arrayMap : baseMap;
             return func(collection, getIteratee(iteratee, 3));
         }
-        /**
-     * This method is like `_.sortBy` except that it allows specifying the sort
-     * orders of the iteratees to sort by. If `orders` is unspecified, all values
-     * are sorted in ascending order. Otherwise, specify an order of "desc" for
-     * descending or "asc" for ascending sort order of corresponding values.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Array[]|Function[]|Object[]|string[]} [iteratees=[_.identity]]
-     *  The iteratees to sort by.
-     * @param {string[]} [orders] The sort orders of `iteratees`.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.reduce`.
-     * @returns {Array} Returns the new sorted array.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'fred',   'age': 48 },
-     *   { 'user': 'barney', 'age': 34 },
-     *   { 'user': 'fred',   'age': 40 },
-     *   { 'user': 'barney', 'age': 36 }
-     * ];
-     *
-     * // Sort by `user` in ascending order and by `age` in descending order.
-     * _.orderBy(users, ['user', 'age'], ['asc', 'desc']);
-     * // => objects for [['barney', 36], ['barney', 34], ['fred', 48], ['fred', 40]]
-     */
         function orderBy(collection, iteratees, orders, guard) {
             if (collection == null) {
                 return [];
@@ -8575,189 +3559,26 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseOrderBy(collection, iteratees, orders);
         }
-        /**
-     * Creates an array of elements split into two groups, the first of which
-     * contains elements `predicate` returns truthy for, the second of which
-     * contains elements `predicate` returns falsey for. The predicate is
-     * invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @returns {Array} Returns the array of grouped elements.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney',  'age': 36, 'active': false },
-     *   { 'user': 'fred',    'age': 40, 'active': true },
-     *   { 'user': 'pebbles', 'age': 1,  'active': false }
-     * ];
-     *
-     * _.partition(users, function(o) { return o.active; });
-     * // => objects for [['fred'], ['barney', 'pebbles']]
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.partition(users, { 'age': 1, 'active': false });
-     * // => objects for [['pebbles'], ['barney', 'fred']]
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.partition(users, ['active', false]);
-     * // => objects for [['barney', 'pebbles'], ['fred']]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.partition(users, 'active');
-     * // => objects for [['fred'], ['barney', 'pebbles']]
-     */
         var partition = createAggregator(function(result, value, key) {
             result[key ? 0 : 1].push(value);
         }, function() {
             return [ [], [] ];
         });
-        /**
-     * Reduces `collection` to a value which is the accumulated result of running
-     * each element in `collection` thru `iteratee`, where each successive
-     * invocation is supplied the return value of the previous. If `accumulator`
-     * is not given, the first element of `collection` is used as the initial
-     * value. The iteratee is invoked with four arguments:
-     * (accumulator, value, index|key, collection).
-     *
-     * Many lodash methods are guarded to work as iteratees for methods like
-     * `_.reduce`, `_.reduceRight`, and `_.transform`.
-     *
-     * The guarded methods are:
-     * `assign`, `defaults`, `defaultsDeep`, `includes`, `merge`, `orderBy`,
-     * and `sortBy`
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @param {*} [accumulator] The initial value.
-     * @returns {*} Returns the accumulated value.
-     * @see _.reduceRight
-     * @example
-     *
-     * _.reduce([1, 2], function(sum, n) {
-     *   return sum + n;
-     * }, 0);
-     * // => 3
-     *
-     * _.reduce({ 'a': 1, 'b': 2, 'c': 1 }, function(result, value, key) {
-     *   (result[value] || (result[value] = [])).push(key);
-     *   return result;
-     * }, {});
-     * // => { '1': ['a', 'c'], '2': ['b'] } (iteration order is not guaranteed)
-     */
         function reduce(collection, iteratee, accumulator) {
             var func = isArray(collection) ? arrayReduce : baseReduce, initAccum = arguments.length < 3;
             return func(collection, getIteratee(iteratee, 4), accumulator, initAccum, baseEach);
         }
-        /**
-     * This method is like `_.reduce` except that it iterates over elements of
-     * `collection` from right to left.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @param {*} [accumulator] The initial value.
-     * @returns {*} Returns the accumulated value.
-     * @see _.reduce
-     * @example
-     *
-     * var array = [[0, 1], [2, 3], [4, 5]];
-     *
-     * _.reduceRight(array, function(flattened, other) {
-     *   return flattened.concat(other);
-     * }, []);
-     * // => [4, 5, 2, 3, 0, 1]
-     */
         function reduceRight(collection, iteratee, accumulator) {
             var func = isArray(collection) ? arrayReduceRight : baseReduce, initAccum = arguments.length < 3;
             return func(collection, getIteratee(iteratee, 4), accumulator, initAccum, baseEachRight);
         }
-        /**
-     * The opposite of `_.filter`; this method returns the elements of `collection`
-     * that `predicate` does **not** return truthy for.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @returns {Array} Returns the new filtered array.
-     * @see _.filter
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney', 'age': 36, 'active': false },
-     *   { 'user': 'fred',   'age': 40, 'active': true }
-     * ];
-     *
-     * _.reject(users, function(o) { return !o.active; });
-     * // => objects for ['fred']
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.reject(users, { 'age': 40, 'active': true });
-     * // => objects for ['barney']
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.reject(users, ['active', false]);
-     * // => objects for ['fred']
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.reject(users, 'active');
-     * // => objects for ['barney']
-     */
         function reject(collection, predicate) {
             var func = isArray(collection) ? arrayFilter : baseFilter;
             return func(collection, negate(getIteratee(predicate, 3)));
         }
-        /**
-     * Gets a random element from `collection`.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to sample.
-     * @returns {*} Returns the random element.
-     * @example
-     *
-     * _.sample([1, 2, 3, 4]);
-     * // => 2
-     */
         function sample(collection) {
             return arraySample(isArrayLike(collection) ? collection : values(collection));
         }
-        /**
-     * Gets `n` random elements at unique keys from `collection` up to the
-     * size of `collection`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to sample.
-     * @param {number} [n=1] The number of elements to sample.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the random elements.
-     * @example
-     *
-     * _.sampleSize([1, 2, 3], 2);
-     * // => [3, 1]
-     *
-     * _.sampleSize([1, 2, 3], 4);
-     * // => [2, 3, 1]
-     */
         function sampleSize(collection, n, guard) {
             if (guard ? isIterateeCall(collection, n, guard) : n === undefined) {
                 n = 1;
@@ -8766,45 +3587,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return arraySampleSize(isArrayLike(collection) ? collection : values(collection), n);
         }
-        /**
-     * Creates an array of shuffled values, using a version of the
-     * [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to shuffle.
-     * @returns {Array} Returns the new shuffled array.
-     * @example
-     *
-     * _.shuffle([1, 2, 3, 4]);
-     * // => [4, 1, 3, 2]
-     */
         function shuffle(collection) {
             return shuffleSelf(isArrayLike(collection) ? copyArray(collection) : values(collection));
         }
-        /**
-     * Gets the size of `collection` by returning its length for array-like
-     * values or the number of own enumerable string keyed properties for objects.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object|string} collection The collection to inspect.
-     * @returns {number} Returns the collection size.
-     * @example
-     *
-     * _.size([1, 2, 3]);
-     * // => 3
-     *
-     * _.size({ 'a': 1, 'b': 2 });
-     * // => 2
-     *
-     * _.size('pebbles');
-     * // => 7
-     */
         function size(collection) {
             if (collection == null) {
                 return 0;
@@ -8818,42 +3603,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseKeys(collection).length;
         }
-        /**
-     * Checks if `predicate` returns truthy for **any** element of `collection`.
-     * Iteration is stopped once `predicate` returns truthy. The predicate is
-     * invoked with three arguments: (value, index|key, collection).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {boolean} Returns `true` if any element passes the predicate check,
-     *  else `false`.
-     * @example
-     *
-     * _.some([null, 0, 'yes', false], Boolean);
-     * // => true
-     *
-     * var users = [
-     *   { 'user': 'barney', 'active': true },
-     *   { 'user': 'fred',   'active': false }
-     * ];
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.some(users, { 'user': 'barney', 'active': false });
-     * // => false
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.some(users, ['active', false]);
-     * // => true
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.some(users, 'active');
-     * // => true
-     */
         function some(collection, predicate, guard) {
             var func = isArray(collection) ? arraySome : baseSome;
             if (guard && isIterateeCall(collection, predicate, guard)) {
@@ -8861,35 +3610,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return func(collection, getIteratee(predicate, 3));
         }
-        /**
-     * Creates an array of elements, sorted in ascending order by the results of
-     * running each element in a collection thru each iteratee. This method
-     * performs a stable sort, that is, it preserves the original sort order of
-     * equal elements. The iteratees are invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Collection
-     * @param {Array|Object} collection The collection to iterate over.
-     * @param {...(Function|Function[])} [iteratees=[_.identity]]
-     *  The iteratees to sort by.
-     * @returns {Array} Returns the new sorted array.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'fred',   'age': 48 },
-     *   { 'user': 'barney', 'age': 36 },
-     *   { 'user': 'fred',   'age': 40 },
-     *   { 'user': 'barney', 'age': 34 }
-     * ];
-     *
-     * _.sortBy(users, [function(o) { return o.user; }]);
-     * // => objects for [['barney', 36], ['barney', 34], ['fred', 48], ['fred', 40]]
-     *
-     * _.sortBy(users, ['user', 'age']);
-     * // => objects for [['barney', 34], ['barney', 36], ['fred', 40], ['fred', 48]]
-     */
         var sortBy = baseRest(function(collection, iteratees) {
             if (collection == null) {
                 return [];
@@ -8902,51 +3622,9 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseOrderBy(collection, baseFlatten(iteratees, 1), []);
         });
-        /*------------------------------------------------------------------------*/
-        /**
-     * Gets the timestamp of the number of milliseconds that have elapsed since
-     * the Unix epoch (1 January 1970 00:00:00 UTC).
-     *
-     * @static
-     * @memberOf _
-     * @since 2.4.0
-     * @category Date
-     * @returns {number} Returns the timestamp.
-     * @example
-     *
-     * _.defer(function(stamp) {
-     *   console.log(_.now() - stamp);
-     * }, _.now());
-     * // => Logs the number of milliseconds it took for the deferred invocation.
-     */
         var now = ctxNow || function() {
             return root.Date.now();
         };
-        /*------------------------------------------------------------------------*/
-        /**
-     * The opposite of `_.before`; this method creates a function that invokes
-     * `func` once it's called `n` or more times.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {number} n The number of calls before `func` is invoked.
-     * @param {Function} func The function to restrict.
-     * @returns {Function} Returns the new restricted function.
-     * @example
-     *
-     * var saves = ['profile', 'settings'];
-     *
-     * var done = _.after(saves.length, function() {
-     *   console.log('done saving!');
-     * });
-     *
-     * _.forEach(saves, function(type) {
-     *   asyncSave({ 'type': type, 'complete': done });
-     * });
-     * // => Logs 'done saving!' after the two async saves have completed.
-     */
         function after(n, func) {
             if (typeof func != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -8958,45 +3636,11 @@ UsergridEventable.mixin = function(destObject) {
                 }
             };
         }
-        /**
-     * Creates a function that invokes `func`, with up to `n` arguments,
-     * ignoring any additional arguments.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Function
-     * @param {Function} func The function to cap arguments for.
-     * @param {number} [n=func.length] The arity cap.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Function} Returns the new capped function.
-     * @example
-     *
-     * _.map(['6', '8', '10'], _.ary(parseInt, 1));
-     * // => [6, 8, 10]
-     */
         function ary(func, n, guard) {
             n = guard ? undefined : n;
             n = func && n == null ? func.length : n;
             return createWrap(func, ARY_FLAG, undefined, undefined, undefined, undefined, n);
         }
-        /**
-     * Creates a function that invokes `func`, with the `this` binding and arguments
-     * of the created function, while it's called less than `n` times. Subsequent
-     * calls to the created function return the result of the last `func` invocation.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Function
-     * @param {number} n The number of calls at which `func` is no longer invoked.
-     * @param {Function} func The function to restrict.
-     * @returns {Function} Returns the new restricted function.
-     * @example
-     *
-     * jQuery(element).on('click', _.before(5, addContactToList));
-     * // => Allows adding up to 4 contacts to the list.
-     */
         function before(n, func) {
             var result;
             if (typeof func != "function") {
@@ -9013,41 +3657,6 @@ UsergridEventable.mixin = function(destObject) {
                 return result;
             };
         }
-        /**
-     * Creates a function that invokes `func` with the `this` binding of `thisArg`
-     * and `partials` prepended to the arguments it receives.
-     *
-     * The `_.bind.placeholder` value, which defaults to `_` in monolithic builds,
-     * may be used as a placeholder for partially applied arguments.
-     *
-     * **Note:** Unlike native `Function#bind`, this method doesn't set the "length"
-     * property of bound functions.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to bind.
-     * @param {*} thisArg The `this` binding of `func`.
-     * @param {...*} [partials] The arguments to be partially applied.
-     * @returns {Function} Returns the new bound function.
-     * @example
-     *
-     * function greet(greeting, punctuation) {
-     *   return greeting + ' ' + this.user + punctuation;
-     * }
-     *
-     * var object = { 'user': 'fred' };
-     *
-     * var bound = _.bind(greet, object, 'hi');
-     * bound('!');
-     * // => 'hi fred!'
-     *
-     * // Bound with placeholders.
-     * var bound = _.bind(greet, object, _, '!');
-     * bound('hi');
-     * // => 'hi fred!'
-     */
         var bind = baseRest(function(func, thisArg, partials) {
             var bitmask = BIND_FLAG;
             if (partials.length) {
@@ -9056,51 +3665,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return createWrap(func, bitmask, thisArg, partials, holders);
         });
-        /**
-     * Creates a function that invokes the method at `object[key]` with `partials`
-     * prepended to the arguments it receives.
-     *
-     * This method differs from `_.bind` by allowing bound functions to reference
-     * methods that may be redefined or don't yet exist. See
-     * [Peter Michaux's article](http://peter.michaux.ca/articles/lazy-function-definition-pattern)
-     * for more details.
-     *
-     * The `_.bindKey.placeholder` value, which defaults to `_` in monolithic
-     * builds, may be used as a placeholder for partially applied arguments.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.10.0
-     * @category Function
-     * @param {Object} object The object to invoke the method on.
-     * @param {string} key The key of the method.
-     * @param {...*} [partials] The arguments to be partially applied.
-     * @returns {Function} Returns the new bound function.
-     * @example
-     *
-     * var object = {
-     *   'user': 'fred',
-     *   'greet': function(greeting, punctuation) {
-     *     return greeting + ' ' + this.user + punctuation;
-     *   }
-     * };
-     *
-     * var bound = _.bindKey(object, 'greet', 'hi');
-     * bound('!');
-     * // => 'hi fred!'
-     *
-     * object.greet = function(greeting, punctuation) {
-     *   return greeting + 'ya ' + this.user + punctuation;
-     * };
-     *
-     * bound('!');
-     * // => 'hiya fred!'
-     *
-     * // Bound with placeholders.
-     * var bound = _.bindKey(object, 'greet', _, '!');
-     * bound('hi');
-     * // => 'hiya fred!'
-     */
         var bindKey = baseRest(function(object, key, partials) {
             var bitmask = BIND_FLAG | BIND_KEY_FLAG;
             if (partials.length) {
@@ -9109,151 +3673,18 @@ UsergridEventable.mixin = function(destObject) {
             }
             return createWrap(key, bitmask, object, partials, holders);
         });
-        /**
-     * Creates a function that accepts arguments of `func` and either invokes
-     * `func` returning its result, if at least `arity` number of arguments have
-     * been provided, or returns a function that accepts the remaining `func`
-     * arguments, and so on. The arity of `func` may be specified if `func.length`
-     * is not sufficient.
-     *
-     * The `_.curry.placeholder` value, which defaults to `_` in monolithic builds,
-     * may be used as a placeholder for provided arguments.
-     *
-     * **Note:** This method doesn't set the "length" property of curried functions.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Function
-     * @param {Function} func The function to curry.
-     * @param {number} [arity=func.length] The arity of `func`.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Function} Returns the new curried function.
-     * @example
-     *
-     * var abc = function(a, b, c) {
-     *   return [a, b, c];
-     * };
-     *
-     * var curried = _.curry(abc);
-     *
-     * curried(1)(2)(3);
-     * // => [1, 2, 3]
-     *
-     * curried(1, 2)(3);
-     * // => [1, 2, 3]
-     *
-     * curried(1, 2, 3);
-     * // => [1, 2, 3]
-     *
-     * // Curried with placeholders.
-     * curried(1)(_, 3)(2);
-     * // => [1, 2, 3]
-     */
         function curry(func, arity, guard) {
             arity = guard ? undefined : arity;
             var result = createWrap(func, CURRY_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
             result.placeholder = curry.placeholder;
             return result;
         }
-        /**
-     * This method is like `_.curry` except that arguments are applied to `func`
-     * in the manner of `_.partialRight` instead of `_.partial`.
-     *
-     * The `_.curryRight.placeholder` value, which defaults to `_` in monolithic
-     * builds, may be used as a placeholder for provided arguments.
-     *
-     * **Note:** This method doesn't set the "length" property of curried functions.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Function
-     * @param {Function} func The function to curry.
-     * @param {number} [arity=func.length] The arity of `func`.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Function} Returns the new curried function.
-     * @example
-     *
-     * var abc = function(a, b, c) {
-     *   return [a, b, c];
-     * };
-     *
-     * var curried = _.curryRight(abc);
-     *
-     * curried(3)(2)(1);
-     * // => [1, 2, 3]
-     *
-     * curried(2, 3)(1);
-     * // => [1, 2, 3]
-     *
-     * curried(1, 2, 3);
-     * // => [1, 2, 3]
-     *
-     * // Curried with placeholders.
-     * curried(3)(1, _)(2);
-     * // => [1, 2, 3]
-     */
         function curryRight(func, arity, guard) {
             arity = guard ? undefined : arity;
             var result = createWrap(func, CURRY_RIGHT_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
             result.placeholder = curryRight.placeholder;
             return result;
         }
-        /**
-     * Creates a debounced function that delays invoking `func` until after `wait`
-     * milliseconds have elapsed since the last time the debounced function was
-     * invoked. The debounced function comes with a `cancel` method to cancel
-     * delayed `func` invocations and a `flush` method to immediately invoke them.
-     * Provide `options` to indicate whether `func` should be invoked on the
-     * leading and/or trailing edge of the `wait` timeout. The `func` is invoked
-     * with the last arguments provided to the debounced function. Subsequent
-     * calls to the debounced function return the result of the last `func`
-     * invocation.
-     *
-     * **Note:** If `leading` and `trailing` options are `true`, `func` is
-     * invoked on the trailing edge of the timeout only if the debounced function
-     * is invoked more than once during the `wait` timeout.
-     *
-     * If `wait` is `0` and `leading` is `false`, `func` invocation is deferred
-     * until to the next tick, similar to `setTimeout` with a timeout of `0`.
-     *
-     * See [David Corbacho's article](https://css-tricks.com/debouncing-throttling-explained-examples/)
-     * for details over the differences between `_.debounce` and `_.throttle`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to debounce.
-     * @param {number} [wait=0] The number of milliseconds to delay.
-     * @param {Object} [options={}] The options object.
-     * @param {boolean} [options.leading=false]
-     *  Specify invoking on the leading edge of the timeout.
-     * @param {number} [options.maxWait]
-     *  The maximum time `func` is allowed to be delayed before it's invoked.
-     * @param {boolean} [options.trailing=true]
-     *  Specify invoking on the trailing edge of the timeout.
-     * @returns {Function} Returns the new debounced function.
-     * @example
-     *
-     * // Avoid costly calculations while the window size is in flux.
-     * jQuery(window).on('resize', _.debounce(calculateLayout, 150));
-     *
-     * // Invoke `sendMail` when clicked, debouncing subsequent calls.
-     * jQuery(element).on('click', _.debounce(sendMail, 300, {
-     *   'leading': true,
-     *   'trailing': false
-     * }));
-     *
-     * // Ensure `batchLog` is invoked once after 1 second of debounced calls.
-     * var debounced = _.debounce(batchLog, 250, { 'maxWait': 1000 });
-     * var source = new EventSource('/stream');
-     * jQuery(source).on('message', debounced);
-     *
-     * // Cancel the trailing debounced invocation.
-     * jQuery(window).on('popstate', debounced.cancel);
-     */
         function debounce(func, wait, options) {
             var lastArgs, lastThis, maxWait, result, timerId, lastCallTime, lastInvokeTime = 0, leading = false, maxing = false, trailing = true;
             if (typeof func != "function") {
@@ -9334,114 +3765,15 @@ UsergridEventable.mixin = function(destObject) {
             debounced.flush = flush;
             return debounced;
         }
-        /**
-     * Defers invoking the `func` until the current call stack has cleared. Any
-     * additional arguments are provided to `func` when it's invoked.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to defer.
-     * @param {...*} [args] The arguments to invoke `func` with.
-     * @returns {number} Returns the timer id.
-     * @example
-     *
-     * _.defer(function(text) {
-     *   console.log(text);
-     * }, 'deferred');
-     * // => Logs 'deferred' after one millisecond.
-     */
         var defer = baseRest(function(func, args) {
             return baseDelay(func, 1, args);
         });
-        /**
-     * Invokes `func` after `wait` milliseconds. Any additional arguments are
-     * provided to `func` when it's invoked.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to delay.
-     * @param {number} wait The number of milliseconds to delay invocation.
-     * @param {...*} [args] The arguments to invoke `func` with.
-     * @returns {number} Returns the timer id.
-     * @example
-     *
-     * _.delay(function(text) {
-     *   console.log(text);
-     * }, 1000, 'later');
-     * // => Logs 'later' after one second.
-     */
         var delay = baseRest(function(func, wait, args) {
             return baseDelay(func, toNumber(wait) || 0, args);
         });
-        /**
-     * Creates a function that invokes `func` with arguments reversed.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Function
-     * @param {Function} func The function to flip arguments for.
-     * @returns {Function} Returns the new flipped function.
-     * @example
-     *
-     * var flipped = _.flip(function() {
-     *   return _.toArray(arguments);
-     * });
-     *
-     * flipped('a', 'b', 'c', 'd');
-     * // => ['d', 'c', 'b', 'a']
-     */
         function flip(func) {
             return createWrap(func, FLIP_FLAG);
         }
-        /**
-     * Creates a function that memoizes the result of `func`. If `resolver` is
-     * provided, it determines the cache key for storing the result based on the
-     * arguments provided to the memoized function. By default, the first argument
-     * provided to the memoized function is used as the map cache key. The `func`
-     * is invoked with the `this` binding of the memoized function.
-     *
-     * **Note:** The cache is exposed as the `cache` property on the memoized
-     * function. Its creation may be customized by replacing the `_.memoize.Cache`
-     * constructor with one whose instances implement the
-     * [`Map`](http://ecma-international.org/ecma-262/7.0/#sec-properties-of-the-map-prototype-object)
-     * method interface of `delete`, `get`, `has`, and `set`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to have its output memoized.
-     * @param {Function} [resolver] The function to resolve the cache key.
-     * @returns {Function} Returns the new memoized function.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': 2 };
-     * var other = { 'c': 3, 'd': 4 };
-     *
-     * var values = _.memoize(_.values);
-     * values(object);
-     * // => [1, 2]
-     *
-     * values(other);
-     * // => [3, 4]
-     *
-     * object.a = 2;
-     * values(object);
-     * // => [1, 2]
-     *
-     * // Modify the result cache.
-     * values.cache.set(object, ['a', 'b']);
-     * values(object);
-     * // => ['a', 'b']
-     *
-     * // Replace `_.memoize.Cache`.
-     * _.memoize.Cache = WeakMap;
-     */
         function memoize(func, resolver) {
             if (typeof func != "function" || resolver && typeof resolver != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -9459,26 +3791,6 @@ UsergridEventable.mixin = function(destObject) {
             return memoized;
         }
         memoize.Cache = MapCache;
-        /**
-     * Creates a function that negates the result of the predicate `func`. The
-     * `func` predicate is invoked with the `this` binding and arguments of the
-     * created function.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Function
-     * @param {Function} predicate The predicate to negate.
-     * @returns {Function} Returns the new negated function.
-     * @example
-     *
-     * function isEven(n) {
-     *   return n % 2 == 0;
-     * }
-     *
-     * _.filter([1, 2, 3, 4, 5, 6], _.negate(isEven));
-     * // => [1, 3, 5]
-     */
         function negate(predicate) {
             if (typeof predicate != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -9501,58 +3813,9 @@ UsergridEventable.mixin = function(destObject) {
                 return !predicate.apply(this, args);
             };
         }
-        /**
-     * Creates a function that is restricted to invoking `func` once. Repeat calls
-     * to the function return the value of the first invocation. The `func` is
-     * invoked with the `this` binding and arguments of the created function.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to restrict.
-     * @returns {Function} Returns the new restricted function.
-     * @example
-     *
-     * var initialize = _.once(createApplication);
-     * initialize();
-     * initialize();
-     * // => `createApplication` is invoked once
-     */
         function once(func) {
             return before(2, func);
         }
-        /**
-     * Creates a function that invokes `func` with its arguments transformed.
-     *
-     * @static
-     * @since 4.0.0
-     * @memberOf _
-     * @category Function
-     * @param {Function} func The function to wrap.
-     * @param {...(Function|Function[])} [transforms=[_.identity]]
-     *  The argument transforms.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * function doubled(n) {
-     *   return n * 2;
-     * }
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * var func = _.overArgs(function(x, y) {
-     *   return [x, y];
-     * }, [square, doubled]);
-     *
-     * func(9, 3);
-     * // => [81, 6]
-     *
-     * func(10, 5);
-     * // => [100, 10]
-     */
         var overArgs = castRest(function(func, transforms) {
             transforms = transforms.length == 1 && isArray(transforms[0]) ? arrayMap(transforms[0], baseUnary(getIteratee())) : arrayMap(baseFlatten(transforms, 1), baseUnary(getIteratee()));
             var funcsLength = transforms.length;
@@ -9564,129 +3827,17 @@ UsergridEventable.mixin = function(destObject) {
                 return apply(func, this, args);
             });
         });
-        /**
-     * Creates a function that invokes `func` with `partials` prepended to the
-     * arguments it receives. This method is like `_.bind` except it does **not**
-     * alter the `this` binding.
-     *
-     * The `_.partial.placeholder` value, which defaults to `_` in monolithic
-     * builds, may be used as a placeholder for partially applied arguments.
-     *
-     * **Note:** This method doesn't set the "length" property of partially
-     * applied functions.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.2.0
-     * @category Function
-     * @param {Function} func The function to partially apply arguments to.
-     * @param {...*} [partials] The arguments to be partially applied.
-     * @returns {Function} Returns the new partially applied function.
-     * @example
-     *
-     * function greet(greeting, name) {
-     *   return greeting + ' ' + name;
-     * }
-     *
-     * var sayHelloTo = _.partial(greet, 'hello');
-     * sayHelloTo('fred');
-     * // => 'hello fred'
-     *
-     * // Partially applied with placeholders.
-     * var greetFred = _.partial(greet, _, 'fred');
-     * greetFred('hi');
-     * // => 'hi fred'
-     */
         var partial = baseRest(function(func, partials) {
             var holders = replaceHolders(partials, getHolder(partial));
             return createWrap(func, PARTIAL_FLAG, undefined, partials, holders);
         });
-        /**
-     * This method is like `_.partial` except that partially applied arguments
-     * are appended to the arguments it receives.
-     *
-     * The `_.partialRight.placeholder` value, which defaults to `_` in monolithic
-     * builds, may be used as a placeholder for partially applied arguments.
-     *
-     * **Note:** This method doesn't set the "length" property of partially
-     * applied functions.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.0.0
-     * @category Function
-     * @param {Function} func The function to partially apply arguments to.
-     * @param {...*} [partials] The arguments to be partially applied.
-     * @returns {Function} Returns the new partially applied function.
-     * @example
-     *
-     * function greet(greeting, name) {
-     *   return greeting + ' ' + name;
-     * }
-     *
-     * var greetFred = _.partialRight(greet, 'fred');
-     * greetFred('hi');
-     * // => 'hi fred'
-     *
-     * // Partially applied with placeholders.
-     * var sayHelloTo = _.partialRight(greet, 'hello', _);
-     * sayHelloTo('fred');
-     * // => 'hello fred'
-     */
         var partialRight = baseRest(function(func, partials) {
             var holders = replaceHolders(partials, getHolder(partialRight));
             return createWrap(func, PARTIAL_RIGHT_FLAG, undefined, partials, holders);
         });
-        /**
-     * Creates a function that invokes `func` with arguments arranged according
-     * to the specified `indexes` where the argument value at the first index is
-     * provided as the first argument, the argument value at the second index is
-     * provided as the second argument, and so on.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Function
-     * @param {Function} func The function to rearrange arguments for.
-     * @param {...(number|number[])} indexes The arranged argument indexes.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var rearged = _.rearg(function(a, b, c) {
-     *   return [a, b, c];
-     * }, [2, 0, 1]);
-     *
-     * rearged('b', 'c', 'a')
-     * // => ['a', 'b', 'c']
-     */
         var rearg = flatRest(function(func, indexes) {
             return createWrap(func, REARG_FLAG, undefined, undefined, undefined, indexes);
         });
-        /**
-     * Creates a function that invokes `func` with the `this` binding of the
-     * created function and arguments from `start` and beyond provided as
-     * an array.
-     *
-     * **Note:** This method is based on the
-     * [rest parameter](https://mdn.io/rest_parameters).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Function
-     * @param {Function} func The function to apply a rest parameter to.
-     * @param {number} [start=func.length-1] The start position of the rest parameter.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var say = _.rest(function(what, names) {
-     *   return what + ' ' + _.initial(names).join(', ') +
-     *     (_.size(names) > 1 ? ', & ' : '') + _.last(names);
-     * });
-     *
-     * say('hello', 'fred', 'barney', 'pebbles');
-     * // => 'hello fred, barney, & pebbles'
-     */
         function rest(func, start) {
             if (typeof func != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -9694,40 +3845,6 @@ UsergridEventable.mixin = function(destObject) {
             start = start === undefined ? start : toInteger(start);
             return baseRest(func, start);
         }
-        /**
-     * Creates a function that invokes `func` with the `this` binding of the
-     * create function and an array of arguments much like
-     * [`Function#apply`](http://www.ecma-international.org/ecma-262/7.0/#sec-function.prototype.apply).
-     *
-     * **Note:** This method is based on the
-     * [spread operator](https://mdn.io/spread_operator).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.2.0
-     * @category Function
-     * @param {Function} func The function to spread arguments over.
-     * @param {number} [start=0] The start position of the spread.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var say = _.spread(function(who, what) {
-     *   return who + ' says ' + what;
-     * });
-     *
-     * say(['fred', 'hello']);
-     * // => 'fred says hello'
-     *
-     * var numbers = Promise.all([
-     *   Promise.resolve(40),
-     *   Promise.resolve(36)
-     * ]);
-     *
-     * numbers.then(_.spread(function(x, y) {
-     *   return x + y;
-     * }));
-     * // => a Promise of 76
-     */
         function spread(func, start) {
             if (typeof func != "function") {
                 throw new TypeError(FUNC_ERROR_TEXT);
@@ -9741,50 +3858,6 @@ UsergridEventable.mixin = function(destObject) {
                 return apply(func, this, otherArgs);
             });
         }
-        /**
-     * Creates a throttled function that only invokes `func` at most once per
-     * every `wait` milliseconds. The throttled function comes with a `cancel`
-     * method to cancel delayed `func` invocations and a `flush` method to
-     * immediately invoke them. Provide `options` to indicate whether `func`
-     * should be invoked on the leading and/or trailing edge of the `wait`
-     * timeout. The `func` is invoked with the last arguments provided to the
-     * throttled function. Subsequent calls to the throttled function return the
-     * result of the last `func` invocation.
-     *
-     * **Note:** If `leading` and `trailing` options are `true`, `func` is
-     * invoked on the trailing edge of the timeout only if the throttled function
-     * is invoked more than once during the `wait` timeout.
-     *
-     * If `wait` is `0` and `leading` is `false`, `func` invocation is deferred
-     * until to the next tick, similar to `setTimeout` with a timeout of `0`.
-     *
-     * See [David Corbacho's article](https://css-tricks.com/debouncing-throttling-explained-examples/)
-     * for details over the differences between `_.throttle` and `_.debounce`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {Function} func The function to throttle.
-     * @param {number} [wait=0] The number of milliseconds to throttle invocations to.
-     * @param {Object} [options={}] The options object.
-     * @param {boolean} [options.leading=true]
-     *  Specify invoking on the leading edge of the timeout.
-     * @param {boolean} [options.trailing=true]
-     *  Specify invoking on the trailing edge of the timeout.
-     * @returns {Function} Returns the new throttled function.
-     * @example
-     *
-     * // Avoid excessively updating the position while scrolling.
-     * jQuery(window).on('scroll', _.throttle(updatePosition, 100));
-     *
-     * // Invoke `renewToken` when the click event is fired, but not more than once every 5 minutes.
-     * var throttled = _.throttle(renewToken, 300000, { 'trailing': false });
-     * jQuery(element).on('click', throttled);
-     *
-     * // Cancel the trailing throttled invocation.
-     * jQuery(window).on('popstate', throttled.cancel);
-     */
         function throttle(func, wait, options) {
             var leading = true, trailing = true;
             if (typeof func != "function") {
@@ -9800,84 +3873,13 @@ UsergridEventable.mixin = function(destObject) {
                 trailing: trailing
             });
         }
-        /**
-     * Creates a function that accepts up to one argument, ignoring any
-     * additional arguments.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Function
-     * @param {Function} func The function to cap arguments for.
-     * @returns {Function} Returns the new capped function.
-     * @example
-     *
-     * _.map(['6', '8', '10'], _.unary(parseInt));
-     * // => [6, 8, 10]
-     */
         function unary(func) {
             return ary(func, 1);
         }
-        /**
-     * Creates a function that provides `value` to `wrapper` as its first
-     * argument. Any additional arguments provided to the function are appended
-     * to those provided to the `wrapper`. The wrapper is invoked with the `this`
-     * binding of the created function.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Function
-     * @param {*} value The value to wrap.
-     * @param {Function} [wrapper=identity] The wrapper function.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var p = _.wrap(_.escape, function(func, text) {
-     *   return '<p>' + func(text) + '</p>';
-     * });
-     *
-     * p('fred, barney, & pebbles');
-     * // => '<p>fred, barney, &amp; pebbles</p>'
-     */
         function wrap(value, wrapper) {
             wrapper = wrapper == null ? identity : wrapper;
             return partial(wrapper, value);
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Casts `value` as an array if it's not one.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.4.0
-     * @category Lang
-     * @param {*} value The value to inspect.
-     * @returns {Array} Returns the cast array.
-     * @example
-     *
-     * _.castArray(1);
-     * // => [1]
-     *
-     * _.castArray({ 'a': 1 });
-     * // => [{ 'a': 1 }]
-     *
-     * _.castArray('abc');
-     * // => ['abc']
-     *
-     * _.castArray(null);
-     * // => [null]
-     *
-     * _.castArray(undefined);
-     * // => [undefined]
-     *
-     * _.castArray();
-     * // => []
-     *
-     * var array = [1, 2, 3];
-     * console.log(_.castArray(array) === array);
-     * // => true
-     */
         function castArray() {
             if (!arguments.length) {
                 return [];
@@ -9885,461 +3887,47 @@ UsergridEventable.mixin = function(destObject) {
             var value = arguments[0];
             return isArray(value) ? value : [ value ];
         }
-        /**
-     * Creates a shallow clone of `value`.
-     *
-     * **Note:** This method is loosely based on the
-     * [structured clone algorithm](https://mdn.io/Structured_clone_algorithm)
-     * and supports cloning arrays, array buffers, booleans, date objects, maps,
-     * numbers, `Object` objects, regexes, sets, strings, symbols, and typed
-     * arrays. The own enumerable properties of `arguments` objects are cloned
-     * as plain objects. An empty object is returned for uncloneable values such
-     * as error objects, functions, DOM nodes, and WeakMaps.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to clone.
-     * @returns {*} Returns the cloned value.
-     * @see _.cloneDeep
-     * @example
-     *
-     * var objects = [{ 'a': 1 }, { 'b': 2 }];
-     *
-     * var shallow = _.clone(objects);
-     * console.log(shallow[0] === objects[0]);
-     * // => true
-     */
         function clone(value) {
             return baseClone(value, false, true);
         }
-        /**
-     * This method is like `_.clone` except that it accepts `customizer` which
-     * is invoked to produce the cloned value. If `customizer` returns `undefined`,
-     * cloning is handled by the method instead. The `customizer` is invoked with
-     * up to four arguments; (value [, index|key, object, stack]).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to clone.
-     * @param {Function} [customizer] The function to customize cloning.
-     * @returns {*} Returns the cloned value.
-     * @see _.cloneDeepWith
-     * @example
-     *
-     * function customizer(value) {
-     *   if (_.isElement(value)) {
-     *     return value.cloneNode(false);
-     *   }
-     * }
-     *
-     * var el = _.cloneWith(document.body, customizer);
-     *
-     * console.log(el === document.body);
-     * // => false
-     * console.log(el.nodeName);
-     * // => 'BODY'
-     * console.log(el.childNodes.length);
-     * // => 0
-     */
         function cloneWith(value, customizer) {
             return baseClone(value, false, true, customizer);
         }
-        /**
-     * This method is like `_.clone` except that it recursively clones `value`.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.0.0
-     * @category Lang
-     * @param {*} value The value to recursively clone.
-     * @returns {*} Returns the deep cloned value.
-     * @see _.clone
-     * @example
-     *
-     * var objects = [{ 'a': 1 }, { 'b': 2 }];
-     *
-     * var deep = _.cloneDeep(objects);
-     * console.log(deep[0] === objects[0]);
-     * // => false
-     */
         function cloneDeep(value) {
             return baseClone(value, true, true);
         }
-        /**
-     * This method is like `_.cloneWith` except that it recursively clones `value`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to recursively clone.
-     * @param {Function} [customizer] The function to customize cloning.
-     * @returns {*} Returns the deep cloned value.
-     * @see _.cloneWith
-     * @example
-     *
-     * function customizer(value) {
-     *   if (_.isElement(value)) {
-     *     return value.cloneNode(true);
-     *   }
-     * }
-     *
-     * var el = _.cloneDeepWith(document.body, customizer);
-     *
-     * console.log(el === document.body);
-     * // => false
-     * console.log(el.nodeName);
-     * // => 'BODY'
-     * console.log(el.childNodes.length);
-     * // => 20
-     */
         function cloneDeepWith(value, customizer) {
             return baseClone(value, true, true, customizer);
         }
-        /**
-     * Checks if `object` conforms to `source` by invoking the predicate
-     * properties of `source` with the corresponding property values of `object`.
-     *
-     * **Note:** This method is equivalent to `_.conforms` when `source` is
-     * partially applied.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.14.0
-     * @category Lang
-     * @param {Object} object The object to inspect.
-     * @param {Object} source The object of property predicates to conform to.
-     * @returns {boolean} Returns `true` if `object` conforms, else `false`.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': 2 };
-     *
-     * _.conformsTo(object, { 'b': function(n) { return n > 1; } });
-     * // => true
-     *
-     * _.conformsTo(object, { 'b': function(n) { return n > 2; } });
-     * // => false
-     */
         function conformsTo(object, source) {
             return source == null || baseConformsTo(object, source, keys(source));
         }
-        /**
-     * Performs a
-     * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
-     * comparison between two values to determine if they are equivalent.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
-     * @example
-     *
-     * var object = { 'a': 1 };
-     * var other = { 'a': 1 };
-     *
-     * _.eq(object, object);
-     * // => true
-     *
-     * _.eq(object, other);
-     * // => false
-     *
-     * _.eq('a', 'a');
-     * // => true
-     *
-     * _.eq('a', Object('a'));
-     * // => false
-     *
-     * _.eq(NaN, NaN);
-     * // => true
-     */
         function eq(value, other) {
             return value === other || value !== value && other !== other;
         }
-        /**
-     * Checks if `value` is greater than `other`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.9.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is greater than `other`,
-     *  else `false`.
-     * @see _.lt
-     * @example
-     *
-     * _.gt(3, 1);
-     * // => true
-     *
-     * _.gt(3, 3);
-     * // => false
-     *
-     * _.gt(1, 3);
-     * // => false
-     */
         var gt = createRelationalOperation(baseGt);
-        /**
-     * Checks if `value` is greater than or equal to `other`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.9.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is greater than or equal to
-     *  `other`, else `false`.
-     * @see _.lte
-     * @example
-     *
-     * _.gte(3, 1);
-     * // => true
-     *
-     * _.gte(3, 3);
-     * // => true
-     *
-     * _.gte(1, 3);
-     * // => false
-     */
         var gte = createRelationalOperation(function(value, other) {
             return value >= other;
         });
-        /**
-     * Checks if `value` is likely an `arguments` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an `arguments` object,
-     *  else `false`.
-     * @example
-     *
-     * _.isArguments(function() { return arguments; }());
-     * // => true
-     *
-     * _.isArguments([1, 2, 3]);
-     * // => false
-     */
         function isArguments(value) {
             return isArrayLikeObject(value) && hasOwnProperty.call(value, "callee") && (!propertyIsEnumerable.call(value, "callee") || objectToString.call(value) == argsTag);
         }
-        /**
-     * Checks if `value` is classified as an `Array` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an array, else `false`.
-     * @example
-     *
-     * _.isArray([1, 2, 3]);
-     * // => true
-     *
-     * _.isArray(document.body.children);
-     * // => false
-     *
-     * _.isArray('abc');
-     * // => false
-     *
-     * _.isArray(_.noop);
-     * // => false
-     */
         var isArray = Array.isArray;
-        /**
-     * Checks if `value` is classified as an `ArrayBuffer` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an array buffer, else `false`.
-     * @example
-     *
-     * _.isArrayBuffer(new ArrayBuffer(2));
-     * // => true
-     *
-     * _.isArrayBuffer(new Array(2));
-     * // => false
-     */
         var isArrayBuffer = nodeIsArrayBuffer ? baseUnary(nodeIsArrayBuffer) : baseIsArrayBuffer;
-        /**
-     * Checks if `value` is array-like. A value is considered array-like if it's
-     * not a function and has a `value.length` that's an integer greater than or
-     * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
-     * @example
-     *
-     * _.isArrayLike([1, 2, 3]);
-     * // => true
-     *
-     * _.isArrayLike(document.body.children);
-     * // => true
-     *
-     * _.isArrayLike('abc');
-     * // => true
-     *
-     * _.isArrayLike(_.noop);
-     * // => false
-     */
         function isArrayLike(value) {
             return value != null && isLength(value.length) && !isFunction(value);
         }
-        /**
-     * This method is like `_.isArrayLike` except that it also checks if `value`
-     * is an object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an array-like object,
-     *  else `false`.
-     * @example
-     *
-     * _.isArrayLikeObject([1, 2, 3]);
-     * // => true
-     *
-     * _.isArrayLikeObject(document.body.children);
-     * // => true
-     *
-     * _.isArrayLikeObject('abc');
-     * // => false
-     *
-     * _.isArrayLikeObject(_.noop);
-     * // => false
-     */
         function isArrayLikeObject(value) {
             return isObjectLike(value) && isArrayLike(value);
         }
-        /**
-     * Checks if `value` is classified as a boolean primitive or object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a boolean, else `false`.
-     * @example
-     *
-     * _.isBoolean(false);
-     * // => true
-     *
-     * _.isBoolean(null);
-     * // => false
-     */
         function isBoolean(value) {
             return value === true || value === false || isObjectLike(value) && objectToString.call(value) == boolTag;
         }
-        /**
-     * Checks if `value` is a buffer.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
-     * @example
-     *
-     * _.isBuffer(new Buffer(2));
-     * // => true
-     *
-     * _.isBuffer(new Uint8Array(2));
-     * // => false
-     */
         var isBuffer = nativeIsBuffer || stubFalse;
-        /**
-     * Checks if `value` is classified as a `Date` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a date object, else `false`.
-     * @example
-     *
-     * _.isDate(new Date);
-     * // => true
-     *
-     * _.isDate('Mon April 23 2012');
-     * // => false
-     */
         var isDate = nodeIsDate ? baseUnary(nodeIsDate) : baseIsDate;
-        /**
-     * Checks if `value` is likely a DOM element.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a DOM element, else `false`.
-     * @example
-     *
-     * _.isElement(document.body);
-     * // => true
-     *
-     * _.isElement('<body>');
-     * // => false
-     */
         function isElement(value) {
             return value != null && value.nodeType === 1 && isObjectLike(value) && !isPlainObject(value);
         }
-        /**
-     * Checks if `value` is an empty object, collection, map, or set.
-     *
-     * Objects are considered empty if they have no own enumerable string keyed
-     * properties.
-     *
-     * Array-like values such as `arguments` objects, arrays, buffers, strings, or
-     * jQuery-like collections are considered empty if they have a `length` of `0`.
-     * Similarly, maps and sets are considered empty if they have a `size` of `0`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is empty, else `false`.
-     * @example
-     *
-     * _.isEmpty(null);
-     * // => true
-     *
-     * _.isEmpty(true);
-     * // => true
-     *
-     * _.isEmpty(1);
-     * // => true
-     *
-     * _.isEmpty([1, 2, 3]);
-     * // => false
-     *
-     * _.isEmpty({ 'a': 1 });
-     * // => false
-     */
         function isEmpty(value) {
             if (isArrayLike(value) && (isArray(value) || typeof value == "string" || typeof value.splice == "function" || isBuffer(value) || isArguments(value))) {
                 return !value.length;
@@ -10358,510 +3946,66 @@ UsergridEventable.mixin = function(destObject) {
             }
             return true;
         }
-        /**
-     * Performs a deep comparison between two values to determine if they are
-     * equivalent.
-     *
-     * **Note:** This method supports comparing arrays, array buffers, booleans,
-     * date objects, error objects, maps, numbers, `Object` objects, regexes,
-     * sets, strings, symbols, and typed arrays. `Object` objects are compared
-     * by their own, not inherited, enumerable properties. Functions and DOM
-     * nodes are **not** supported.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
-     * @example
-     *
-     * var object = { 'a': 1 };
-     * var other = { 'a': 1 };
-     *
-     * _.isEqual(object, other);
-     * // => true
-     *
-     * object === other;
-     * // => false
-     */
         function isEqual(value, other) {
             return baseIsEqual(value, other);
         }
-        /**
-     * This method is like `_.isEqual` except that it accepts `customizer` which
-     * is invoked to compare values. If `customizer` returns `undefined`, comparisons
-     * are handled by the method instead. The `customizer` is invoked with up to
-     * six arguments: (objValue, othValue [, index|key, object, other, stack]).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @param {Function} [customizer] The function to customize comparisons.
-     * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
-     * @example
-     *
-     * function isGreeting(value) {
-     *   return /^h(?:i|ello)$/.test(value);
-     * }
-     *
-     * function customizer(objValue, othValue) {
-     *   if (isGreeting(objValue) && isGreeting(othValue)) {
-     *     return true;
-     *   }
-     * }
-     *
-     * var array = ['hello', 'goodbye'];
-     * var other = ['hi', 'goodbye'];
-     *
-     * _.isEqualWith(array, other, customizer);
-     * // => true
-     */
         function isEqualWith(value, other, customizer) {
             customizer = typeof customizer == "function" ? customizer : undefined;
             var result = customizer ? customizer(value, other) : undefined;
             return result === undefined ? baseIsEqual(value, other, customizer) : !!result;
         }
-        /**
-     * Checks if `value` is an `Error`, `EvalError`, `RangeError`, `ReferenceError`,
-     * `SyntaxError`, `TypeError`, or `URIError` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an error object, else `false`.
-     * @example
-     *
-     * _.isError(new Error);
-     * // => true
-     *
-     * _.isError(Error);
-     * // => false
-     */
         function isError(value) {
             if (!isObjectLike(value)) {
                 return false;
             }
             return objectToString.call(value) == errorTag || typeof value.message == "string" && typeof value.name == "string";
         }
-        /**
-     * Checks if `value` is a finite primitive number.
-     *
-     * **Note:** This method is based on
-     * [`Number.isFinite`](https://mdn.io/Number/isFinite).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a finite number, else `false`.
-     * @example
-     *
-     * _.isFinite(3);
-     * // => true
-     *
-     * _.isFinite(Number.MIN_VALUE);
-     * // => true
-     *
-     * _.isFinite(Infinity);
-     * // => false
-     *
-     * _.isFinite('3');
-     * // => false
-     */
         function isFinite(value) {
             return typeof value == "number" && nativeIsFinite(value);
         }
-        /**
-     * Checks if `value` is classified as a `Function` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a function, else `false`.
-     * @example
-     *
-     * _.isFunction(_);
-     * // => true
-     *
-     * _.isFunction(/abc/);
-     * // => false
-     */
         function isFunction(value) {
             var tag = isObject(value) ? objectToString.call(value) : "";
             return tag == funcTag || tag == genTag;
         }
-        /**
-     * Checks if `value` is an integer.
-     *
-     * **Note:** This method is based on
-     * [`Number.isInteger`](https://mdn.io/Number/isInteger).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an integer, else `false`.
-     * @example
-     *
-     * _.isInteger(3);
-     * // => true
-     *
-     * _.isInteger(Number.MIN_VALUE);
-     * // => false
-     *
-     * _.isInteger(Infinity);
-     * // => false
-     *
-     * _.isInteger('3');
-     * // => false
-     */
         function isInteger(value) {
             return typeof value == "number" && value == toInteger(value);
         }
-        /**
-     * Checks if `value` is a valid array-like length.
-     *
-     * **Note:** This method is loosely based on
-     * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
-     * @example
-     *
-     * _.isLength(3);
-     * // => true
-     *
-     * _.isLength(Number.MIN_VALUE);
-     * // => false
-     *
-     * _.isLength(Infinity);
-     * // => false
-     *
-     * _.isLength('3');
-     * // => false
-     */
         function isLength(value) {
             return typeof value == "number" && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
         }
-        /**
-     * Checks if `value` is the
-     * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
-     * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is an object, else `false`.
-     * @example
-     *
-     * _.isObject({});
-     * // => true
-     *
-     * _.isObject([1, 2, 3]);
-     * // => true
-     *
-     * _.isObject(_.noop);
-     * // => true
-     *
-     * _.isObject(null);
-     * // => false
-     */
         function isObject(value) {
             var type = typeof value;
             return value != null && (type == "object" || type == "function");
         }
-        /**
-     * Checks if `value` is object-like. A value is object-like if it's not `null`
-     * and has a `typeof` result of "object".
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
-     * @example
-     *
-     * _.isObjectLike({});
-     * // => true
-     *
-     * _.isObjectLike([1, 2, 3]);
-     * // => true
-     *
-     * _.isObjectLike(_.noop);
-     * // => false
-     *
-     * _.isObjectLike(null);
-     * // => false
-     */
         function isObjectLike(value) {
             return value != null && typeof value == "object";
         }
-        /**
-     * Checks if `value` is classified as a `Map` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a map, else `false`.
-     * @example
-     *
-     * _.isMap(new Map);
-     * // => true
-     *
-     * _.isMap(new WeakMap);
-     * // => false
-     */
         var isMap = nodeIsMap ? baseUnary(nodeIsMap) : baseIsMap;
-        /**
-     * Performs a partial deep comparison between `object` and `source` to
-     * determine if `object` contains equivalent property values.
-     *
-     * **Note:** This method is equivalent to `_.matches` when `source` is
-     * partially applied.
-     *
-     * Partial comparisons will match empty array and empty object `source`
-     * values against any array or object value, respectively. See `_.isEqual`
-     * for a list of supported value comparisons.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Lang
-     * @param {Object} object The object to inspect.
-     * @param {Object} source The object of property values to match.
-     * @returns {boolean} Returns `true` if `object` is a match, else `false`.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': 2 };
-     *
-     * _.isMatch(object, { 'b': 2 });
-     * // => true
-     *
-     * _.isMatch(object, { 'b': 1 });
-     * // => false
-     */
         function isMatch(object, source) {
             return object === source || baseIsMatch(object, source, getMatchData(source));
         }
-        /**
-     * This method is like `_.isMatch` except that it accepts `customizer` which
-     * is invoked to compare values. If `customizer` returns `undefined`, comparisons
-     * are handled by the method instead. The `customizer` is invoked with five
-     * arguments: (objValue, srcValue, index|key, object, source).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {Object} object The object to inspect.
-     * @param {Object} source The object of property values to match.
-     * @param {Function} [customizer] The function to customize comparisons.
-     * @returns {boolean} Returns `true` if `object` is a match, else `false`.
-     * @example
-     *
-     * function isGreeting(value) {
-     *   return /^h(?:i|ello)$/.test(value);
-     * }
-     *
-     * function customizer(objValue, srcValue) {
-     *   if (isGreeting(objValue) && isGreeting(srcValue)) {
-     *     return true;
-     *   }
-     * }
-     *
-     * var object = { 'greeting': 'hello' };
-     * var source = { 'greeting': 'hi' };
-     *
-     * _.isMatchWith(object, source, customizer);
-     * // => true
-     */
         function isMatchWith(object, source, customizer) {
             customizer = typeof customizer == "function" ? customizer : undefined;
             return baseIsMatch(object, source, getMatchData(source), customizer);
         }
-        /**
-     * Checks if `value` is `NaN`.
-     *
-     * **Note:** This method is based on
-     * [`Number.isNaN`](https://mdn.io/Number/isNaN) and is not the same as
-     * global [`isNaN`](https://mdn.io/isNaN) which returns `true` for
-     * `undefined` and other non-number values.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is `NaN`, else `false`.
-     * @example
-     *
-     * _.isNaN(NaN);
-     * // => true
-     *
-     * _.isNaN(new Number(NaN));
-     * // => true
-     *
-     * isNaN(undefined);
-     * // => true
-     *
-     * _.isNaN(undefined);
-     * // => false
-     */
         function isNaN(value) {
             return isNumber(value) && value != +value;
         }
-        /**
-     * Checks if `value` is a pristine native function.
-     *
-     * **Note:** This method can't reliably detect native functions in the presence
-     * of the core-js package because core-js circumvents this kind of detection.
-     * Despite multiple requests, the core-js maintainer has made it clear: any
-     * attempt to fix the detection will be obstructed. As a result, we're left
-     * with little choice but to throw an error. Unfortunately, this also affects
-     * packages, like [babel-polyfill](https://www.npmjs.com/package/babel-polyfill),
-     * which rely on core-js.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a native function,
-     *  else `false`.
-     * @example
-     *
-     * _.isNative(Array.prototype.push);
-     * // => true
-     *
-     * _.isNative(_);
-     * // => false
-     */
         function isNative(value) {
             if (isMaskable(value)) {
                 throw new Error("This method is not supported with core-js. Try https://github.com/es-shims.");
             }
             return baseIsNative(value);
         }
-        /**
-     * Checks if `value` is `null`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is `null`, else `false`.
-     * @example
-     *
-     * _.isNull(null);
-     * // => true
-     *
-     * _.isNull(void 0);
-     * // => false
-     */
         function isNull(value) {
             return value === null;
         }
-        /**
-     * Checks if `value` is `null` or `undefined`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is nullish, else `false`.
-     * @example
-     *
-     * _.isNil(null);
-     * // => true
-     *
-     * _.isNil(void 0);
-     * // => true
-     *
-     * _.isNil(NaN);
-     * // => false
-     */
         function isNil(value) {
             return value == null;
         }
-        /**
-     * Checks if `value` is classified as a `Number` primitive or object.
-     *
-     * **Note:** To exclude `Infinity`, `-Infinity`, and `NaN`, which are
-     * classified as numbers, use the `_.isFinite` method.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a number, else `false`.
-     * @example
-     *
-     * _.isNumber(3);
-     * // => true
-     *
-     * _.isNumber(Number.MIN_VALUE);
-     * // => true
-     *
-     * _.isNumber(Infinity);
-     * // => true
-     *
-     * _.isNumber('3');
-     * // => false
-     */
         function isNumber(value) {
             return typeof value == "number" || isObjectLike(value) && objectToString.call(value) == numberTag;
         }
-        /**
-     * Checks if `value` is a plain object, that is, an object created by the
-     * `Object` constructor or one with a `[[Prototype]]` of `null`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.8.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a plain object, else `false`.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     * }
-     *
-     * _.isPlainObject(new Foo);
-     * // => false
-     *
-     * _.isPlainObject([1, 2, 3]);
-     * // => false
-     *
-     * _.isPlainObject({ 'x': 0, 'y': 0 });
-     * // => true
-     *
-     * _.isPlainObject(Object.create(null));
-     * // => true
-     */
         function isPlainObject(value) {
             if (!isObjectLike(value) || objectToString.call(value) != objectTag) {
                 return false;
@@ -10873,263 +4017,31 @@ UsergridEventable.mixin = function(destObject) {
             var Ctor = hasOwnProperty.call(proto, "constructor") && proto.constructor;
             return typeof Ctor == "function" && Ctor instanceof Ctor && funcToString.call(Ctor) == objectCtorString;
         }
-        /**
-     * Checks if `value` is classified as a `RegExp` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.1.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a regexp, else `false`.
-     * @example
-     *
-     * _.isRegExp(/abc/);
-     * // => true
-     *
-     * _.isRegExp('/abc/');
-     * // => false
-     */
         var isRegExp = nodeIsRegExp ? baseUnary(nodeIsRegExp) : baseIsRegExp;
-        /**
-     * Checks if `value` is a safe integer. An integer is safe if it's an IEEE-754
-     * double precision number which isn't the result of a rounded unsafe integer.
-     *
-     * **Note:** This method is based on
-     * [`Number.isSafeInteger`](https://mdn.io/Number/isSafeInteger).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a safe integer, else `false`.
-     * @example
-     *
-     * _.isSafeInteger(3);
-     * // => true
-     *
-     * _.isSafeInteger(Number.MIN_VALUE);
-     * // => false
-     *
-     * _.isSafeInteger(Infinity);
-     * // => false
-     *
-     * _.isSafeInteger('3');
-     * // => false
-     */
         function isSafeInteger(value) {
             return isInteger(value) && value >= -MAX_SAFE_INTEGER && value <= MAX_SAFE_INTEGER;
         }
-        /**
-     * Checks if `value` is classified as a `Set` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a set, else `false`.
-     * @example
-     *
-     * _.isSet(new Set);
-     * // => true
-     *
-     * _.isSet(new WeakSet);
-     * // => false
-     */
         var isSet = nodeIsSet ? baseUnary(nodeIsSet) : baseIsSet;
-        /**
-     * Checks if `value` is classified as a `String` primitive or object.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a string, else `false`.
-     * @example
-     *
-     * _.isString('abc');
-     * // => true
-     *
-     * _.isString(1);
-     * // => false
-     */
         function isString(value) {
             return typeof value == "string" || !isArray(value) && isObjectLike(value) && objectToString.call(value) == stringTag;
         }
-        /**
-     * Checks if `value` is classified as a `Symbol` primitive or object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
-     * @example
-     *
-     * _.isSymbol(Symbol.iterator);
-     * // => true
-     *
-     * _.isSymbol('abc');
-     * // => false
-     */
         function isSymbol(value) {
             return typeof value == "symbol" || isObjectLike(value) && objectToString.call(value) == symbolTag;
         }
-        /**
-     * Checks if `value` is classified as a typed array.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
-     * @example
-     *
-     * _.isTypedArray(new Uint8Array);
-     * // => true
-     *
-     * _.isTypedArray([]);
-     * // => false
-     */
         var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
-        /**
-     * Checks if `value` is `undefined`.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is `undefined`, else `false`.
-     * @example
-     *
-     * _.isUndefined(void 0);
-     * // => true
-     *
-     * _.isUndefined(null);
-     * // => false
-     */
         function isUndefined(value) {
             return value === undefined;
         }
-        /**
-     * Checks if `value` is classified as a `WeakMap` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a weak map, else `false`.
-     * @example
-     *
-     * _.isWeakMap(new WeakMap);
-     * // => true
-     *
-     * _.isWeakMap(new Map);
-     * // => false
-     */
         function isWeakMap(value) {
             return isObjectLike(value) && getTag(value) == weakMapTag;
         }
-        /**
-     * Checks if `value` is classified as a `WeakSet` object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.3.0
-     * @category Lang
-     * @param {*} value The value to check.
-     * @returns {boolean} Returns `true` if `value` is a weak set, else `false`.
-     * @example
-     *
-     * _.isWeakSet(new WeakSet);
-     * // => true
-     *
-     * _.isWeakSet(new Set);
-     * // => false
-     */
         function isWeakSet(value) {
             return isObjectLike(value) && objectToString.call(value) == weakSetTag;
         }
-        /**
-     * Checks if `value` is less than `other`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.9.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is less than `other`,
-     *  else `false`.
-     * @see _.gt
-     * @example
-     *
-     * _.lt(1, 3);
-     * // => true
-     *
-     * _.lt(3, 3);
-     * // => false
-     *
-     * _.lt(3, 1);
-     * // => false
-     */
         var lt = createRelationalOperation(baseLt);
-        /**
-     * Checks if `value` is less than or equal to `other`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.9.0
-     * @category Lang
-     * @param {*} value The value to compare.
-     * @param {*} other The other value to compare.
-     * @returns {boolean} Returns `true` if `value` is less than or equal to
-     *  `other`, else `false`.
-     * @see _.gte
-     * @example
-     *
-     * _.lte(1, 3);
-     * // => true
-     *
-     * _.lte(3, 3);
-     * // => true
-     *
-     * _.lte(3, 1);
-     * // => false
-     */
         var lte = createRelationalOperation(function(value, other) {
             return value <= other;
         });
-        /**
-     * Converts `value` to an array.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {Array} Returns the converted array.
-     * @example
-     *
-     * _.toArray({ 'a': 1, 'b': 2 });
-     * // => [1, 2]
-     *
-     * _.toArray('abc');
-     * // => ['a', 'b', 'c']
-     *
-     * _.toArray(1);
-     * // => []
-     *
-     * _.toArray(null);
-     * // => []
-     */
         function toArray(value) {
             if (!value) {
                 return [];
@@ -11143,29 +4055,6 @@ UsergridEventable.mixin = function(destObject) {
             var tag = getTag(value), func = tag == mapTag ? mapToArray : tag == setTag ? setToArray : values;
             return func(value);
         }
-        /**
-     * Converts `value` to a finite number.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.12.0
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {number} Returns the converted number.
-     * @example
-     *
-     * _.toFinite(3.2);
-     * // => 3.2
-     *
-     * _.toFinite(Number.MIN_VALUE);
-     * // => 5e-324
-     *
-     * _.toFinite(Infinity);
-     * // => 1.7976931348623157e+308
-     *
-     * _.toFinite('3.2');
-     * // => 3.2
-     */
         function toFinite(value) {
             if (!value) {
                 return value === 0 ? value : 0;
@@ -11177,89 +4066,13 @@ UsergridEventable.mixin = function(destObject) {
             }
             return value === value ? value : 0;
         }
-        /**
-     * Converts `value` to an integer.
-     *
-     * **Note:** This method is loosely based on
-     * [`ToInteger`](http://www.ecma-international.org/ecma-262/7.0/#sec-tointeger).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {number} Returns the converted integer.
-     * @example
-     *
-     * _.toInteger(3.2);
-     * // => 3
-     *
-     * _.toInteger(Number.MIN_VALUE);
-     * // => 0
-     *
-     * _.toInteger(Infinity);
-     * // => 1.7976931348623157e+308
-     *
-     * _.toInteger('3.2');
-     * // => 3
-     */
         function toInteger(value) {
             var result = toFinite(value), remainder = result % 1;
             return result === result ? remainder ? result - remainder : result : 0;
         }
-        /**
-     * Converts `value` to an integer suitable for use as the length of an
-     * array-like object.
-     *
-     * **Note:** This method is based on
-     * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {number} Returns the converted integer.
-     * @example
-     *
-     * _.toLength(3.2);
-     * // => 3
-     *
-     * _.toLength(Number.MIN_VALUE);
-     * // => 0
-     *
-     * _.toLength(Infinity);
-     * // => 4294967295
-     *
-     * _.toLength('3.2');
-     * // => 3
-     */
         function toLength(value) {
             return value ? baseClamp(toInteger(value), 0, MAX_ARRAY_LENGTH) : 0;
         }
-        /**
-     * Converts `value` to a number.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to process.
-     * @returns {number} Returns the number.
-     * @example
-     *
-     * _.toNumber(3.2);
-     * // => 3.2
-     *
-     * _.toNumber(Number.MIN_VALUE);
-     * // => 5e-324
-     *
-     * _.toNumber(Infinity);
-     * // => Infinity
-     *
-     * _.toNumber('3.2');
-     * // => 3.2
-     */
         function toNumber(value) {
             if (typeof value == "number") {
                 return value;
@@ -11278,117 +4091,15 @@ UsergridEventable.mixin = function(destObject) {
             var isBinary = reIsBinary.test(value);
             return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
         }
-        /**
-     * Converts `value` to a plain object flattening inherited enumerable string
-     * keyed properties of `value` to own properties of the plain object.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {Object} Returns the converted plain object.
-     * @example
-     *
-     * function Foo() {
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.assign({ 'a': 1 }, new Foo);
-     * // => { 'a': 1, 'b': 2 }
-     *
-     * _.assign({ 'a': 1 }, _.toPlainObject(new Foo));
-     * // => { 'a': 1, 'b': 2, 'c': 3 }
-     */
         function toPlainObject(value) {
             return copyObject(value, keysIn(value));
         }
-        /**
-     * Converts `value` to a safe integer. A safe integer can be compared and
-     * represented correctly.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to convert.
-     * @returns {number} Returns the converted integer.
-     * @example
-     *
-     * _.toSafeInteger(3.2);
-     * // => 3
-     *
-     * _.toSafeInteger(Number.MIN_VALUE);
-     * // => 0
-     *
-     * _.toSafeInteger(Infinity);
-     * // => 9007199254740991
-     *
-     * _.toSafeInteger('3.2');
-     * // => 3
-     */
         function toSafeInteger(value) {
             return baseClamp(toInteger(value), -MAX_SAFE_INTEGER, MAX_SAFE_INTEGER);
         }
-        /**
-     * Converts `value` to a string. An empty string is returned for `null`
-     * and `undefined` values. The sign of `-0` is preserved.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Lang
-     * @param {*} value The value to process.
-     * @returns {string} Returns the string.
-     * @example
-     *
-     * _.toString(null);
-     * // => ''
-     *
-     * _.toString(-0);
-     * // => '-0'
-     *
-     * _.toString([1, 2, 3]);
-     * // => '1,2,3'
-     */
         function toString(value) {
             return value == null ? "" : baseToString(value);
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Assigns own enumerable string keyed properties of source objects to the
-     * destination object. Source objects are applied from left to right.
-     * Subsequent sources overwrite property assignments of previous sources.
-     *
-     * **Note:** This method mutates `object` and is loosely based on
-     * [`Object.assign`](https://mdn.io/Object/assign).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.10.0
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} [sources] The source objects.
-     * @returns {Object} Returns `object`.
-     * @see _.assignIn
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     * }
-     *
-     * function Bar() {
-     *   this.c = 3;
-     * }
-     *
-     * Foo.prototype.b = 2;
-     * Bar.prototype.d = 4;
-     *
-     * _.assign({ 'a': 0 }, new Foo, new Bar);
-     * // => { 'a': 1, 'c': 3 }
-     */
         var assign = createAssigner(function(object, source) {
             if (isPrototype(source) || isArrayLike(source)) {
                 copyObject(source, keys(source), object);
@@ -11400,590 +4111,65 @@ UsergridEventable.mixin = function(destObject) {
                 }
             }
         });
-        /**
-     * This method is like `_.assign` except that it iterates over own and
-     * inherited source properties.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @alias extend
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} [sources] The source objects.
-     * @returns {Object} Returns `object`.
-     * @see _.assign
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     * }
-     *
-     * function Bar() {
-     *   this.c = 3;
-     * }
-     *
-     * Foo.prototype.b = 2;
-     * Bar.prototype.d = 4;
-     *
-     * _.assignIn({ 'a': 0 }, new Foo, new Bar);
-     * // => { 'a': 1, 'b': 2, 'c': 3, 'd': 4 }
-     */
         var assignIn = createAssigner(function(object, source) {
             copyObject(source, keysIn(source), object);
         });
-        /**
-     * This method is like `_.assignIn` except that it accepts `customizer`
-     * which is invoked to produce the assigned values. If `customizer` returns
-     * `undefined`, assignment is handled by the method instead. The `customizer`
-     * is invoked with five arguments: (objValue, srcValue, key, object, source).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @alias extendWith
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} sources The source objects.
-     * @param {Function} [customizer] The function to customize assigned values.
-     * @returns {Object} Returns `object`.
-     * @see _.assignWith
-     * @example
-     *
-     * function customizer(objValue, srcValue) {
-     *   return _.isUndefined(objValue) ? srcValue : objValue;
-     * }
-     *
-     * var defaults = _.partialRight(_.assignInWith, customizer);
-     *
-     * defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
-     * // => { 'a': 1, 'b': 2 }
-     */
         var assignInWith = createAssigner(function(object, source, srcIndex, customizer) {
             copyObject(source, keysIn(source), object, customizer);
         });
-        /**
-     * This method is like `_.assign` except that it accepts `customizer`
-     * which is invoked to produce the assigned values. If `customizer` returns
-     * `undefined`, assignment is handled by the method instead. The `customizer`
-     * is invoked with five arguments: (objValue, srcValue, key, object, source).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} sources The source objects.
-     * @param {Function} [customizer] The function to customize assigned values.
-     * @returns {Object} Returns `object`.
-     * @see _.assignInWith
-     * @example
-     *
-     * function customizer(objValue, srcValue) {
-     *   return _.isUndefined(objValue) ? srcValue : objValue;
-     * }
-     *
-     * var defaults = _.partialRight(_.assignWith, customizer);
-     *
-     * defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
-     * // => { 'a': 1, 'b': 2 }
-     */
         var assignWith = createAssigner(function(object, source, srcIndex, customizer) {
             copyObject(source, keys(source), object, customizer);
         });
-        /**
-     * Creates an array of values corresponding to `paths` of `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.0.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {...(string|string[])} [paths] The property paths of elements to pick.
-     * @returns {Array} Returns the picked values.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 3 } }, 4] };
-     *
-     * _.at(object, ['a[0].b.c', 'a[1]']);
-     * // => [3, 4]
-     */
         var at = flatRest(baseAt);
-        /**
-     * Creates an object that inherits from the `prototype` object. If a
-     * `properties` object is given, its own enumerable string keyed properties
-     * are assigned to the created object.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.3.0
-     * @category Object
-     * @param {Object} prototype The object to inherit from.
-     * @param {Object} [properties] The properties to assign to the object.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * function Shape() {
-     *   this.x = 0;
-     *   this.y = 0;
-     * }
-     *
-     * function Circle() {
-     *   Shape.call(this);
-     * }
-     *
-     * Circle.prototype = _.create(Shape.prototype, {
-     *   'constructor': Circle
-     * });
-     *
-     * var circle = new Circle;
-     * circle instanceof Circle;
-     * // => true
-     *
-     * circle instanceof Shape;
-     * // => true
-     */
         function create(prototype, properties) {
             var result = baseCreate(prototype);
             return properties ? baseAssign(result, properties) : result;
         }
-        /**
-     * Assigns own and inherited enumerable string keyed properties of source
-     * objects to the destination object for all destination properties that
-     * resolve to `undefined`. Source objects are applied from left to right.
-     * Once a property is set, additional values of the same property are ignored.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} [sources] The source objects.
-     * @returns {Object} Returns `object`.
-     * @see _.defaultsDeep
-     * @example
-     *
-     * _.defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
-     * // => { 'a': 1, 'b': 2 }
-     */
         var defaults = baseRest(function(args) {
             args.push(undefined, assignInDefaults);
             return apply(assignInWith, undefined, args);
         });
-        /**
-     * This method is like `_.defaults` except that it recursively assigns
-     * default properties.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.10.0
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} [sources] The source objects.
-     * @returns {Object} Returns `object`.
-     * @see _.defaults
-     * @example
-     *
-     * _.defaultsDeep({ 'a': { 'b': 2 } }, { 'a': { 'b': 1, 'c': 3 } });
-     * // => { 'a': { 'b': 2, 'c': 3 } }
-     */
         var defaultsDeep = baseRest(function(args) {
             args.push(undefined, mergeDefaults);
             return apply(mergeWith, undefined, args);
         });
-        /**
-     * This method is like `_.find` except that it returns the key of the first
-     * element `predicate` returns truthy for instead of the element itself.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.1.0
-     * @category Object
-     * @param {Object} object The object to inspect.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @returns {string|undefined} Returns the key of the matched element,
-     *  else `undefined`.
-     * @example
-     *
-     * var users = {
-     *   'barney':  { 'age': 36, 'active': true },
-     *   'fred':    { 'age': 40, 'active': false },
-     *   'pebbles': { 'age': 1,  'active': true }
-     * };
-     *
-     * _.findKey(users, function(o) { return o.age < 40; });
-     * // => 'barney' (iteration order is not guaranteed)
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.findKey(users, { 'age': 1, 'active': true });
-     * // => 'pebbles'
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.findKey(users, ['active', false]);
-     * // => 'fred'
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.findKey(users, 'active');
-     * // => 'barney'
-     */
         function findKey(object, predicate) {
             return baseFindKey(object, getIteratee(predicate, 3), baseForOwn);
         }
-        /**
-     * This method is like `_.findKey` except that it iterates over elements of
-     * a collection in the opposite order.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Object
-     * @param {Object} object The object to inspect.
-     * @param {Function} [predicate=_.identity] The function invoked per iteration.
-     * @returns {string|undefined} Returns the key of the matched element,
-     *  else `undefined`.
-     * @example
-     *
-     * var users = {
-     *   'barney':  { 'age': 36, 'active': true },
-     *   'fred':    { 'age': 40, 'active': false },
-     *   'pebbles': { 'age': 1,  'active': true }
-     * };
-     *
-     * _.findLastKey(users, function(o) { return o.age < 40; });
-     * // => returns 'pebbles' assuming `_.findKey` returns 'barney'
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.findLastKey(users, { 'age': 36, 'active': true });
-     * // => 'barney'
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.findLastKey(users, ['active', false]);
-     * // => 'fred'
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.findLastKey(users, 'active');
-     * // => 'pebbles'
-     */
         function findLastKey(object, predicate) {
             return baseFindKey(object, getIteratee(predicate, 3), baseForOwnRight);
         }
-        /**
-     * Iterates over own and inherited enumerable string keyed properties of an
-     * object and invokes `iteratee` for each property. The iteratee is invoked
-     * with three arguments: (value, key, object). Iteratee functions may exit
-     * iteration early by explicitly returning `false`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.3.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     * @see _.forInRight
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.forIn(new Foo, function(value, key) {
-     *   console.log(key);
-     * });
-     * // => Logs 'a', 'b', then 'c' (iteration order is not guaranteed).
-     */
         function forIn(object, iteratee) {
             return object == null ? object : baseFor(object, getIteratee(iteratee, 3), keysIn);
         }
-        /**
-     * This method is like `_.forIn` except that it iterates over properties of
-     * `object` in the opposite order.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     * @see _.forIn
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.forInRight(new Foo, function(value, key) {
-     *   console.log(key);
-     * });
-     * // => Logs 'c', 'b', then 'a' assuming `_.forIn` logs 'a', 'b', then 'c'.
-     */
         function forInRight(object, iteratee) {
             return object == null ? object : baseForRight(object, getIteratee(iteratee, 3), keysIn);
         }
-        /**
-     * Iterates over own enumerable string keyed properties of an object and
-     * invokes `iteratee` for each property. The iteratee is invoked with three
-     * arguments: (value, key, object). Iteratee functions may exit iteration
-     * early by explicitly returning `false`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.3.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     * @see _.forOwnRight
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.forOwn(new Foo, function(value, key) {
-     *   console.log(key);
-     * });
-     * // => Logs 'a' then 'b' (iteration order is not guaranteed).
-     */
         function forOwn(object, iteratee) {
             return object && baseForOwn(object, getIteratee(iteratee, 3));
         }
-        /**
-     * This method is like `_.forOwn` except that it iterates over properties of
-     * `object` in the opposite order.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.0.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns `object`.
-     * @see _.forOwn
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.forOwnRight(new Foo, function(value, key) {
-     *   console.log(key);
-     * });
-     * // => Logs 'b' then 'a' assuming `_.forOwn` logs 'a' then 'b'.
-     */
         function forOwnRight(object, iteratee) {
             return object && baseForOwnRight(object, getIteratee(iteratee, 3));
         }
-        /**
-     * Creates an array of function property names from own enumerable properties
-     * of `object`.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The object to inspect.
-     * @returns {Array} Returns the function names.
-     * @see _.functionsIn
-     * @example
-     *
-     * function Foo() {
-     *   this.a = _.constant('a');
-     *   this.b = _.constant('b');
-     * }
-     *
-     * Foo.prototype.c = _.constant('c');
-     *
-     * _.functions(new Foo);
-     * // => ['a', 'b']
-     */
         function functions(object) {
             return object == null ? [] : baseFunctions(object, keys(object));
         }
-        /**
-     * Creates an array of function property names from own and inherited
-     * enumerable properties of `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The object to inspect.
-     * @returns {Array} Returns the function names.
-     * @see _.functions
-     * @example
-     *
-     * function Foo() {
-     *   this.a = _.constant('a');
-     *   this.b = _.constant('b');
-     * }
-     *
-     * Foo.prototype.c = _.constant('c');
-     *
-     * _.functionsIn(new Foo);
-     * // => ['a', 'b', 'c']
-     */
         function functionsIn(object) {
             return object == null ? [] : baseFunctions(object, keysIn(object));
         }
-        /**
-     * Gets the value at `path` of `object`. If the resolved value is
-     * `undefined`, the `defaultValue` is returned in its place.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.7.0
-     * @category Object
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path of the property to get.
-     * @param {*} [defaultValue] The value returned for `undefined` resolved values.
-     * @returns {*} Returns the resolved value.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 3 } }] };
-     *
-     * _.get(object, 'a[0].b.c');
-     * // => 3
-     *
-     * _.get(object, ['a', '0', 'b', 'c']);
-     * // => 3
-     *
-     * _.get(object, 'a.b.c', 'default');
-     * // => 'default'
-     */
         function get(object, path, defaultValue) {
             var result = object == null ? undefined : baseGet(object, path);
             return result === undefined ? defaultValue : result;
         }
-        /**
-     * Checks if `path` is a direct property of `object`.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path to check.
-     * @returns {boolean} Returns `true` if `path` exists, else `false`.
-     * @example
-     *
-     * var object = { 'a': { 'b': 2 } };
-     * var other = _.create({ 'a': _.create({ 'b': 2 }) });
-     *
-     * _.has(object, 'a');
-     * // => true
-     *
-     * _.has(object, 'a.b');
-     * // => true
-     *
-     * _.has(object, ['a', 'b']);
-     * // => true
-     *
-     * _.has(other, 'a');
-     * // => false
-     */
         function has(object, path) {
             return object != null && hasPath(object, path, baseHas);
         }
-        /**
-     * Checks if `path` is a direct or inherited property of `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path to check.
-     * @returns {boolean} Returns `true` if `path` exists, else `false`.
-     * @example
-     *
-     * var object = _.create({ 'a': _.create({ 'b': 2 }) });
-     *
-     * _.hasIn(object, 'a');
-     * // => true
-     *
-     * _.hasIn(object, 'a.b');
-     * // => true
-     *
-     * _.hasIn(object, ['a', 'b']);
-     * // => true
-     *
-     * _.hasIn(object, 'b');
-     * // => false
-     */
         function hasIn(object, path) {
             return object != null && hasPath(object, path, baseHasIn);
         }
-        /**
-     * Creates an object composed of the inverted keys and values of `object`.
-     * If `object` contains duplicate values, subsequent values overwrite
-     * property assignments of previous values.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.7.0
-     * @category Object
-     * @param {Object} object The object to invert.
-     * @returns {Object} Returns the new inverted object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': 2, 'c': 1 };
-     *
-     * _.invert(object);
-     * // => { '1': 'c', '2': 'b' }
-     */
         var invert = createInverter(function(result, value, key) {
             result[value] = key;
         }, constant(identity));
-        /**
-     * This method is like `_.invert` except that the inverted object is generated
-     * from the results of running each element of `object` thru `iteratee`. The
-     * corresponding inverted value of each inverted key is an array of keys
-     * responsible for generating the inverted value. The iteratee is invoked
-     * with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.1.0
-     * @category Object
-     * @param {Object} object The object to invert.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {Object} Returns the new inverted object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': 2, 'c': 1 };
-     *
-     * _.invertBy(object);
-     * // => { '1': ['a', 'c'], '2': ['b'] }
-     *
-     * _.invertBy(object, function(value) {
-     *   return 'group' + value;
-     * });
-     * // => { 'group1': ['a', 'c'], 'group2': ['b'] }
-     */
         var invertBy = createInverter(function(result, value, key) {
             if (hasOwnProperty.call(result, value)) {
                 result[value].push(key);
@@ -11991,103 +4177,13 @@ UsergridEventable.mixin = function(destObject) {
                 result[value] = [ key ];
             }
         }, getIteratee);
-        /**
-     * Invokes the method at `path` of `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path of the method to invoke.
-     * @param {...*} [args] The arguments to invoke the method with.
-     * @returns {*} Returns the result of the invoked method.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': [1, 2, 3, 4] } }] };
-     *
-     * _.invoke(object, 'a[0].b.c.slice', 1, 3);
-     * // => [2, 3]
-     */
         var invoke = baseRest(baseInvoke);
-        /**
-     * Creates an array of the own enumerable property names of `object`.
-     *
-     * **Note:** Non-object values are coerced to objects. See the
-     * [ES spec](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
-     * for more details.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.keys(new Foo);
-     * // => ['a', 'b'] (iteration order is not guaranteed)
-     *
-     * _.keys('hi');
-     * // => ['0', '1']
-     */
         function keys(object) {
             return isArrayLike(object) ? arrayLikeKeys(object) : baseKeys(object);
         }
-        /**
-     * Creates an array of the own and inherited enumerable property names of `object`.
-     *
-     * **Note:** Non-object values are coerced to objects.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property names.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.keysIn(new Foo);
-     * // => ['a', 'b', 'c'] (iteration order is not guaranteed)
-     */
         function keysIn(object) {
             return isArrayLike(object) ? arrayLikeKeys(object, true) : baseKeysIn(object);
         }
-        /**
-     * The opposite of `_.mapValues`; this method creates an object with the
-     * same values as `object` and keys generated by running each own enumerable
-     * string keyed property of `object` thru `iteratee`. The iteratee is invoked
-     * with three arguments: (value, key, object).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.8.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns the new mapped object.
-     * @see _.mapValues
-     * @example
-     *
-     * _.mapKeys({ 'a': 1, 'b': 2 }, function(value, key) {
-     *   return key + value;
-     * });
-     * // => { 'a1': 1, 'b2': 2 }
-     */
         function mapKeys(object, iteratee) {
             var result = {};
             iteratee = getIteratee(iteratee, 3);
@@ -12096,34 +4192,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * Creates an object with the same keys as `object` and values generated
-     * by running each own enumerable string keyed property of `object` thru
-     * `iteratee`. The iteratee is invoked with three arguments:
-     * (value, key, object).
-     *
-     * @static
-     * @memberOf _
-     * @since 2.4.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Object} Returns the new mapped object.
-     * @see _.mapKeys
-     * @example
-     *
-     * var users = {
-     *   'fred':    { 'user': 'fred',    'age': 40 },
-     *   'pebbles': { 'user': 'pebbles', 'age': 1 }
-     * };
-     *
-     * _.mapValues(users, function(o) { return o.age; });
-     * // => { 'fred': 40, 'pebbles': 1 } (iteration order is not guaranteed)
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.mapValues(users, 'age');
-     * // => { 'fred': 40, 'pebbles': 1 } (iteration order is not guaranteed)
-     */
         function mapValues(object, iteratee) {
             var result = {};
             iteratee = getIteratee(iteratee, 3);
@@ -12132,93 +4200,12 @@ UsergridEventable.mixin = function(destObject) {
             });
             return result;
         }
-        /**
-     * This method is like `_.assign` except that it recursively merges own and
-     * inherited enumerable string keyed properties of source objects into the
-     * destination object. Source properties that resolve to `undefined` are
-     * skipped if a destination value exists. Array and plain object properties
-     * are merged recursively. Other objects and value types are overridden by
-     * assignment. Source objects are applied from left to right. Subsequent
-     * sources overwrite property assignments of previous sources.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.5.0
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} [sources] The source objects.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var object = {
-     *   'a': [{ 'b': 2 }, { 'd': 4 }]
-     * };
-     *
-     * var other = {
-     *   'a': [{ 'c': 3 }, { 'e': 5 }]
-     * };
-     *
-     * _.merge(object, other);
-     * // => { 'a': [{ 'b': 2, 'c': 3 }, { 'd': 4, 'e': 5 }] }
-     */
         var merge = createAssigner(function(object, source, srcIndex) {
             baseMerge(object, source, srcIndex);
         });
-        /**
-     * This method is like `_.merge` except that it accepts `customizer` which
-     * is invoked to produce the merged values of the destination and source
-     * properties. If `customizer` returns `undefined`, merging is handled by the
-     * method instead. The `customizer` is invoked with six arguments:
-     * (objValue, srcValue, key, object, source, stack).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The destination object.
-     * @param {...Object} sources The source objects.
-     * @param {Function} customizer The function to customize assigned values.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * function customizer(objValue, srcValue) {
-     *   if (_.isArray(objValue)) {
-     *     return objValue.concat(srcValue);
-     *   }
-     * }
-     *
-     * var object = { 'a': [1], 'b': [2] };
-     * var other = { 'a': [3], 'b': [4] };
-     *
-     * _.mergeWith(object, other, customizer);
-     * // => { 'a': [1, 3], 'b': [2, 4] }
-     */
         var mergeWith = createAssigner(function(object, source, srcIndex, customizer) {
             baseMerge(object, source, srcIndex, customizer);
         });
-        /**
-     * The opposite of `_.pick`; this method creates an object composed of the
-     * own and inherited enumerable string keyed properties of `object` that are
-     * not omitted.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The source object.
-     * @param {...(string|string[])} [props] The property identifiers to omit.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': '2', 'c': 3 };
-     *
-     * _.omit(object, ['a', 'c']);
-     * // => { 'b': '2' }
-     */
         var omit = flatRest(function(object, props) {
             if (object == null) {
                 return {};
@@ -12226,99 +4213,15 @@ UsergridEventable.mixin = function(destObject) {
             props = arrayMap(props, toKey);
             return basePick(object, baseDifference(getAllKeysIn(object), props));
         });
-        /**
-     * The opposite of `_.pickBy`; this method creates an object composed of
-     * the own and inherited enumerable string keyed properties of `object` that
-     * `predicate` doesn't return truthy for. The predicate is invoked with two
-     * arguments: (value, key).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The source object.
-     * @param {Function} [predicate=_.identity] The function invoked per property.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': '2', 'c': 3 };
-     *
-     * _.omitBy(object, _.isNumber);
-     * // => { 'b': '2' }
-     */
         function omitBy(object, predicate) {
             return pickBy(object, negate(getIteratee(predicate)));
         }
-        /**
-     * Creates an object composed of the picked `object` properties.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The source object.
-     * @param {...(string|string[])} [props] The property identifiers to pick.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': '2', 'c': 3 };
-     *
-     * _.pick(object, ['a', 'c']);
-     * // => { 'a': 1, 'c': 3 }
-     */
         var pick = flatRest(function(object, props) {
             return object == null ? {} : basePick(object, arrayMap(props, toKey));
         });
-        /**
-     * Creates an object composed of the `object` properties `predicate` returns
-     * truthy for. The predicate is invoked with two arguments: (value, key).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The source object.
-     * @param {Function} [predicate=_.identity] The function invoked per property.
-     * @returns {Object} Returns the new object.
-     * @example
-     *
-     * var object = { 'a': 1, 'b': '2', 'c': 3 };
-     *
-     * _.pickBy(object, _.isNumber);
-     * // => { 'a': 1, 'c': 3 }
-     */
         function pickBy(object, predicate) {
             return object == null ? {} : basePickBy(object, getAllKeysIn(object), getIteratee(predicate));
         }
-        /**
-     * This method is like `_.get` except that if the resolved value is a
-     * function it's invoked with the `this` binding of its parent object and
-     * its result is returned.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The object to query.
-     * @param {Array|string} path The path of the property to resolve.
-     * @param {*} [defaultValue] The value returned for `undefined` resolved values.
-     * @returns {*} Returns the resolved value.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c1': 3, 'c2': _.constant(4) } }] };
-     *
-     * _.result(object, 'a[0].b.c1');
-     * // => 3
-     *
-     * _.result(object, 'a[0].b.c2');
-     * // => 4
-     *
-     * _.result(object, 'a[0].b.c3', 'default');
-     * // => 'default'
-     *
-     * _.result(object, 'a[0].b.c3', _.constant('default'));
-     * // => 'default'
-     */
         function result(object, path, defaultValue) {
             path = isKey(path, object) ? [ path ] : castPath(path);
             var index = -1, length = path.length;
@@ -12336,145 +4239,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return object;
         }
-        /**
-     * Sets the value at `path` of `object`. If a portion of `path` doesn't exist,
-     * it's created. Arrays are created for missing index properties while objects
-     * are created for all other missing properties. Use `_.setWith` to customize
-     * `path` creation.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.7.0
-     * @category Object
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to set.
-     * @param {*} value The value to set.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 3 } }] };
-     *
-     * _.set(object, 'a[0].b.c', 4);
-     * console.log(object.a[0].b.c);
-     * // => 4
-     *
-     * _.set(object, ['x', '0', 'y', 'z'], 5);
-     * console.log(object.x[0].y.z);
-     * // => 5
-     */
         function set(object, path, value) {
             return object == null ? object : baseSet(object, path, value);
         }
-        /**
-     * This method is like `_.set` except that it accepts `customizer` which is
-     * invoked to produce the objects of `path`.  If `customizer` returns `undefined`
-     * path creation is handled by the method instead. The `customizer` is invoked
-     * with three arguments: (nsValue, key, nsObject).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to set.
-     * @param {*} value The value to set.
-     * @param {Function} [customizer] The function to customize assigned values.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var object = {};
-     *
-     * _.setWith(object, '[0][1]', 'a', Object);
-     * // => { '0': { '1': 'a' } }
-     */
         function setWith(object, path, value, customizer) {
             customizer = typeof customizer == "function" ? customizer : undefined;
             return object == null ? object : baseSet(object, path, value, customizer);
         }
-        /**
-     * Creates an array of own enumerable string keyed-value pairs for `object`
-     * which can be consumed by `_.fromPairs`. If `object` is a map or set, its
-     * entries are returned.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @alias entries
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the key-value pairs.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.toPairs(new Foo);
-     * // => [['a', 1], ['b', 2]] (iteration order is not guaranteed)
-     */
         var toPairs = createToPairs(keys);
-        /**
-     * Creates an array of own and inherited enumerable string keyed-value pairs
-     * for `object` which can be consumed by `_.fromPairs`. If `object` is a map
-     * or set, its entries are returned.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @alias entriesIn
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the key-value pairs.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.toPairsIn(new Foo);
-     * // => [['a', 1], ['b', 2], ['c', 3]] (iteration order is not guaranteed)
-     */
         var toPairsIn = createToPairs(keysIn);
-        /**
-     * An alternative to `_.reduce`; this method transforms `object` to a new
-     * `accumulator` object which is the result of running each of its own
-     * enumerable string keyed properties thru `iteratee`, with each invocation
-     * potentially mutating the `accumulator` object. If `accumulator` is not
-     * provided, a new object with the same `[[Prototype]]` will be used. The
-     * iteratee is invoked with four arguments: (accumulator, value, key, object).
-     * Iteratee functions may exit iteration early by explicitly returning `false`.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.3.0
-     * @category Object
-     * @param {Object} object The object to iterate over.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @param {*} [accumulator] The custom accumulator value.
-     * @returns {*} Returns the accumulated value.
-     * @example
-     *
-     * _.transform([2, 3, 4], function(result, n) {
-     *   result.push(n *= n);
-     *   return n % 2 == 0;
-     * }, []);
-     * // => [4, 9]
-     *
-     * _.transform({ 'a': 1, 'b': 2, 'c': 1 }, function(result, value, key) {
-     *   (result[value] || (result[value] = [])).push(key);
-     * }, {});
-     * // => { '1': ['a', 'c'], '2': ['b'] }
-     */
         function transform(object, iteratee, accumulator) {
             var isArr = isArray(object) || isTypedArray(object);
             iteratee = getIteratee(iteratee, 4);
@@ -12495,170 +4268,22 @@ UsergridEventable.mixin = function(destObject) {
             });
             return accumulator;
         }
-        /**
-     * Removes the property at `path` of `object`.
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Object
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to unset.
-     * @returns {boolean} Returns `true` if the property is deleted, else `false`.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 7 } }] };
-     * _.unset(object, 'a[0].b.c');
-     * // => true
-     *
-     * console.log(object);
-     * // => { 'a': [{ 'b': {} }] };
-     *
-     * _.unset(object, ['a', '0', 'b', 'c']);
-     * // => true
-     *
-     * console.log(object);
-     * // => { 'a': [{ 'b': {} }] };
-     */
         function unset(object, path) {
             return object == null ? true : baseUnset(object, path);
         }
-        /**
-     * This method is like `_.set` except that accepts `updater` to produce the
-     * value to set. Use `_.updateWith` to customize `path` creation. The `updater`
-     * is invoked with one argument: (value).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.6.0
-     * @category Object
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to set.
-     * @param {Function} updater The function to produce the updated value.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var object = { 'a': [{ 'b': { 'c': 3 } }] };
-     *
-     * _.update(object, 'a[0].b.c', function(n) { return n * n; });
-     * console.log(object.a[0].b.c);
-     * // => 9
-     *
-     * _.update(object, 'x[0].y.z', function(n) { return n ? n + 1 : 0; });
-     * console.log(object.x[0].y.z);
-     * // => 0
-     */
         function update(object, path, updater) {
             return object == null ? object : baseUpdate(object, path, castFunction(updater));
         }
-        /**
-     * This method is like `_.update` except that it accepts `customizer` which is
-     * invoked to produce the objects of `path`.  If `customizer` returns `undefined`
-     * path creation is handled by the method instead. The `customizer` is invoked
-     * with three arguments: (nsValue, key, nsObject).
-     *
-     * **Note:** This method mutates `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.6.0
-     * @category Object
-     * @param {Object} object The object to modify.
-     * @param {Array|string} path The path of the property to set.
-     * @param {Function} updater The function to produce the updated value.
-     * @param {Function} [customizer] The function to customize assigned values.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var object = {};
-     *
-     * _.updateWith(object, '[0][1]', _.constant('a'), Object);
-     * // => { '0': { '1': 'a' } }
-     */
         function updateWith(object, path, updater, customizer) {
             customizer = typeof customizer == "function" ? customizer : undefined;
             return object == null ? object : baseUpdate(object, path, castFunction(updater), customizer);
         }
-        /**
-     * Creates an array of the own enumerable string keyed property values of `object`.
-     *
-     * **Note:** Non-object values are coerced to objects.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property values.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.values(new Foo);
-     * // => [1, 2] (iteration order is not guaranteed)
-     *
-     * _.values('hi');
-     * // => ['h', 'i']
-     */
         function values(object) {
             return object ? baseValues(object, keys(object)) : [];
         }
-        /**
-     * Creates an array of the own and inherited enumerable string keyed property
-     * values of `object`.
-     *
-     * **Note:** Non-object values are coerced to objects.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Object
-     * @param {Object} object The object to query.
-     * @returns {Array} Returns the array of property values.
-     * @example
-     *
-     * function Foo() {
-     *   this.a = 1;
-     *   this.b = 2;
-     * }
-     *
-     * Foo.prototype.c = 3;
-     *
-     * _.valuesIn(new Foo);
-     * // => [1, 2, 3] (iteration order is not guaranteed)
-     */
         function valuesIn(object) {
             return object == null ? [] : baseValues(object, keysIn(object));
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Clamps `number` within the inclusive `lower` and `upper` bounds.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Number
-     * @param {number} number The number to clamp.
-     * @param {number} [lower] The lower bound.
-     * @param {number} upper The upper bound.
-     * @returns {number} Returns the clamped number.
-     * @example
-     *
-     * _.clamp(-10, -5, 5);
-     * // => -5
-     *
-     * _.clamp(10, -5, 5);
-     * // => 5
-     */
         function clamp(number, lower, upper) {
             if (upper === undefined) {
                 upper = lower;
@@ -12674,44 +4299,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseClamp(toNumber(number), lower, upper);
         }
-        /**
-     * Checks if `n` is between `start` and up to, but not including, `end`. If
-     * `end` is not specified, it's set to `start` with `start` then set to `0`.
-     * If `start` is greater than `end` the params are swapped to support
-     * negative ranges.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.3.0
-     * @category Number
-     * @param {number} number The number to check.
-     * @param {number} [start=0] The start of the range.
-     * @param {number} end The end of the range.
-     * @returns {boolean} Returns `true` if `number` is in the range, else `false`.
-     * @see _.range, _.rangeRight
-     * @example
-     *
-     * _.inRange(3, 2, 4);
-     * // => true
-     *
-     * _.inRange(4, 8);
-     * // => true
-     *
-     * _.inRange(4, 2);
-     * // => false
-     *
-     * _.inRange(2, 2);
-     * // => false
-     *
-     * _.inRange(1.2, 2);
-     * // => true
-     *
-     * _.inRange(5.2, 4);
-     * // => false
-     *
-     * _.inRange(-3, -2, -6);
-     * // => true
-     */
         function inRange(number, start, end) {
             start = toFinite(start);
             if (end === undefined) {
@@ -12723,37 +4310,6 @@ UsergridEventable.mixin = function(destObject) {
             number = toNumber(number);
             return baseInRange(number, start, end);
         }
-        /**
-     * Produces a random number between the inclusive `lower` and `upper` bounds.
-     * If only one argument is provided a number between `0` and the given number
-     * is returned. If `floating` is `true`, or either `lower` or `upper` are
-     * floats, a floating-point number is returned instead of an integer.
-     *
-     * **Note:** JavaScript follows the IEEE-754 standard for resolving
-     * floating-point values which can produce unexpected results.
-     *
-     * @static
-     * @memberOf _
-     * @since 0.7.0
-     * @category Number
-     * @param {number} [lower=0] The lower bound.
-     * @param {number} [upper=1] The upper bound.
-     * @param {boolean} [floating] Specify returning a floating-point number.
-     * @returns {number} Returns the random number.
-     * @example
-     *
-     * _.random(0, 5);
-     * // => an integer between 0 and 5
-     *
-     * _.random(5);
-     * // => also an integer between 0 and 5
-     *
-     * _.random(5, true);
-     * // => a floating-point number between 0 and 5
-     *
-     * _.random(1.2, 5.2);
-     * // => a floating-point number between 1.2 and 5.2
-     */
         function random(lower, upper, floating) {
             if (floating && typeof floating != "boolean" && isIterateeCall(lower, upper, floating)) {
                 upper = floating = undefined;
@@ -12790,94 +4346,17 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseRandom(lower, upper);
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Converts `string` to [camel case](https://en.wikipedia.org/wiki/CamelCase).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the camel cased string.
-     * @example
-     *
-     * _.camelCase('Foo Bar');
-     * // => 'fooBar'
-     *
-     * _.camelCase('--foo-bar--');
-     * // => 'fooBar'
-     *
-     * _.camelCase('__FOO_BAR__');
-     * // => 'fooBar'
-     */
         var camelCase = createCompounder(function(result, word, index) {
             word = word.toLowerCase();
             return result + (index ? capitalize(word) : word);
         });
-        /**
-     * Converts the first character of `string` to upper case and the remaining
-     * to lower case.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to capitalize.
-     * @returns {string} Returns the capitalized string.
-     * @example
-     *
-     * _.capitalize('FRED');
-     * // => 'Fred'
-     */
         function capitalize(string) {
             return upperFirst(toString(string).toLowerCase());
         }
-        /**
-     * Deburrs `string` by converting
-     * [Latin-1 Supplement](https://en.wikipedia.org/wiki/Latin-1_Supplement_(Unicode_block)#Character_table)
-     * and [Latin Extended-A](https://en.wikipedia.org/wiki/Latin_Extended-A)
-     * letters to basic Latin letters and removing
-     * [combining diacritical marks](https://en.wikipedia.org/wiki/Combining_Diacritical_Marks).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to deburr.
-     * @returns {string} Returns the deburred string.
-     * @example
-     *
-     * _.deburr('déjà vu');
-     * // => 'deja vu'
-     */
         function deburr(string) {
             string = toString(string);
             return string && string.replace(reLatin, deburrLetter).replace(reComboMark, "");
         }
-        /**
-     * Checks if `string` ends with the given target string.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to inspect.
-     * @param {string} [target] The string to search for.
-     * @param {number} [position=string.length] The position to search up to.
-     * @returns {boolean} Returns `true` if `string` ends with `target`,
-     *  else `false`.
-     * @example
-     *
-     * _.endsWith('abc', 'c');
-     * // => true
-     *
-     * _.endsWith('abc', 'b');
-     * // => false
-     *
-     * _.endsWith('abc', 'b', 2);
-     * // => true
-     */
         function endsWith(string, target, position) {
             string = toString(string);
             target = baseToString(target);
@@ -12887,145 +4366,21 @@ UsergridEventable.mixin = function(destObject) {
             position -= target.length;
             return position >= 0 && string.slice(position, end) == target;
         }
-        /**
-     * Converts the characters "&", "<", ">", '"', and "'" in `string` to their
-     * corresponding HTML entities.
-     *
-     * **Note:** No other characters are escaped. To escape additional
-     * characters use a third-party library like [_he_](https://mths.be/he).
-     *
-     * Though the ">" character is escaped for symmetry, characters like
-     * ">" and "/" don't need escaping in HTML and have no special meaning
-     * unless they're part of a tag or unquoted attribute value. See
-     * [Mathias Bynens's article](https://mathiasbynens.be/notes/ambiguous-ampersands)
-     * (under "semi-related fun fact") for more details.
-     *
-     * When working with HTML you should always
-     * [quote attribute values](http://wonko.com/post/html-escaping) to reduce
-     * XSS vectors.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category String
-     * @param {string} [string=''] The string to escape.
-     * @returns {string} Returns the escaped string.
-     * @example
-     *
-     * _.escape('fred, barney, & pebbles');
-     * // => 'fred, barney, &amp; pebbles'
-     */
         function escape(string) {
             string = toString(string);
             return string && reHasUnescapedHtml.test(string) ? string.replace(reUnescapedHtml, escapeHtmlChar) : string;
         }
-        /**
-     * Escapes the `RegExp` special characters "^", "$", "\", ".", "*", "+",
-     * "?", "(", ")", "[", "]", "{", "}", and "|" in `string`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to escape.
-     * @returns {string} Returns the escaped string.
-     * @example
-     *
-     * _.escapeRegExp('[lodash](https://lodash.com/)');
-     * // => '\[lodash\]\(https://lodash\.com/\)'
-     */
         function escapeRegExp(string) {
             string = toString(string);
             return string && reHasRegExpChar.test(string) ? string.replace(reRegExpChar, "\\$&") : string;
         }
-        /**
-     * Converts `string` to
-     * [kebab case](https://en.wikipedia.org/wiki/Letter_case#Special_case_styles).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the kebab cased string.
-     * @example
-     *
-     * _.kebabCase('Foo Bar');
-     * // => 'foo-bar'
-     *
-     * _.kebabCase('fooBar');
-     * // => 'foo-bar'
-     *
-     * _.kebabCase('__FOO_BAR__');
-     * // => 'foo-bar'
-     */
         var kebabCase = createCompounder(function(result, word, index) {
             return result + (index ? "-" : "") + word.toLowerCase();
         });
-        /**
-     * Converts `string`, as space separated words, to lower case.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the lower cased string.
-     * @example
-     *
-     * _.lowerCase('--Foo-Bar--');
-     * // => 'foo bar'
-     *
-     * _.lowerCase('fooBar');
-     * // => 'foo bar'
-     *
-     * _.lowerCase('__FOO_BAR__');
-     * // => 'foo bar'
-     */
         var lowerCase = createCompounder(function(result, word, index) {
             return result + (index ? " " : "") + word.toLowerCase();
         });
-        /**
-     * Converts the first character of `string` to lower case.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the converted string.
-     * @example
-     *
-     * _.lowerFirst('Fred');
-     * // => 'fred'
-     *
-     * _.lowerFirst('FRED');
-     * // => 'fRED'
-     */
         var lowerFirst = createCaseFirst("toLowerCase");
-        /**
-     * Pads `string` on the left and right sides if it's shorter than `length`.
-     * Padding characters are truncated if they can't be evenly divided by `length`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to pad.
-     * @param {number} [length=0] The padding length.
-     * @param {string} [chars=' '] The string used as padding.
-     * @returns {string} Returns the padded string.
-     * @example
-     *
-     * _.pad('abc', 8);
-     * // => '  abc   '
-     *
-     * _.pad('abc', 8, '_-');
-     * // => '_-abc_-_'
-     *
-     * _.pad('abc', 3);
-     * // => 'abc'
-     */
         function pad(string, length, chars) {
             string = toString(string);
             length = toInteger(length);
@@ -13036,88 +4391,18 @@ UsergridEventable.mixin = function(destObject) {
             var mid = (length - strLength) / 2;
             return createPadding(nativeFloor(mid), chars) + string + createPadding(nativeCeil(mid), chars);
         }
-        /**
-     * Pads `string` on the right side if it's shorter than `length`. Padding
-     * characters are truncated if they exceed `length`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to pad.
-     * @param {number} [length=0] The padding length.
-     * @param {string} [chars=' '] The string used as padding.
-     * @returns {string} Returns the padded string.
-     * @example
-     *
-     * _.padEnd('abc', 6);
-     * // => 'abc   '
-     *
-     * _.padEnd('abc', 6, '_-');
-     * // => 'abc_-_'
-     *
-     * _.padEnd('abc', 3);
-     * // => 'abc'
-     */
         function padEnd(string, length, chars) {
             string = toString(string);
             length = toInteger(length);
             var strLength = length ? stringSize(string) : 0;
             return length && strLength < length ? string + createPadding(length - strLength, chars) : string;
         }
-        /**
-     * Pads `string` on the left side if it's shorter than `length`. Padding
-     * characters are truncated if they exceed `length`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to pad.
-     * @param {number} [length=0] The padding length.
-     * @param {string} [chars=' '] The string used as padding.
-     * @returns {string} Returns the padded string.
-     * @example
-     *
-     * _.padStart('abc', 6);
-     * // => '   abc'
-     *
-     * _.padStart('abc', 6, '_-');
-     * // => '_-_abc'
-     *
-     * _.padStart('abc', 3);
-     * // => 'abc'
-     */
         function padStart(string, length, chars) {
             string = toString(string);
             length = toInteger(length);
             var strLength = length ? stringSize(string) : 0;
             return length && strLength < length ? createPadding(length - strLength, chars) + string : string;
         }
-        /**
-     * Converts `string` to an integer of the specified radix. If `radix` is
-     * `undefined` or `0`, a `radix` of `10` is used unless `value` is a
-     * hexadecimal, in which case a `radix` of `16` is used.
-     *
-     * **Note:** This method aligns with the
-     * [ES5 implementation](https://es5.github.io/#x15.1.2.2) of `parseInt`.
-     *
-     * @static
-     * @memberOf _
-     * @since 1.1.0
-     * @category String
-     * @param {string} string The string to convert.
-     * @param {number} [radix=10] The radix to interpret `value` by.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {number} Returns the converted integer.
-     * @example
-     *
-     * _.parseInt('08');
-     * // => 8
-     *
-     * _.map(['6', '08', '10'], _.parseInt);
-     * // => [6, 8, 10]
-     */
         function parseInt(string, radix, guard) {
             if (guard || radix == null) {
                 radix = 0;
@@ -13126,28 +4411,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return nativeParseInt(toString(string), radix || 0);
         }
-        /**
-     * Repeats the given string `n` times.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to repeat.
-     * @param {number} [n=1] The number of times to repeat the string.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {string} Returns the repeated string.
-     * @example
-     *
-     * _.repeat('*', 3);
-     * // => '***'
-     *
-     * _.repeat('abc', 2);
-     * // => 'abcabc'
-     *
-     * _.repeat('abc', 0);
-     * // => ''
-     */
         function repeat(string, n, guard) {
             if (guard ? isIterateeCall(string, n, guard) : n === undefined) {
                 n = 1;
@@ -13156,72 +4419,13 @@ UsergridEventable.mixin = function(destObject) {
             }
             return baseRepeat(toString(string), n);
         }
-        /**
-     * Replaces matches for `pattern` in `string` with `replacement`.
-     *
-     * **Note:** This method is based on
-     * [`String#replace`](https://mdn.io/String/replace).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to modify.
-     * @param {RegExp|string} pattern The pattern to replace.
-     * @param {Function|string} replacement The match replacement.
-     * @returns {string} Returns the modified string.
-     * @example
-     *
-     * _.replace('Hi Fred', 'Fred', 'Barney');
-     * // => 'Hi Barney'
-     */
         function replace() {
             var args = arguments, string = toString(args[0]);
             return args.length < 3 ? string : string.replace(args[1], args[2]);
         }
-        /**
-     * Converts `string` to
-     * [snake case](https://en.wikipedia.org/wiki/Snake_case).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the snake cased string.
-     * @example
-     *
-     * _.snakeCase('Foo Bar');
-     * // => 'foo_bar'
-     *
-     * _.snakeCase('fooBar');
-     * // => 'foo_bar'
-     *
-     * _.snakeCase('--FOO-BAR--');
-     * // => 'foo_bar'
-     */
         var snakeCase = createCompounder(function(result, word, index) {
             return result + (index ? "_" : "") + word.toLowerCase();
         });
-        /**
-     * Splits `string` by `separator`.
-     *
-     * **Note:** This method is based on
-     * [`String#split`](https://mdn.io/String/split).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to split.
-     * @param {RegExp|string} separator The separator pattern to split by.
-     * @param {number} [limit] The length to truncate results to.
-     * @returns {Array} Returns the string segments.
-     * @example
-     *
-     * _.split('a-b-c', '-', 2);
-     * // => ['a', 'b']
-     */
         function split(string, separator, limit) {
             if (limit && typeof limit != "number" && isIterateeCall(string, separator, limit)) {
                 separator = limit = undefined;
@@ -13239,163 +4443,15 @@ UsergridEventable.mixin = function(destObject) {
             }
             return string.split(separator, limit);
         }
-        /**
-     * Converts `string` to
-     * [start case](https://en.wikipedia.org/wiki/Letter_case#Stylistic_or_specialised_usage).
-     *
-     * @static
-     * @memberOf _
-     * @since 3.1.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the start cased string.
-     * @example
-     *
-     * _.startCase('--foo-bar--');
-     * // => 'Foo Bar'
-     *
-     * _.startCase('fooBar');
-     * // => 'Foo Bar'
-     *
-     * _.startCase('__FOO_BAR__');
-     * // => 'FOO BAR'
-     */
         var startCase = createCompounder(function(result, word, index) {
             return result + (index ? " " : "") + upperFirst(word);
         });
-        /**
-     * Checks if `string` starts with the given target string.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to inspect.
-     * @param {string} [target] The string to search for.
-     * @param {number} [position=0] The position to search from.
-     * @returns {boolean} Returns `true` if `string` starts with `target`,
-     *  else `false`.
-     * @example
-     *
-     * _.startsWith('abc', 'a');
-     * // => true
-     *
-     * _.startsWith('abc', 'b');
-     * // => false
-     *
-     * _.startsWith('abc', 'b', 1);
-     * // => true
-     */
         function startsWith(string, target, position) {
             string = toString(string);
             position = baseClamp(toInteger(position), 0, string.length);
             target = baseToString(target);
             return string.slice(position, position + target.length) == target;
         }
-        /**
-     * Creates a compiled template function that can interpolate data properties
-     * in "interpolate" delimiters, HTML-escape interpolated data properties in
-     * "escape" delimiters, and execute JavaScript in "evaluate" delimiters. Data
-     * properties may be accessed as free variables in the template. If a setting
-     * object is given, it takes precedence over `_.templateSettings` values.
-     *
-     * **Note:** In the development build `_.template` utilizes
-     * [sourceURLs](http://www.html5rocks.com/en/tutorials/developertools/sourcemaps/#toc-sourceurl)
-     * for easier debugging.
-     *
-     * For more information on precompiling templates see
-     * [lodash's custom builds documentation](https://lodash.com/custom-builds).
-     *
-     * For more information on Chrome extension sandboxes see
-     * [Chrome's extensions documentation](https://developer.chrome.com/extensions/sandboxingEval).
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category String
-     * @param {string} [string=''] The template string.
-     * @param {Object} [options={}] The options object.
-     * @param {RegExp} [options.escape=_.templateSettings.escape]
-     *  The HTML "escape" delimiter.
-     * @param {RegExp} [options.evaluate=_.templateSettings.evaluate]
-     *  The "evaluate" delimiter.
-     * @param {Object} [options.imports=_.templateSettings.imports]
-     *  An object to import into the template as free variables.
-     * @param {RegExp} [options.interpolate=_.templateSettings.interpolate]
-     *  The "interpolate" delimiter.
-     * @param {string} [options.sourceURL='lodash.templateSources[n]']
-     *  The sourceURL of the compiled template.
-     * @param {string} [options.variable='obj']
-     *  The data object variable name.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Function} Returns the compiled template function.
-     * @example
-     *
-     * // Use the "interpolate" delimiter to create a compiled template.
-     * var compiled = _.template('hello <%= user %>!');
-     * compiled({ 'user': 'fred' });
-     * // => 'hello fred!'
-     *
-     * // Use the HTML "escape" delimiter to escape data property values.
-     * var compiled = _.template('<b><%- value %></b>');
-     * compiled({ 'value': '<script>' });
-     * // => '<b>&lt;script&gt;</b>'
-     *
-     * // Use the "evaluate" delimiter to execute JavaScript and generate HTML.
-     * var compiled = _.template('<% _.forEach(users, function(user) { %><li><%- user %></li><% }); %>');
-     * compiled({ 'users': ['fred', 'barney'] });
-     * // => '<li>fred</li><li>barney</li>'
-     *
-     * // Use the internal `print` function in "evaluate" delimiters.
-     * var compiled = _.template('<% print("hello " + user); %>!');
-     * compiled({ 'user': 'barney' });
-     * // => 'hello barney!'
-     *
-     * // Use the ES template literal delimiter as an "interpolate" delimiter.
-     * // Disable support by replacing the "interpolate" delimiter.
-     * var compiled = _.template('hello ${ user }!');
-     * compiled({ 'user': 'pebbles' });
-     * // => 'hello pebbles!'
-     *
-     * // Use backslashes to treat delimiters as plain text.
-     * var compiled = _.template('<%= "\\<%- value %\\>" %>');
-     * compiled({ 'value': 'ignored' });
-     * // => '<%- value %>'
-     *
-     * // Use the `imports` option to import `jQuery` as `jq`.
-     * var text = '<% jq.each(users, function(user) { %><li><%- user %></li><% }); %>';
-     * var compiled = _.template(text, { 'imports': { 'jq': jQuery } });
-     * compiled({ 'users': ['fred', 'barney'] });
-     * // => '<li>fred</li><li>barney</li>'
-     *
-     * // Use the `sourceURL` option to specify a custom sourceURL for the template.
-     * var compiled = _.template('hello <%= user %>!', { 'sourceURL': '/basic/greeting.jst' });
-     * compiled(data);
-     * // => Find the source of "greeting.jst" under the Sources tab or Resources panel of the web inspector.
-     *
-     * // Use the `variable` option to ensure a with-statement isn't used in the compiled template.
-     * var compiled = _.template('hi <%= data.user %>!', { 'variable': 'data' });
-     * compiled.source;
-     * // => function(data) {
-     * //   var __t, __p = '';
-     * //   __p += 'hi ' + ((__t = ( data.user )) == null ? '' : __t) + '!';
-     * //   return __p;
-     * // }
-     *
-     * // Use custom template delimiters.
-     * _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
-     * var compiled = _.template('hello {{ user }}!');
-     * compiled({ 'user': 'mustache' });
-     * // => 'hello mustache!'
-     *
-     * // Use the `source` property to inline compiled templates for meaningful
-     * // line numbers in error messages and stack traces.
-     * fs.writeFileSync(path.join(process.cwd(), 'jst.js'), '\
-     *   var JST = {\
-     *     "main": ' + _.template(mainText).source + '\
-     *   };\
-     * ');
-     */
         function template(string, options, guard) {
             var settings = lodash.templateSettings;
             if (guard && isIterateeCall(string, options, guard)) {
@@ -13440,76 +4496,12 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Converts `string`, as a whole, to lower case just like
-     * [String#toLowerCase](https://mdn.io/toLowerCase).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the lower cased string.
-     * @example
-     *
-     * _.toLower('--Foo-Bar--');
-     * // => '--foo-bar--'
-     *
-     * _.toLower('fooBar');
-     * // => 'foobar'
-     *
-     * _.toLower('__FOO_BAR__');
-     * // => '__foo_bar__'
-     */
         function toLower(value) {
             return toString(value).toLowerCase();
         }
-        /**
-     * Converts `string`, as a whole, to upper case just like
-     * [String#toUpperCase](https://mdn.io/toUpperCase).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the upper cased string.
-     * @example
-     *
-     * _.toUpper('--foo-bar--');
-     * // => '--FOO-BAR--'
-     *
-     * _.toUpper('fooBar');
-     * // => 'FOOBAR'
-     *
-     * _.toUpper('__foo_bar__');
-     * // => '__FOO_BAR__'
-     */
         function toUpper(value) {
             return toString(value).toUpperCase();
         }
-        /**
-     * Removes leading and trailing whitespace or specified characters from `string`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to trim.
-     * @param {string} [chars=whitespace] The characters to trim.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {string} Returns the trimmed string.
-     * @example
-     *
-     * _.trim('  abc  ');
-     * // => 'abc'
-     *
-     * _.trim('-_-abc-_-', '_-');
-     * // => 'abc'
-     *
-     * _.map(['  foo  ', '  bar  '], _.trim);
-     * // => ['foo', 'bar']
-     */
         function trim(string, chars, guard) {
             string = toString(string);
             if (string && (guard || chars === undefined)) {
@@ -13521,25 +4513,6 @@ UsergridEventable.mixin = function(destObject) {
             var strSymbols = stringToArray(string), chrSymbols = stringToArray(chars), start = charsStartIndex(strSymbols, chrSymbols), end = charsEndIndex(strSymbols, chrSymbols) + 1;
             return castSlice(strSymbols, start, end).join("");
         }
-        /**
-     * Removes trailing whitespace or specified characters from `string`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to trim.
-     * @param {string} [chars=whitespace] The characters to trim.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {string} Returns the trimmed string.
-     * @example
-     *
-     * _.trimEnd('  abc  ');
-     * // => '  abc'
-     *
-     * _.trimEnd('-_-abc-_-', '_-');
-     * // => '-_-abc'
-     */
         function trimEnd(string, chars, guard) {
             string = toString(string);
             if (string && (guard || chars === undefined)) {
@@ -13551,25 +4524,6 @@ UsergridEventable.mixin = function(destObject) {
             var strSymbols = stringToArray(string), end = charsEndIndex(strSymbols, stringToArray(chars)) + 1;
             return castSlice(strSymbols, 0, end).join("");
         }
-        /**
-     * Removes leading whitespace or specified characters from `string`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to trim.
-     * @param {string} [chars=whitespace] The characters to trim.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {string} Returns the trimmed string.
-     * @example
-     *
-     * _.trimStart('  abc  ');
-     * // => 'abc  '
-     *
-     * _.trimStart('-_-abc-_-', '_-');
-     * // => 'abc-_-'
-     */
         function trimStart(string, chars, guard) {
             string = toString(string);
             if (string && (guard || chars === undefined)) {
@@ -13581,43 +4535,6 @@ UsergridEventable.mixin = function(destObject) {
             var strSymbols = stringToArray(string), start = charsStartIndex(strSymbols, stringToArray(chars));
             return castSlice(strSymbols, start).join("");
         }
-        /**
-     * Truncates `string` if it's longer than the given maximum string length.
-     * The last characters of the truncated string are replaced with the omission
-     * string which defaults to "...".
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to truncate.
-     * @param {Object} [options={}] The options object.
-     * @param {number} [options.length=30] The maximum string length.
-     * @param {string} [options.omission='...'] The string to indicate text is omitted.
-     * @param {RegExp|string} [options.separator] The separator pattern to truncate to.
-     * @returns {string} Returns the truncated string.
-     * @example
-     *
-     * _.truncate('hi-diddly-ho there, neighborino');
-     * // => 'hi-diddly-ho there, neighbo...'
-     *
-     * _.truncate('hi-diddly-ho there, neighborino', {
-     *   'length': 24,
-     *   'separator': ' '
-     * });
-     * // => 'hi-diddly-ho there,...'
-     *
-     * _.truncate('hi-diddly-ho there, neighborino', {
-     *   'length': 24,
-     *   'separator': /,? +/
-     * });
-     * // => 'hi-diddly-ho there...'
-     *
-     * _.truncate('hi-diddly-ho there, neighborino', {
-     *   'omission': ' [...]'
-     * });
-     * // => 'hi-diddly-ho there, neig [...]'
-     */
         function truncate(string, options) {
             var length = DEFAULT_TRUNC_LENGTH, omission = DEFAULT_TRUNC_OMISSION;
             if (isObject(options)) {
@@ -13665,89 +4582,14 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result + omission;
         }
-        /**
-     * The inverse of `_.escape`; this method converts the HTML entities
-     * `&amp;`, `&lt;`, `&gt;`, `&quot;`, and `&#39;` in `string` to
-     * their corresponding characters.
-     *
-     * **Note:** No other HTML entities are unescaped. To unescape additional
-     * HTML entities use a third-party library like [_he_](https://mths.be/he).
-     *
-     * @static
-     * @memberOf _
-     * @since 0.6.0
-     * @category String
-     * @param {string} [string=''] The string to unescape.
-     * @returns {string} Returns the unescaped string.
-     * @example
-     *
-     * _.unescape('fred, barney, &amp; pebbles');
-     * // => 'fred, barney, & pebbles'
-     */
         function unescape(string) {
             string = toString(string);
             return string && reHasEscapedHtml.test(string) ? string.replace(reEscapedHtml, unescapeHtmlChar) : string;
         }
-        /**
-     * Converts `string`, as space separated words, to upper case.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the upper cased string.
-     * @example
-     *
-     * _.upperCase('--foo-bar');
-     * // => 'FOO BAR'
-     *
-     * _.upperCase('fooBar');
-     * // => 'FOO BAR'
-     *
-     * _.upperCase('__foo_bar__');
-     * // => 'FOO BAR'
-     */
         var upperCase = createCompounder(function(result, word, index) {
             return result + (index ? " " : "") + word.toUpperCase();
         });
-        /**
-     * Converts the first character of `string` to upper case.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category String
-     * @param {string} [string=''] The string to convert.
-     * @returns {string} Returns the converted string.
-     * @example
-     *
-     * _.upperFirst('fred');
-     * // => 'Fred'
-     *
-     * _.upperFirst('FRED');
-     * // => 'FRED'
-     */
         var upperFirst = createCaseFirst("toUpperCase");
-        /**
-     * Splits `string` into an array of its words.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category String
-     * @param {string} [string=''] The string to inspect.
-     * @param {RegExp|string} [pattern] The pattern to match words.
-     * @param- {Object} [guard] Enables use as an iteratee for methods like `_.map`.
-     * @returns {Array} Returns the words of `string`.
-     * @example
-     *
-     * _.words('fred, barney, & pebbles');
-     * // => ['fred', 'barney', 'pebbles']
-     *
-     * _.words('fred, barney, & pebbles', /[^, ]+/g);
-     * // => ['fred', 'barney', '&', 'pebbles']
-     */
         function words(string, pattern, guard) {
             string = toString(string);
             pattern = guard ? undefined : pattern;
@@ -13756,29 +4598,6 @@ UsergridEventable.mixin = function(destObject) {
             }
             return string.match(pattern) || [];
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Attempts to invoke `func`, returning either the result or the caught error
-     * object. Any additional arguments are provided to `func` when it's invoked.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Util
-     * @param {Function} func The function to attempt.
-     * @param {...*} [args] The arguments to invoke `func` with.
-     * @returns {*} Returns the `func` result or error object.
-     * @example
-     *
-     * // Avoid throwing errors for invalid selectors.
-     * var elements = _.attempt(function(selector) {
-     *   return document.querySelectorAll(selector);
-     * }, '>_>');
-     *
-     * if (_.isError(elements)) {
-     *   elements = [];
-     * }
-     */
         var attempt = baseRest(function(func, args) {
             try {
                 return apply(func, undefined, args);
@@ -13786,32 +4605,6 @@ UsergridEventable.mixin = function(destObject) {
                 return isError(e) ? e : new Error(e);
             }
         });
-        /**
-     * Binds methods of an object to the object itself, overwriting the existing
-     * method.
-     *
-     * **Note:** This method doesn't set the "length" property of bound functions.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {Object} object The object to bind and assign the bound methods to.
-     * @param {...(string|string[])} methodNames The object method names to bind.
-     * @returns {Object} Returns `object`.
-     * @example
-     *
-     * var view = {
-     *   'label': 'docs',
-     *   'click': function() {
-     *     console.log('clicked ' + this.label);
-     *   }
-     * };
-     *
-     * _.bindAll(view, ['click']);
-     * jQuery(element).on('click', view.click);
-     * // => Logs 'clicked docs' when clicked.
-     */
         var bindAll = flatRest(function(object, methodNames) {
             arrayEach(methodNames, function(key) {
                 key = toKey(key);
@@ -13819,35 +4612,6 @@ UsergridEventable.mixin = function(destObject) {
             });
             return object;
         });
-        /**
-     * Creates a function that iterates over `pairs` and invokes the corresponding
-     * function of the first predicate to return truthy. The predicate-function
-     * pairs are invoked with the `this` binding and arguments of the created
-     * function.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {Array} pairs The predicate-function pairs.
-     * @returns {Function} Returns the new composite function.
-     * @example
-     *
-     * var func = _.cond([
-     *   [_.matches({ 'a': 1 }),           _.constant('matches A')],
-     *   [_.conforms({ 'b': _.isNumber }), _.constant('matches B')],
-     *   [_.stubTrue,                      _.constant('no match')]
-     * ]);
-     *
-     * func({ 'a': 1, 'b': 2 });
-     * // => 'matches A'
-     *
-     * func({ 'a': 0, 'b': 1 });
-     * // => 'matches B'
-     *
-     * func({ 'a': '1', 'b': '2' });
-     * // => 'no match'
-     */
         function cond(pairs) {
             var length = pairs ? pairs.length : 0, toIteratee = getIteratee();
             pairs = !length ? [] : arrayMap(pairs, function(pair) {
@@ -13866,342 +4630,41 @@ UsergridEventable.mixin = function(destObject) {
                 }
             });
         }
-        /**
-     * Creates a function that invokes the predicate properties of `source` with
-     * the corresponding property values of a given object, returning `true` if
-     * all predicates return truthy, else `false`.
-     *
-     * **Note:** The created function is equivalent to `_.conformsTo` with
-     * `source` partially applied.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {Object} source The object of property predicates to conform to.
-     * @returns {Function} Returns the new spec function.
-     * @example
-     *
-     * var objects = [
-     *   { 'a': 2, 'b': 1 },
-     *   { 'a': 1, 'b': 2 }
-     * ];
-     *
-     * _.filter(objects, _.conforms({ 'b': function(n) { return n > 1; } }));
-     * // => [{ 'a': 1, 'b': 2 }]
-     */
         function conforms(source) {
             return baseConforms(baseClone(source, true));
         }
-        /**
-     * Creates a function that returns `value`.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.4.0
-     * @category Util
-     * @param {*} value The value to return from the new function.
-     * @returns {Function} Returns the new constant function.
-     * @example
-     *
-     * var objects = _.times(2, _.constant({ 'a': 1 }));
-     *
-     * console.log(objects);
-     * // => [{ 'a': 1 }, { 'a': 1 }]
-     *
-     * console.log(objects[0] === objects[1]);
-     * // => true
-     */
         function constant(value) {
             return function() {
                 return value;
             };
         }
-        /**
-     * Checks `value` to determine whether a default value should be returned in
-     * its place. The `defaultValue` is returned if `value` is `NaN`, `null`,
-     * or `undefined`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.14.0
-     * @category Util
-     * @param {*} value The value to check.
-     * @param {*} defaultValue The default value.
-     * @returns {*} Returns the resolved value.
-     * @example
-     *
-     * _.defaultTo(1, 10);
-     * // => 1
-     *
-     * _.defaultTo(undefined, 10);
-     * // => 10
-     */
         function defaultTo(value, defaultValue) {
             return value == null || value !== value ? defaultValue : value;
         }
-        /**
-     * Creates a function that returns the result of invoking the given functions
-     * with the `this` binding of the created function, where each successive
-     * invocation is supplied the return value of the previous.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Util
-     * @param {...(Function|Function[])} [funcs] The functions to invoke.
-     * @returns {Function} Returns the new composite function.
-     * @see _.flowRight
-     * @example
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * var addSquare = _.flow([_.add, square]);
-     * addSquare(1, 2);
-     * // => 9
-     */
         var flow = createFlow();
-        /**
-     * This method is like `_.flow` except that it creates a function that
-     * invokes the given functions from right to left.
-     *
-     * @static
-     * @since 3.0.0
-     * @memberOf _
-     * @category Util
-     * @param {...(Function|Function[])} [funcs] The functions to invoke.
-     * @returns {Function} Returns the new composite function.
-     * @see _.flow
-     * @example
-     *
-     * function square(n) {
-     *   return n * n;
-     * }
-     *
-     * var addSquare = _.flowRight([square, _.add]);
-     * addSquare(1, 2);
-     * // => 9
-     */
         var flowRight = createFlow(true);
-        /**
-     * This method returns the first argument it receives.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {*} value Any value.
-     * @returns {*} Returns `value`.
-     * @example
-     *
-     * var object = { 'a': 1 };
-     *
-     * console.log(_.identity(object) === object);
-     * // => true
-     */
         function identity(value) {
             return value;
         }
-        /**
-     * Creates a function that invokes `func` with the arguments of the created
-     * function. If `func` is a property name, the created function returns the
-     * property value for a given element. If `func` is an array or object, the
-     * created function returns `true` for elements that contain the equivalent
-     * source properties, otherwise it returns `false`.
-     *
-     * @static
-     * @since 4.0.0
-     * @memberOf _
-     * @category Util
-     * @param {*} [func=_.identity] The value to convert to a callback.
-     * @returns {Function} Returns the callback.
-     * @example
-     *
-     * var users = [
-     *   { 'user': 'barney', 'age': 36, 'active': true },
-     *   { 'user': 'fred',   'age': 40, 'active': false }
-     * ];
-     *
-     * // The `_.matches` iteratee shorthand.
-     * _.filter(users, _.iteratee({ 'user': 'barney', 'active': true }));
-     * // => [{ 'user': 'barney', 'age': 36, 'active': true }]
-     *
-     * // The `_.matchesProperty` iteratee shorthand.
-     * _.filter(users, _.iteratee(['user', 'fred']));
-     * // => [{ 'user': 'fred', 'age': 40 }]
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.map(users, _.iteratee('user'));
-     * // => ['barney', 'fred']
-     *
-     * // Create custom iteratee shorthands.
-     * _.iteratee = _.wrap(_.iteratee, function(iteratee, func) {
-     *   return !_.isRegExp(func) ? iteratee(func) : function(string) {
-     *     return func.test(string);
-     *   };
-     * });
-     *
-     * _.filter(['abc', 'def'], /ef/);
-     * // => ['def']
-     */
         function iteratee(func) {
             return baseIteratee(typeof func == "function" ? func : baseClone(func, true));
         }
-        /**
-     * Creates a function that performs a partial deep comparison between a given
-     * object and `source`, returning `true` if the given object has equivalent
-     * property values, else `false`.
-     *
-     * **Note:** The created function is equivalent to `_.isMatch` with `source`
-     * partially applied.
-     *
-     * Partial comparisons will match empty array and empty object `source`
-     * values against any array or object value, respectively. See `_.isEqual`
-     * for a list of supported value comparisons.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Util
-     * @param {Object} source The object of property values to match.
-     * @returns {Function} Returns the new spec function.
-     * @example
-     *
-     * var objects = [
-     *   { 'a': 1, 'b': 2, 'c': 3 },
-     *   { 'a': 4, 'b': 5, 'c': 6 }
-     * ];
-     *
-     * _.filter(objects, _.matches({ 'a': 4, 'c': 6 }));
-     * // => [{ 'a': 4, 'b': 5, 'c': 6 }]
-     */
         function matches(source) {
             return baseMatches(baseClone(source, true));
         }
-        /**
-     * Creates a function that performs a partial deep comparison between the
-     * value at `path` of a given object to `srcValue`, returning `true` if the
-     * object value is equivalent, else `false`.
-     *
-     * **Note:** Partial comparisons will match empty array and empty object
-     * `srcValue` values against any array or object value, respectively. See
-     * `_.isEqual` for a list of supported value comparisons.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.2.0
-     * @category Util
-     * @param {Array|string} path The path of the property to get.
-     * @param {*} srcValue The value to match.
-     * @returns {Function} Returns the new spec function.
-     * @example
-     *
-     * var objects = [
-     *   { 'a': 1, 'b': 2, 'c': 3 },
-     *   { 'a': 4, 'b': 5, 'c': 6 }
-     * ];
-     *
-     * _.find(objects, _.matchesProperty('a', 4));
-     * // => { 'a': 4, 'b': 5, 'c': 6 }
-     */
         function matchesProperty(path, srcValue) {
             return baseMatchesProperty(path, baseClone(srcValue, true));
         }
-        /**
-     * Creates a function that invokes the method at `path` of a given object.
-     * Any additional arguments are provided to the invoked method.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.7.0
-     * @category Util
-     * @param {Array|string} path The path of the method to invoke.
-     * @param {...*} [args] The arguments to invoke the method with.
-     * @returns {Function} Returns the new invoker function.
-     * @example
-     *
-     * var objects = [
-     *   { 'a': { 'b': _.constant(2) } },
-     *   { 'a': { 'b': _.constant(1) } }
-     * ];
-     *
-     * _.map(objects, _.method('a.b'));
-     * // => [2, 1]
-     *
-     * _.map(objects, _.method(['a', 'b']));
-     * // => [2, 1]
-     */
         var method = baseRest(function(path, args) {
             return function(object) {
                 return baseInvoke(object, path, args);
             };
         });
-        /**
-     * The opposite of `_.method`; this method creates a function that invokes
-     * the method at a given path of `object`. Any additional arguments are
-     * provided to the invoked method.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.7.0
-     * @category Util
-     * @param {Object} object The object to query.
-     * @param {...*} [args] The arguments to invoke the method with.
-     * @returns {Function} Returns the new invoker function.
-     * @example
-     *
-     * var array = _.times(3, _.constant),
-     *     object = { 'a': array, 'b': array, 'c': array };
-     *
-     * _.map(['a[2]', 'c[0]'], _.methodOf(object));
-     * // => [2, 0]
-     *
-     * _.map([['a', '2'], ['c', '0']], _.methodOf(object));
-     * // => [2, 0]
-     */
         var methodOf = baseRest(function(object, args) {
             return function(path) {
                 return baseInvoke(object, path, args);
             };
         });
-        /**
-     * Adds all own enumerable string keyed function properties of a source
-     * object to the destination object. If `object` is a function, then methods
-     * are added to its prototype as well.
-     *
-     * **Note:** Use `_.runInContext` to create a pristine `lodash` function to
-     * avoid conflicts caused by modifying the original.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {Function|Object} [object=lodash] The destination object.
-     * @param {Object} source The object of functions to add.
-     * @param {Object} [options={}] The options object.
-     * @param {boolean} [options.chain=true] Specify whether mixins are chainable.
-     * @returns {Function|Object} Returns `object`.
-     * @example
-     *
-     * function vowels(string) {
-     *   return _.filter(string, function(v) {
-     *     return /[aeiou]/i.test(v);
-     *   });
-     * }
-     *
-     * _.mixin({ 'vowels': vowels });
-     * _.vowels('fred');
-     * // => ['e']
-     *
-     * _('fred').vowels().value();
-     * // => ['e']
-     *
-     * _.mixin({ 'vowels': vowels }, { 'chain': false });
-     * _('fred').vowels();
-     * // => ['e']
-     */
         function mixin(object, source, options) {
             var props = keys(source), methodNames = baseFunctions(source, props);
             if (options == null && !(isObject(source) && (methodNames.length || !props.length))) {
@@ -14233,372 +4696,47 @@ UsergridEventable.mixin = function(destObject) {
             });
             return object;
         }
-        /**
-     * Reverts the `_` variable to its previous value and returns a reference to
-     * the `lodash` function.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @returns {Function} Returns the `lodash` function.
-     * @example
-     *
-     * var lodash = _.noConflict();
-     */
         function noConflict() {
             if (root._ === this) {
                 root._ = oldDash;
             }
             return this;
         }
-        /**
-     * This method returns `undefined`.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.3.0
-     * @category Util
-     * @example
-     *
-     * _.times(2, _.noop);
-     * // => [undefined, undefined]
-     */
         function noop() {}
-        /**
-     * Creates a function that gets the argument at index `n`. If `n` is negative,
-     * the nth argument from the end is returned.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {number} [n=0] The index of the argument to return.
-     * @returns {Function} Returns the new pass-thru function.
-     * @example
-     *
-     * var func = _.nthArg(1);
-     * func('a', 'b', 'c', 'd');
-     * // => 'b'
-     *
-     * var func = _.nthArg(-2);
-     * func('a', 'b', 'c', 'd');
-     * // => 'c'
-     */
         function nthArg(n) {
             n = toInteger(n);
             return baseRest(function(args) {
                 return baseNth(args, n);
             });
         }
-        /**
-     * Creates a function that invokes `iteratees` with the arguments it receives
-     * and returns their results.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {...(Function|Function[])} [iteratees=[_.identity]]
-     *  The iteratees to invoke.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var func = _.over([Math.max, Math.min]);
-     *
-     * func(1, 2, 3, 4);
-     * // => [4, 1]
-     */
         var over = createOver(arrayMap);
-        /**
-     * Creates a function that checks if **all** of the `predicates` return
-     * truthy when invoked with the arguments it receives.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {...(Function|Function[])} [predicates=[_.identity]]
-     *  The predicates to check.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var func = _.overEvery([Boolean, isFinite]);
-     *
-     * func('1');
-     * // => true
-     *
-     * func(null);
-     * // => false
-     *
-     * func(NaN);
-     * // => false
-     */
         var overEvery = createOver(arrayEvery);
-        /**
-     * Creates a function that checks if **any** of the `predicates` return
-     * truthy when invoked with the arguments it receives.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {...(Function|Function[])} [predicates=[_.identity]]
-     *  The predicates to check.
-     * @returns {Function} Returns the new function.
-     * @example
-     *
-     * var func = _.overSome([Boolean, isFinite]);
-     *
-     * func('1');
-     * // => true
-     *
-     * func(null);
-     * // => true
-     *
-     * func(NaN);
-     * // => false
-     */
         var overSome = createOver(arraySome);
-        /**
-     * Creates a function that returns the value at `path` of a given object.
-     *
-     * @static
-     * @memberOf _
-     * @since 2.4.0
-     * @category Util
-     * @param {Array|string} path The path of the property to get.
-     * @returns {Function} Returns the new accessor function.
-     * @example
-     *
-     * var objects = [
-     *   { 'a': { 'b': 2 } },
-     *   { 'a': { 'b': 1 } }
-     * ];
-     *
-     * _.map(objects, _.property('a.b'));
-     * // => [2, 1]
-     *
-     * _.map(_.sortBy(objects, _.property(['a', 'b'])), 'a.b');
-     * // => [1, 2]
-     */
         function property(path) {
             return isKey(path) ? baseProperty(toKey(path)) : basePropertyDeep(path);
         }
-        /**
-     * The opposite of `_.property`; this method creates a function that returns
-     * the value at a given path of `object`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.0.0
-     * @category Util
-     * @param {Object} object The object to query.
-     * @returns {Function} Returns the new accessor function.
-     * @example
-     *
-     * var array = [0, 1, 2],
-     *     object = { 'a': array, 'b': array, 'c': array };
-     *
-     * _.map(['a[2]', 'c[0]'], _.propertyOf(object));
-     * // => [2, 0]
-     *
-     * _.map([['a', '2'], ['c', '0']], _.propertyOf(object));
-     * // => [2, 0]
-     */
         function propertyOf(object) {
             return function(path) {
                 return object == null ? undefined : baseGet(object, path);
             };
         }
-        /**
-     * Creates an array of numbers (positive and/or negative) progressing from
-     * `start` up to, but not including, `end`. A step of `-1` is used if a negative
-     * `start` is specified without an `end` or `step`. If `end` is not specified,
-     * it's set to `start` with `start` then set to `0`.
-     *
-     * **Note:** JavaScript follows the IEEE-754 standard for resolving
-     * floating-point values which can produce unexpected results.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {number} [start=0] The start of the range.
-     * @param {number} end The end of the range.
-     * @param {number} [step=1] The value to increment or decrement by.
-     * @returns {Array} Returns the range of numbers.
-     * @see _.inRange, _.rangeRight
-     * @example
-     *
-     * _.range(4);
-     * // => [0, 1, 2, 3]
-     *
-     * _.range(-4);
-     * // => [0, -1, -2, -3]
-     *
-     * _.range(1, 5);
-     * // => [1, 2, 3, 4]
-     *
-     * _.range(0, 20, 5);
-     * // => [0, 5, 10, 15]
-     *
-     * _.range(0, -4, -1);
-     * // => [0, -1, -2, -3]
-     *
-     * _.range(1, 4, 0);
-     * // => [1, 1, 1]
-     *
-     * _.range(0);
-     * // => []
-     */
         var range = createRange();
-        /**
-     * This method is like `_.range` except that it populates values in
-     * descending order.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {number} [start=0] The start of the range.
-     * @param {number} end The end of the range.
-     * @param {number} [step=1] The value to increment or decrement by.
-     * @returns {Array} Returns the range of numbers.
-     * @see _.inRange, _.range
-     * @example
-     *
-     * _.rangeRight(4);
-     * // => [3, 2, 1, 0]
-     *
-     * _.rangeRight(-4);
-     * // => [-3, -2, -1, 0]
-     *
-     * _.rangeRight(1, 5);
-     * // => [4, 3, 2, 1]
-     *
-     * _.rangeRight(0, 20, 5);
-     * // => [15, 10, 5, 0]
-     *
-     * _.rangeRight(0, -4, -1);
-     * // => [-3, -2, -1, 0]
-     *
-     * _.rangeRight(1, 4, 0);
-     * // => [1, 1, 1]
-     *
-     * _.rangeRight(0);
-     * // => []
-     */
         var rangeRight = createRange(true);
-        /**
-     * This method returns a new empty array.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.13.0
-     * @category Util
-     * @returns {Array} Returns the new empty array.
-     * @example
-     *
-     * var arrays = _.times(2, _.stubArray);
-     *
-     * console.log(arrays);
-     * // => [[], []]
-     *
-     * console.log(arrays[0] === arrays[1]);
-     * // => false
-     */
         function stubArray() {
             return [];
         }
-        /**
-     * This method returns `false`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.13.0
-     * @category Util
-     * @returns {boolean} Returns `false`.
-     * @example
-     *
-     * _.times(2, _.stubFalse);
-     * // => [false, false]
-     */
         function stubFalse() {
             return false;
         }
-        /**
-     * This method returns a new empty object.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.13.0
-     * @category Util
-     * @returns {Object} Returns the new empty object.
-     * @example
-     *
-     * var objects = _.times(2, _.stubObject);
-     *
-     * console.log(objects);
-     * // => [{}, {}]
-     *
-     * console.log(objects[0] === objects[1]);
-     * // => false
-     */
         function stubObject() {
             return {};
         }
-        /**
-     * This method returns an empty string.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.13.0
-     * @category Util
-     * @returns {string} Returns the empty string.
-     * @example
-     *
-     * _.times(2, _.stubString);
-     * // => ['', '']
-     */
         function stubString() {
             return "";
         }
-        /**
-     * This method returns `true`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.13.0
-     * @category Util
-     * @returns {boolean} Returns `true`.
-     * @example
-     *
-     * _.times(2, _.stubTrue);
-     * // => [true, true]
-     */
         function stubTrue() {
             return true;
         }
-        /**
-     * Invokes the iteratee `n` times, returning an array of the results of
-     * each invocation. The iteratee is invoked with one argument; (index).
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {number} n The number of times to invoke `iteratee`.
-     * @param {Function} [iteratee=_.identity] The function invoked per iteration.
-     * @returns {Array} Returns the array of results.
-     * @example
-     *
-     * _.times(3, String);
-     * // => ['0', '1', '2']
-     *
-     *  _.times(4, _.constant(0));
-     * // => [0, 0, 0, 0]
-     */
         function times(n, iteratee) {
             n = toInteger(n);
             if (n < 1 || n > MAX_SAFE_INTEGER) {
@@ -14613,370 +4751,55 @@ UsergridEventable.mixin = function(destObject) {
             }
             return result;
         }
-        /**
-     * Converts `value` to a property path array.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Util
-     * @param {*} value The value to convert.
-     * @returns {Array} Returns the new property path array.
-     * @example
-     *
-     * _.toPath('a.b.c');
-     * // => ['a', 'b', 'c']
-     *
-     * _.toPath('a[0].b.c');
-     * // => ['a', '0', 'b', 'c']
-     */
         function toPath(value) {
             if (isArray(value)) {
                 return arrayMap(value, toKey);
             }
             return isSymbol(value) ? [ value ] : copyArray(stringToPath(value));
         }
-        /**
-     * Generates a unique ID. If `prefix` is given, the ID is appended to it.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Util
-     * @param {string} [prefix=''] The value to prefix the ID with.
-     * @returns {string} Returns the unique ID.
-     * @example
-     *
-     * _.uniqueId('contact_');
-     * // => 'contact_104'
-     *
-     * _.uniqueId();
-     * // => '105'
-     */
         function uniqueId(prefix) {
             var id = ++idCounter;
             return toString(prefix) + id;
         }
-        /*------------------------------------------------------------------------*/
-        /**
-     * Adds two numbers.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.4.0
-     * @category Math
-     * @param {number} augend The first number in an addition.
-     * @param {number} addend The second number in an addition.
-     * @returns {number} Returns the total.
-     * @example
-     *
-     * _.add(6, 4);
-     * // => 10
-     */
         var add = createMathOperation(function(augend, addend) {
             return augend + addend;
         }, 0);
-        /**
-     * Computes `number` rounded up to `precision`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.10.0
-     * @category Math
-     * @param {number} number The number to round up.
-     * @param {number} [precision=0] The precision to round up to.
-     * @returns {number} Returns the rounded up number.
-     * @example
-     *
-     * _.ceil(4.006);
-     * // => 5
-     *
-     * _.ceil(6.004, 2);
-     * // => 6.01
-     *
-     * _.ceil(6040, -2);
-     * // => 6100
-     */
         var ceil = createRound("ceil");
-        /**
-     * Divide two numbers.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.7.0
-     * @category Math
-     * @param {number} dividend The first number in a division.
-     * @param {number} divisor The second number in a division.
-     * @returns {number} Returns the quotient.
-     * @example
-     *
-     * _.divide(6, 4);
-     * // => 1.5
-     */
         var divide = createMathOperation(function(dividend, divisor) {
             return dividend / divisor;
         }, 1);
-        /**
-     * Computes `number` rounded down to `precision`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.10.0
-     * @category Math
-     * @param {number} number The number to round down.
-     * @param {number} [precision=0] The precision to round down to.
-     * @returns {number} Returns the rounded down number.
-     * @example
-     *
-     * _.floor(4.006);
-     * // => 4
-     *
-     * _.floor(0.046, 2);
-     * // => 0.04
-     *
-     * _.floor(4060, -2);
-     * // => 4000
-     */
         var floor = createRound("floor");
-        /**
-     * Computes the maximum value of `array`. If `array` is empty or falsey,
-     * `undefined` is returned.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @returns {*} Returns the maximum value.
-     * @example
-     *
-     * _.max([4, 2, 8, 6]);
-     * // => 8
-     *
-     * _.max([]);
-     * // => undefined
-     */
         function max(array) {
             return array && array.length ? baseExtremum(array, identity, baseGt) : undefined;
         }
-        /**
-     * This method is like `_.max` except that it accepts `iteratee` which is
-     * invoked for each element in `array` to generate the criterion by which
-     * the value is ranked. The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {*} Returns the maximum value.
-     * @example
-     *
-     * var objects = [{ 'n': 1 }, { 'n': 2 }];
-     *
-     * _.maxBy(objects, function(o) { return o.n; });
-     * // => { 'n': 2 }
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.maxBy(objects, 'n');
-     * // => { 'n': 2 }
-     */
         function maxBy(array, iteratee) {
             return array && array.length ? baseExtremum(array, getIteratee(iteratee, 2), baseGt) : undefined;
         }
-        /**
-     * Computes the mean of the values in `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @returns {number} Returns the mean.
-     * @example
-     *
-     * _.mean([4, 2, 8, 6]);
-     * // => 5
-     */
         function mean(array) {
             return baseMean(array, identity);
         }
-        /**
-     * This method is like `_.mean` except that it accepts `iteratee` which is
-     * invoked for each element in `array` to generate the value to be averaged.
-     * The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.7.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {number} Returns the mean.
-     * @example
-     *
-     * var objects = [{ 'n': 4 }, { 'n': 2 }, { 'n': 8 }, { 'n': 6 }];
-     *
-     * _.meanBy(objects, function(o) { return o.n; });
-     * // => 5
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.meanBy(objects, 'n');
-     * // => 5
-     */
         function meanBy(array, iteratee) {
             return baseMean(array, getIteratee(iteratee, 2));
         }
-        /**
-     * Computes the minimum value of `array`. If `array` is empty or falsey,
-     * `undefined` is returned.
-     *
-     * @static
-     * @since 0.1.0
-     * @memberOf _
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @returns {*} Returns the minimum value.
-     * @example
-     *
-     * _.min([4, 2, 8, 6]);
-     * // => 2
-     *
-     * _.min([]);
-     * // => undefined
-     */
         function min(array) {
             return array && array.length ? baseExtremum(array, identity, baseLt) : undefined;
         }
-        /**
-     * This method is like `_.min` except that it accepts `iteratee` which is
-     * invoked for each element in `array` to generate the criterion by which
-     * the value is ranked. The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {*} Returns the minimum value.
-     * @example
-     *
-     * var objects = [{ 'n': 1 }, { 'n': 2 }];
-     *
-     * _.minBy(objects, function(o) { return o.n; });
-     * // => { 'n': 1 }
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.minBy(objects, 'n');
-     * // => { 'n': 1 }
-     */
         function minBy(array, iteratee) {
             return array && array.length ? baseExtremum(array, getIteratee(iteratee, 2), baseLt) : undefined;
         }
-        /**
-     * Multiply two numbers.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.7.0
-     * @category Math
-     * @param {number} multiplier The first number in a multiplication.
-     * @param {number} multiplicand The second number in a multiplication.
-     * @returns {number} Returns the product.
-     * @example
-     *
-     * _.multiply(6, 4);
-     * // => 24
-     */
         var multiply = createMathOperation(function(multiplier, multiplicand) {
             return multiplier * multiplicand;
         }, 1);
-        /**
-     * Computes `number` rounded to `precision`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.10.0
-     * @category Math
-     * @param {number} number The number to round.
-     * @param {number} [precision=0] The precision to round to.
-     * @returns {number} Returns the rounded number.
-     * @example
-     *
-     * _.round(4.006);
-     * // => 4
-     *
-     * _.round(4.006, 2);
-     * // => 4.01
-     *
-     * _.round(4060, -2);
-     * // => 4100
-     */
         var round = createRound("round");
-        /**
-     * Subtract two numbers.
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Math
-     * @param {number} minuend The first number in a subtraction.
-     * @param {number} subtrahend The second number in a subtraction.
-     * @returns {number} Returns the difference.
-     * @example
-     *
-     * _.subtract(6, 4);
-     * // => 2
-     */
         var subtract = createMathOperation(function(minuend, subtrahend) {
             return minuend - subtrahend;
         }, 0);
-        /**
-     * Computes the sum of the values in `array`.
-     *
-     * @static
-     * @memberOf _
-     * @since 3.4.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @returns {number} Returns the sum.
-     * @example
-     *
-     * _.sum([4, 2, 8, 6]);
-     * // => 20
-     */
         function sum(array) {
             return array && array.length ? baseSum(array, identity) : 0;
         }
-        /**
-     * This method is like `_.sum` except that it accepts `iteratee` which is
-     * invoked for each element in `array` to generate the value to be summed.
-     * The iteratee is invoked with one argument: (value).
-     *
-     * @static
-     * @memberOf _
-     * @since 4.0.0
-     * @category Math
-     * @param {Array} array The array to iterate over.
-     * @param {Function} [iteratee=_.identity] The iteratee invoked per element.
-     * @returns {number} Returns the sum.
-     * @example
-     *
-     * var objects = [{ 'n': 4 }, { 'n': 2 }, { 'n': 8 }, { 'n': 6 }];
-     *
-     * _.sumBy(objects, function(o) { return o.n; });
-     * // => 20
-     *
-     * // The `_.property` iteratee shorthand.
-     * _.sumBy(objects, 'n');
-     * // => 20
-     */
         function sumBy(array, iteratee) {
             return array && array.length ? baseSum(array, getIteratee(iteratee, 2)) : 0;
         }
-        /*------------------------------------------------------------------------*/
         lodash.after = after;
         lodash.ary = ary;
         lodash.assign = assign;
@@ -15131,7 +4954,6 @@ UsergridEventable.mixin = function(destObject) {
         lodash.extend = assignIn;
         lodash.extendWith = assignInWith;
         mixin(lodash, lodash);
-        /*------------------------------------------------------------------------*/
         lodash.add = add;
         lodash.attempt = attempt;
         lodash.camelCase = camelCase;
@@ -15295,14 +5117,6 @@ UsergridEventable.mixin = function(destObject) {
         }(), {
             chain: false
         });
-        /*------------------------------------------------------------------------*/
-        /**
-     * The semantic version number.
-     *
-     * @static
-     * @memberOf _
-     * @type {string}
-     */
         lodash.VERSION = VERSION;
         arrayEach([ "bind", "bindKey", "curry", "curryRight", "partial", "partialRight" ], function(methodName) {
             lodash[methodName].placeholder = lodash;
@@ -15471,7 +5285,6 @@ UsergridEventable.mixin = function(destObject) {
         }
         return lodash;
     }
-    /*--------------------------------------------------------------------------*/
     var _ = runInContext();
     if (typeof define == "function" && typeof define.amd == "object" && define.amd) {
         root._ = _;
@@ -15486,9 +5299,55 @@ UsergridEventable.mixin = function(destObject) {
     }
 }).call(this);
 
+var UsergridAuthMode = Object.freeze({
+    NONE: "none",
+    USER: "user",
+    APP: "app"
+});
+
+var UsergridDirection = Object.freeze({
+    IN: "connecting",
+    OUT: "connections"
+});
+
+var UsergridHttpMethod = Object.freeze({
+    GET: "GET",
+    PUT: "PUT",
+    POST: "POST",
+    DELETE: "DELETE"
+});
+
+var UsergridQueryOperator = Object.freeze({
+    EQUAL: "=",
+    GREATER_THAN: ">",
+    GREATER_THAN_EQUAL_TO: ">=",
+    LESS_THAN: "<",
+    LESS_THAN_EQUAL_TO: "<="
+});
+
+var UsergridQuerySortOrder = Object.freeze({
+    ASC: "asc",
+    DESC: "desc"
+});
+
 (function(global) {
     var name = "UsergridHelpers", overwrittenName = global[name];
     function UsergridHelpers() {}
+    UsergridHelpers.validateAndRetrieveClient = function(args) {
+        var client = undefined;
+        if (args instanceof UsergridClient) {
+            client = args;
+        } else if (args[0] instanceof UsergridClient) {
+            client = args[0];
+        } else if (_.get(args, "client")) {
+            client = args.client;
+        } else if (Usergrid.isInitialized) {
+            client = Usergrid.getInstance();
+        } else {
+            throw new Error("this method requires either the Usergrid shared instance to be initialized or a UsergridClient instance as the first argument");
+        }
+        return client;
+    };
     UsergridHelpers.inherits = function(ctor, superCtor) {
         ctor.super_ = superCtor;
         ctor.prototype = Object.create(superCtor.prototype, {
@@ -15507,6 +5366,16 @@ UsergridEventable.mixin = function(destObject) {
         var args = _.flattenDeep(Array.prototype.slice.call(arguments)).reverse();
         var emptyFunc = function() {};
         return _.first(_.flattenDeep([ args, _.get(args, "0.callback"), emptyFunc ]).filter(_.isFunction));
+    };
+    UsergridHelpers.doCallback = function(callback, params, context) {
+        var returnValue;
+        if (_.isFunction(callback)) {
+            if (!params) params = [];
+            if (!context) context = this;
+            params.push(context);
+            returnValue = callback.apply(context, params);
+        }
+        return returnValue;
     };
     UsergridHelpers.authForRequests = function(client) {
         var authForRequests = undefined;
@@ -15542,8 +5411,15 @@ UsergridEventable.mixin = function(destObject) {
         }
         return body;
     };
+    UsergridHelpers.calculateExpiry = function(expires_in) {
+        return Date.now() + (expires_in ? expires_in - 5 : 0) * 1e3;
+    };
+    var uuidValueRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    UsergridHelpers.isUUID = function(uuid) {
+        return !uuid ? false : uuidValueRegex.test(uuid);
+    };
     UsergridHelpers.useQuotesIfRequired = function(value) {
-        return _.isFinite(value) || isUUID(value) || _.isBoolean(value) || _.isObject(value) && !_.isFunction(value) || _.isArray(value) ? value : "'" + value + "'";
+        return _.isFinite(value) || UsergridHelpers.isUUID(value) || _.isBoolean(value) || _.isObject(value) && !_.isFunction(value) || _.isArray(value) ? value : "'" + value + "'";
     };
     UsergridHelpers.setReadOnly = function(obj, key) {
         if (_.isArray(key)) {
@@ -15613,8 +5489,7 @@ UsergridEventable.mixin = function(destObject) {
             var index = headerPair.indexOf(": ");
             if (index > 0) {
                 var key = headerPair.substring(0, index);
-                var val = headerPair.substring(index + 2);
-                headers[key] = val;
+                headers[key] = headerPair.substring(index + 2);
             }
         }
         return headers;
@@ -15740,13 +5615,13 @@ UsergridEventable.mixin = function(destObject) {
             options.entity.type = _.first([ options.entity.type, args[0] ].filter(_.isString));
         }
         options.relationship = _.first([ options.relationship, args[2] ].filter(_.isString));
-        if (_.isString(args[3]) && !isUUID(args[3]) && _.isString(args[4])) {
+        if (_.isString(args[3]) && !UsergridHelpers.isUUID(args[3]) && _.isString(args[4])) {
             options.to.type = args[3];
-        } else if (_.isString(args[2]) && !isUUID(args[2]) && _.isString(args[3]) && _.isObject(args[0]) && !_.isFunction(args[0])) {
+        } else if (_.isString(args[2]) && !UsergridHelpers.isUUID(args[2]) && _.isString(args[3]) && _.isObject(args[0]) && !_.isFunction(args[0])) {
             options.to.type = args[2];
         }
         options.to.uuidOrName = _.first([ options.to.uuidOrName, options.to.uuid, options.to.name, args[4], args[3], args[2] ].filter(function(property) {
-            return _.isString(options.to.type) && _.isString(property) || isUUID(property);
+            return _.isString(options.to.type) && _.isString(property) || UsergridHelpers.isUUID(property);
         }));
         if (!_.isString(options.entity.uuidOrName)) {
             throw new Error('source entity "uuidOrName" is required when connecting or disconnecting entities');
@@ -15754,7 +5629,7 @@ UsergridEventable.mixin = function(destObject) {
         if (!_.isString(options.to.uuidOrName)) {
             throw new Error('target entity "uuidOrName" is required when connecting or disconnecting entities');
         }
-        if (!_.isString(options.to.type) && !isUUID(options.to.uuidOrName)) {
+        if (!_.isString(options.to.type) && !UsergridHelpers.isUUID(options.to.uuidOrName)) {
             throw new Error('target "type" (collection name) parameter is required connecting or disconnecting entities by name');
         }
         options.uri = UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, _.isString(options.entity.type) ? options.entity.type : "", _.isString(options.entity.uuidOrName) ? options.entity.uuidOrName : "", options.relationship, _.isString(options.to.type) ? options.to.type : "", _.isString(options.to.uuidOrName) ? options.to.uuidOrName : "");
@@ -15794,391 +5669,6 @@ UsergridEventable.mixin = function(destObject) {
     return global[name];
 })(this);
 
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
-"use strict";
-
-var UsergridQuery = function(type) {
-    var self = this;
-    var query = "", queryString, sort, __nextIsNot = false;
-    self._type = type;
-    _.assign(self, {
-        type: function(value) {
-            self._type = value;
-            return self;
-        },
-        collection: function(value) {
-            self._type = value;
-            return self;
-        },
-        limit: function(value) {
-            self._limit = value;
-            return self;
-        },
-        cursor: function(value) {
-            self._cursor = value;
-            return self;
-        },
-        eq: function(key, value) {
-            query = self.andJoin(key + " = " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        equal: this.eq,
-        gt: function(key, value) {
-            query = self.andJoin(key + " > " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        greaterThan: this.gt,
-        gte: function(key, value) {
-            query = self.andJoin(key + " >= " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        greaterThanOrEqual: this.gte,
-        lt: function(key, value) {
-            query = self.andJoin(key + " < " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        lessThan: this.lt,
-        lte: function(key, value) {
-            query = self.andJoin(key + " <= " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        lessThanOrEqual: this.lte,
-        contains: function(key, value) {
-            query = self.andJoin(key + " contains " + UsergridHelpers.useQuotesIfRequired(value));
-            return self;
-        },
-        locationWithin: function(distanceInMeters, lat, lng) {
-            query = self.andJoin("location within " + distanceInMeters + " of " + lat + ", " + lng);
-            return self;
-        },
-        asc: function(key) {
-            self.sort(key, UsergridQuerySortOrder.ASC);
-            return self;
-        },
-        desc: function(key) {
-            self.sort(key, UsergridQuerySortOrder.DESC);
-            return self;
-        },
-        sort: function(key, order) {
-            sort = key && order ? " order by " + key + " " + order : "";
-            return self;
-        },
-        fromString: function(string) {
-            queryString = string;
-            return self;
-        },
-        andJoin: function(append) {
-            if (__nextIsNot) {
-                append = "not " + append;
-                __nextIsNot = false;
-            }
-            if (!append) {
-                return query;
-            } else if (query.length === 0) {
-                return append;
-            } else {
-                return _.endsWith(query, "and") || _.endsWith(query, "or") ? query + " " + append : query + " and " + append;
-            }
-        },
-        orJoin: function() {
-            return query.length > 0 && !_.endsWith(query, "or") ? query + " or" : query;
-        }
-    });
-    Object.defineProperty(self, "_ql", {
-        get: function() {
-            if (queryString !== undefined) {
-                return queryString;
-            } else {
-                return "select *" + (query.length > 0 || sort !== undefined ? " where " + (query || "") + (sort || "") : "");
-            }
-        }
-    });
-    Object.defineProperty(self, "encodedStringValue", {
-        get: function() {
-            var self = this;
-            var limit = self._limit;
-            var cursor = self._cursor;
-            var requirementsString = self._ql;
-            var encodedStringValue = undefined;
-            if (limit !== undefined) {
-                encodedStringValue = "limit=" + limit;
-            }
-            if (!_.isEmpty(cursor)) {
-                var cursorString = "cursor=" + cursor;
-                if (_.isEmpty(encodedStringValue)) {
-                    encodedStringValue = cursorString;
-                } else {
-                    encodedStringValue += "&" + cursorString;
-                }
-            }
-            if (!_.isEmpty(requirementsString)) {
-                var qLString = "ql=" + encodeURIComponent(requirementsString);
-                if (_.isEmpty(encodedStringValue)) {
-                    encodedStringValue = qLString;
-                } else {
-                    encodedStringValue += "&" + qLString;
-                }
-            }
-            if (!_.isEmpty(encodedStringValue)) {
-                encodedStringValue = "?" + encodedStringValue;
-            }
-            return !_.isEmpty(encodedStringValue) ? encodedStringValue : undefined;
-        }
-    });
-    Object.defineProperty(self, "and", {
-        get: function() {
-            query = self.andJoin("");
-            return self;
-        }
-    });
-    Object.defineProperty(self, "or", {
-        get: function() {
-            query = self.orJoin();
-            return self;
-        }
-    });
-    Object.defineProperty(self, "not", {
-        get: function() {
-            __nextIsNot = true;
-            return self;
-        }
-    });
-    return self;
-};
-
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-window.console = window.console || {};
-
-window.console.log = window.console.log || function() {};
-
-function extend(subClass, superClass) {
-    var F = function() {};
-    F.prototype = superClass.prototype;
-    subClass.prototype = new F();
-    subClass.prototype.constructor = subClass;
-    subClass.superclass = superClass.prototype;
-    if (superClass.prototype.constructor == Object.prototype.constructor) {
-        superClass.prototype.constructor = superClass;
-    }
-    return subClass;
-}
-
-function propCopy(from, to) {
-    for (var prop in from) {
-        if (from.hasOwnProperty(prop)) {
-            if ("object" === typeof from[prop] && "object" === typeof to[prop]) {
-                to[prop] = propCopy(from[prop], to[prop]);
-            } else {
-                to[prop] = from[prop];
-            }
-        }
-    }
-    return to;
-}
-
-function NOOP() {}
-
-function isValidUrl(url) {
-    if (!url) return false;
-    var doc, base, anchor, isValid = false;
-    try {
-        doc = document.implementation.createHTMLDocument("");
-        base = doc.createElement("base");
-        base.href = base || window.lo;
-        doc.head.appendChild(base);
-        anchor = doc.createElement("a");
-        anchor.href = url;
-        doc.body.appendChild(anchor);
-        isValid = !(anchor.href === "");
-    } catch (e) {
-        console.error(e);
-    } finally {
-        doc.head.removeChild(base);
-        doc.body.removeChild(anchor);
-        base = null;
-        anchor = null;
-        doc = null;
-        return isValid;
-    }
-}
-
-/*
- * Tests if the string is a uuid
- *
- * @public
- * @method isUUID
- * @param {string} uuid The string to test
- * @returns {Boolean} true if string is uuid
- */
-var uuidValueRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-function isUUID(uuid) {
-    return !uuid ? false : uuidValueRegex.test(uuid);
-}
-
-/*
- *  method to encode the query string parameters
- *
- *  @method encodeParams
- *  @public
- *  @params {object} params - an object of name value pairs that will be urlencoded
- *  @return {string} Returns the encoded string
- */
-function encodeParams(params) {
-    var queryString;
-    if (params && Object.keys(params)) {
-        queryString = [].slice.call(arguments).reduce(function(a, b) {
-            return a.concat(b instanceof Array ? b : [ b ]);
-        }, []).filter(function(c) {
-            return "object" === typeof c;
-        }).reduce(function(p, c) {
-            !(c instanceof Array) ? p = p.concat(Object.keys(c).map(function(key) {
-                return [ key, c[key] ];
-            })) : p.push(c);
-            return p;
-        }, []).reduce(function(p, c) {
-            c.length === 2 ? p.push(c) : p = p.concat(c);
-            return p;
-        }, []).reduce(function(p, c) {
-            c[1] instanceof Array ? c[1].forEach(function(v) {
-                p.push([ c[0], v ]);
-            }) : p.push(c);
-            return p;
-        }, []).map(function(c) {
-            c[1] = encodeURIComponent(c[1]);
-            return c.join("=");
-        }).join("&");
-    }
-    return queryString;
-}
-
-/*
- *  method to determine whether or not the passed variable is a function
- *
- *  @method isFunction
- *  @public
- *  @params {any} f - any variable
- *  @return {boolean} Returns true or false
- */
-function isFunction(f) {
-    return f && f !== null && typeof f === "function";
-}
-
-/*
- *  a safe wrapper for executing a callback
- *
- *  @method doCallback
- *  @public
- *  @params {Function} callback - the passed-in callback method
- *  @params {Array} params - an array of arguments to pass to the callback
- *  @params {Object} context - an optional calling context for the callback
- *  @return Returns whatever would be returned by the callback. or false.
- */
-function doCallback(callback, params, context) {
-    var returnValue;
-    if (isFunction(callback)) {
-        if (!params) params = [];
-        if (!context) context = this;
-        params.push(context);
-        returnValue = callback.apply(context, params);
-    }
-    return returnValue;
-}
-
-(function(global) {
-    var name = "Usergrid", overwrittenName = global[name];
-    var VALID_REQUEST_METHODS = [ "GET", "POST", "PUT", "DELETE" ];
-    var __sharedInstance;
-    var isInitialized = false;
-    function Usergrid() {
-        this.logger = new Logger(name);
-    }
-    Usergrid.initSharedInstance = function(options) {
-        console.warn("TRYING TO INITIALIZING SHARED INSTANCE");
-        if (!this.isInitialized) {
-            console.warn("INITIALIZING SHARED INSTANCE");
-            this.__sharedInstance = new UsergridClient(options);
-            this.isInitialized = true;
-        }
-        return this.__sharedInstance;
-    };
-    Usergrid.getInstance = function() {
-        return this.__sharedInstance;
-    };
-    Usergrid.isValidEndpoint = function(endpoint) {
-        return true;
-    };
-    Usergrid.validateAndRetrieveClient = function(args) {
-        var client = undefined;
-        if (args instanceof UsergridClient) {
-            client = args;
-        } else if (args[0] instanceof UsergridClient) {
-            client = args[0];
-        } else if (_.get(args, "client")) {
-            client = args.client;
-        } else if (Usergrid.isInitialized) {
-            client = Usergrid.getInstance();
-        } else {
-            throw new Error("this method requires either the Usergrid shared instance to be initialized or a UsergridClient instance as the first argument");
-        }
-        return client;
-    };
-    Usergrid.calculateExpiry = function(expires_in) {
-        return Date.now() + (expires_in ? expires_in - 5 : 0) * 1e3;
-    };
-    Usergrid.VERSION = Usergrid.USERGRID_SDK_VERSION = "0.11.0";
-    global[name] = Usergrid;
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
-        }
-        return Usergrid;
-    };
-    return global[name];
-})(this);
-
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var defaultOptions = {
@@ -16231,7 +5721,7 @@ UsergridClient.prototype = {
         req.responseType = "blob";
         req.onload = function() {
             entity.asset = new UsergridAsset(req.response);
-            doCallback(callback, [ entity.asset, null, entity ]);
+            UsergridHelpers.doCallback(callback, [ entity.asset, null, entity ]);
         };
         req.onerror = function(err) {
             console.error(err);
@@ -16247,7 +5737,7 @@ UsergridClient.prototype = {
         xmlHttpRequest.onload = function(ev) {
             var response = new UsergridResponse(xmlHttpRequest);
             UsergridHelpers.updateEntityFromRemote(entity, response);
-            doCallback(callback, [ asset, response, entity ]);
+            UsergridHelpers.doCallback(callback, [ asset, response, entity ]);
         };
         var formData = new FormData();
         formData.append("file", asset.data);
@@ -16307,9 +5797,8 @@ UsergridClient.prototype = {
             var promise = new Promise();
             response.request = usergridRequest;
             promise.done(response);
-            doCallback(callback, [ response ]);
+            UsergridHelpers.doCallback(callback, [ response ]);
         }.bind(self);
-        /* and a promise to chain them all together */
         Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
         return usergridRequest;
     },
@@ -16390,7 +5879,7 @@ UsergridClient.prototype = {
                 }
                 self.appAuth.token = usergridResponse.responseJSON.access_token;
                 var expiresIn = usergridResponse.responseJSON.expires_in;
-                self.appAuth.expiry = Usergrid.calculateExpiry(expiresIn);
+                self.appAuth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
                 self.appAuth.tokenTtl = expiresIn;
             }
             callback(usergridResponse);
@@ -16429,751 +5918,194 @@ UsergridClient.prototype = {
     }
 };
 
-var defaultOptions = {
-    baseUrl: "https://api.usergrid.com",
-    authMode: UsergridAuthMode.USER
+window.console = window.console || {};
+
+window.console.log = window.console.log || function() {};
+
+"use strict";
+
+var UsergridClientSharedInstance = function() {
+    var self = this;
+    self.isInitialized = false;
+    self.isSharedInstance = true;
+    return self;
 };
 
-(function() {
-    var name = "Client", global = this, overwrittenName = global[name], exports;
-    var AUTH_ERRORS = [ "auth_expired_session_token", "auth_missing_credentials", "auth_unverified_oath", "expired_token", "unauthorized", "auth_invalid" ];
-    Usergrid.Client = function(options) {
-        var self = this;
-        if (!options.orgId || !options.appId) {
-            throw new Error('"orgId" and "appId" parameters are required when instantiating UsergridClient');
-        }
-        _.defaults(this, options, defaultOptions);
-        self.clientAppURL = [ self.baseUrl, self.orgId, self.appId ].join("/");
-        self.isSharedInstance = false;
-        self.currentUser = undefined;
-        self.__appAuth = undefined;
-        Object.defineProperty(self, "appAuth", {
-            get: function() {
-                return self.__appAuth;
-            },
-            set: function(options) {
-                if (options instanceof UsergridAppAuth) {
-                    self.__appAuth = options;
-                } else if (typeof options !== "undefined") {
-                    self.__appAuth = new UsergridAppAuth(options);
-                }
+UsergridHelpers.inherits(UsergridClientSharedInstance, UsergridClient);
+
+var Usergrid = new UsergridClientSharedInstance();
+
+Usergrid.initSharedInstance = function(options) {
+    if (Usergrid.isInitialized) {
+        console.log("Usergrid shared instance is already initialized");
+    } else {
+        _.assign(Usergrid, new UsergridClient(options));
+        Usergrid.isInitialized = true;
+        Usergrid.isSharedInstance = true;
+    }
+    return Usergrid;
+};
+
+Usergrid.init = function(options) {
+    return Usergrid.initSharedInstance(options);
+};
+
+"use strict";
+
+var UsergridQuery = function(type) {
+    var self = this;
+    var query = "", queryString, sort, __nextIsNot = false;
+    self._type = type;
+    _.assign(self, {
+        type: function(value) {
+            self._type = value;
+            return self;
+        },
+        collection: function(value) {
+            self._type = value;
+            return self;
+        },
+        limit: function(value) {
+            self._limit = value;
+            return self;
+        },
+        cursor: function(value) {
+            self._cursor = value;
+            return self;
+        },
+        eq: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.EQUAL + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        equal: this.eq,
+        gt: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.GREATER_THAN + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThan: this.gt,
+        gte: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.GREATER_THAN_EQUAL_TO + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThanOrEqual: this.gte,
+        lt: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.LESS_THAN + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        lessThan: this.lt,
+        lte: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.LESS_THAN_EQUAL_TO + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        lessThanOrEqual: this.lte,
+        contains: function(key, value) {
+            query = self.andJoin(key + " contains " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        locationWithin: function(distanceInMeters, lat, lng) {
+            query = self.andJoin("location within " + distanceInMeters + " of " + lat + ", " + lng);
+            return self;
+        },
+        asc: function(key) {
+            self.sort(key, UsergridQuerySortOrder.ASC);
+            return self;
+        },
+        desc: function(key) {
+            self.sort(key, UsergridQuerySortOrder.DESC);
+            return self;
+        },
+        sort: function(key, order) {
+            sort = key && order ? " order by " + key + " " + order : "";
+            return self;
+        },
+        fromString: function(string) {
+            queryString = string;
+            return self;
+        },
+        andJoin: function(append) {
+            if (__nextIsNot) {
+                append = "not " + append;
+                __nextIsNot = false;
             }
-        });
-        this.userAuth = undefined;
-        if (options.qs) {
-            this.setObject("default_qs", options.qs);
-        }
-        this.buildCurl = options.buildCurl || false;
-        this.logging = options.logging || false;
-    };
-    /*
-   *  Main function for creating new groups. Call this directly.
-   *
-   *  @method createGroup
-   *  @public
-   *  @params {string} path
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createGroup = function(options, callback) {
-        var group = new Usergrid.Group({
-            path: options.path,
-            client: this,
-            data: options
-        });
-        group.save(function(err, response) {
-            doCallback(callback, [ err, response, group ], group);
-        });
-    };
-    /*
-   *  Main function for creating new entities - should be called directly.
-   *
-   *  options object: options {data:{'type':'collection_type', 'key':'value'}, uuid:uuid}}
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createEntity = function(options, callback) {
-        var entity = new UsergridEntity(options);
-        entity.save(function(err, response) {
-            doCallback(callback, [ err, response, entity ], entity);
-        });
-    };
-    /*
-   *  Main function for getting existing entities - should be called directly.
-   *
-   *  You must supply a uuid or (username or name). Username only applies to users.
-   *  Name applies to all custom entities
-   *
-   *  options object: options {data:{'type':'collection_type', 'name':'value', 'username':'value'}, uuid:uuid}}
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.getEntity = function(options, callback) {
-        var entity = new Usergrid.Entity({
-            client: this,
-            data: options
-        });
-        entity.fetch(function(err, response) {
-            doCallback(callback, [ err, response, entity ], entity);
-        });
-    };
-    /*
-   *  Main function for restoring an entity from serialized data.
-   *
-   *  serializedObject should have come from entityObject.serialize();
-   *
-   *  @method restoreEntity
-   *  @public
-   *  @param {string} serializedObject
-   *  @return {object} Entity Object
-   */
-    Usergrid.Client.prototype.restoreEntity = function(serializedObject) {
-        var data = JSON.parse(serializedObject);
-        var options = {
-            client: this,
-            data: data
-        };
-        var entity = new Usergrid.Entity(options);
-        return entity;
-    };
-    /*
-   *  Main function for creating new counters - should be called directly.
-   *
-   *  options object: options {timestamp:0, category:'value', counters:{name : value}}
-   *
-   *  @method createCounter
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, response, counter)
-   */
-    Usergrid.Client.prototype.createCounter = function(options, callback) {
-        var counter = new Usergrid.Counter({
-            client: this,
-            data: options
-        });
-        counter.save(callback);
-    };
-    /*
-   *  Main function for creating new assets - should be called directly.
-   *
-   *  options object: options {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000", file: FileOrBlobObject }
-   *
-   *  @method createCounter
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, response, counter)
-   */
-    Usergrid.Client.prototype.createAsset = function(options, callback) {
-        var file = options.file;
-        if (file) {
-            options.name = options.name || file.name;
-            options["content-type"] = options["content-type"] || file.type;
-            options.path = options.path || "/";
-            delete options.file;
-        }
-        var asset = new Usergrid.Asset({
-            client: this,
-            data: options
-        });
-        asset.save(function(err, response, asset) {
-            if (file && !err) {
-                asset.upload(file, callback);
+            if (!append) {
+                return query;
+            } else if (query.length === 0) {
+                return append;
             } else {
-                doCallback(callback, [ err, response, asset ], asset);
+                return _.endsWith(query, "and") || _.endsWith(query, "or") ? query + " " + append : query + " and " + append;
             }
-        });
-    };
-    /*
-   *  Main function for creating new collections - should be called directly.
-   *
-   *  options object: options {client:client, type: type, qs:qs}
-   *
-   *  @method createCollection
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createCollection = function(options, callback) {
-        options.client = this;
-        var collection = new Usergrid.Collection(options);
-        this.request({
-            method: "POST",
-            endpoint: options.type
-        }, function(err, data) {
-            if (!err) {
-                collection.fetch(function(err, response, collection) {
-                    doCallback(callback, [ err, response, collection ], self);
-                });
-            } else {
-                doCallback(callback, [ err, data, collection ], self);
-            }
-        });
-    };
-    /*
-   *  Main function for restoring a collection from serialized data.
-   *
-   *  serializedObject should have come from collectionObject.serialize();
-   *
-   *  @method restoreCollection
-   *  @public
-   *  @param {string} serializedObject
-   *  @return {object} Collection Object
-   */
-    Usergrid.Client.prototype.restoreCollection = function(serializedObject) {
-        var data = JSON.parse(serializedObject);
-        data.client = this;
-        var collection = new Usergrid.Collection(data);
-        return collection;
-    };
-    /*
-   *  Main function for retrieving a user's activity feed.
-   *
-   *  @method getFeedForUser
-   *  @public
-   *  @params {string} username
-   *  @param {function} callback
-   *  @return {callback} callback(err, data, activities)
-   */
-    Usergrid.Client.prototype.getFeedForUser = function(username, callback) {
-        var options = {
-            method: "GET",
-            endpoint: "users/" + username + "/feed"
-        };
-        this.request(options, function(err, data) {
-            if (err) {
-                doCallback(callback, [ err ]);
-            } else {
-                doCallback(callback, [ err, data, data.getEntities() ]);
-            }
-        });
-    };
-    /*
-   *  Function for creating new activities for the current user - should be called directly.
-   *
-   *  //user can be any of the following: "me", a uuid, a username
-   *  Note: the "me" alias will reference the currently logged in user (e.g. 'users/me/activties')
-   *
-   *  //build a json object that looks like this:
-   *  var options =
-   *  {
-   *    "actor" : {
-   *      "displayName" :"myusername",
-   *      "uuid" : "myuserid",
-   *      "username" : "myusername",
-   *      "email" : "myemail",
-   *      "picture": "http://path/to/picture",
-   *      "image" : {
-   *          "duration" : 0,
-   *          "height" : 80,
-   *          "url" : "http://www.gravatar.com/avatar/",
-   *          "width" : 80
-   *      },
-   *    },
-   *    "verb" : "post",
-   *    "content" : "My cool message",
-   *    "lat" : 48.856614,
-   *    "lon" : 2.352222
-   *  }
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {string} user // "me", a uuid, or a username
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createUserActivity = function(user, options, callback) {
-        options.type = "users/" + user + "/activities";
-        options = {
-            client: this,
-            data: options
-        };
-        var entity = new Usergrid.Entity(options);
-        entity.save(function(err, data) {
-            doCallback(callback, [ err, data, entity ]);
-        });
-    };
-    /*
-   *  Function for creating user activities with an associated user entity.
-   *
-   *  user object:
-   *  The user object passed into this function is an instance of Usergrid.Entity.
-   *
-   *  @method createUserActivityWithEntity
-   *  @public
-   *  @params {object} user
-   *  @params {string} content
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createUserActivityWithEntity = function(user, content, callback) {
-        var username = user.get("username");
-        var options = {
-            actor: {
-                displayName: username,
-                uuid: user.get("uuid"),
-                username: username,
-                email: user.get("email"),
-                picture: user.get("picture"),
-                image: {
-                    duration: 0,
-                    height: 80,
-                    url: user.get("picture"),
-                    width: 80
-                }
-            },
-            verb: "post",
-            content: content
-        };
-        this.createUserActivity(username, options, callback);
-    };
-    /*
-   *  A private method to get call timing of last call
-   */
-    Usergrid.Client.prototype.calcTimeDiff = function() {
-        var seconds = 0;
-        var time = this._end - this._start;
-        try {
-            seconds = (time / 10 / 60).toFixed(2);
-        } catch (e) {
-            return 0;
+        },
+        orJoin: function() {
+            return query.length > 0 && !_.endsWith(query, "or") ? query + " or" : query;
         }
-        return seconds;
-    };
-    /*
-   *  A public method to store the OAuth token for later use - uses localstorage if available
-   *
-   *  @method setToken
-   *  @public
-   *  @params {string} token
-   *  @return none
-   */
-    Usergrid.Client.prototype.setToken = function(token) {
-        this.set("token", token);
-    };
-    /*
-   *  A public method to get the OAuth token
-   *
-   *  @method getToken
-   *  @public
-   *  @return {string} token
-   */
-    Usergrid.Client.prototype.getToken = function() {
-        return this.get("token");
-    };
-    Usergrid.Client.prototype.setObject = function(key, value) {
-        if (value) {
-            value = JSON.stringify(value);
-        }
-        this.set(key, value);
-    };
-    Usergrid.Client.prototype.set = function(key, value) {
-        var keyStore = "apigee_" + key;
-        this[key] = value;
-        if (typeof Storage !== "undefined") {
-            if (value) {
-                localStorage.setItem(keyStore, value);
+    });
+    Object.defineProperty(self, "_ql", {
+        get: function() {
+            if (queryString !== undefined) {
+                return queryString;
             } else {
-                localStorage.removeItem(keyStore);
+                return "select *" + (query.length > 0 || sort !== undefined ? " where " + (query || "") + (sort || "") : "");
             }
         }
-    };
-    Usergrid.Client.prototype.getObject = function(key) {
-        return JSON.parse(this.get(key));
-    };
-    Usergrid.Client.prototype.get = function(key) {
-        var keyStore = "apigee_" + key;
-        var value = null;
-        if (this[key]) {
-            value = this[key];
-        } else if (typeof Storage !== "undefined") {
-            value = localStorage.getItem(keyStore);
-        }
-        return value;
-    };
-    /*
-   * A public facing helper method for signing up users
-   *
-   * @method signup
-   * @public
-   * @params {string} username
-   * @params {string} password
-   * @params {string} email
-   * @params {string} name
-   * @param {function} callback
-   * @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.signup = function(username, password, email, name, callback) {
-        var self = this;
-        var options = {
-            type: "users",
-            username: username,
-            password: password,
-            email: email,
-            name: name
-        };
-        this.createEntity(options, callback);
-    };
-    /*
-   *
-   *  A public method to log in an app user - stores the token for later use
-   *
-   *  @method login
-   *  @public
-   *  @params {string} username
-   *  @params {string} password
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.login = function(username, password, callback) {
-        var self = this;
-        var options = {
-            method: "POST",
-            endpoint: "token",
-            body: {
-                username: username,
-                password: password,
-                grant_type: "password"
+    });
+    Object.defineProperty(self, "encodedStringValue", {
+        get: function() {
+            var self = this;
+            var limit = self._limit;
+            var cursor = self._cursor;
+            var requirementsString = self._ql;
+            var encodedStringValue = undefined;
+            if (limit !== undefined) {
+                encodedStringValue = "limit" + UsergridQueryOperator.EQUAL + limit;
             }
-        };
-        self.request(options, function(err, response) {
-            var user = {};
-            if (err) {
-                if (self.logging) console.log("error trying to log user in");
-            } else {
-                var options = {
-                    client: self,
-                    data: response.user
-                };
-                user = new Usergrid.Entity(options);
-                self.setToken(response.access_token);
-            }
-            doCallback(callback, [ err, response, user ]);
-        });
-    };
-    Usergrid.Client.prototype.adminlogin = function(username, password, callback) {
-        var self = this;
-        var options = {
-            method: "POST",
-            endpoint: "management/token",
-            body: {
-                username: username,
-                password: password,
-                grant_type: "password"
-            },
-            mQuery: true
-        };
-        self.request(options, function(err, response) {
-            var user = {};
-            if (err) {
-                if (self.logging) console.log("error trying to log adminuser in");
-            } else {
-                var options = {
-                    client: self,
-                    data: response.user
-                };
-                user = new Usergrid.Entity(options);
-                self.setToken(response.access_token);
-            }
-            doCallback(callback, [ err, response, user ]);
-        });
-    };
-    Usergrid.Client.prototype.reAuthenticateLite = function(callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "management/me",
-            mQuery: true
-        };
-        this.request(options, function(err, response) {
-            if (err && self.logging) {
-                console.log("error trying to re-authenticate user");
-            } else {
-                self.setToken(response.data.access_token);
-            }
-            doCallback(callback, [ err ]);
-        });
-    };
-    Usergrid.Client.prototype.reAuthenticate = function(email, callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "management/users/" + email,
-            mQuery: true
-        };
-        this.request(options, function(err, response) {
-            var organizations = {};
-            var applications = {};
-            var user = {};
-            var data;
-            if (err && self.logging) {
-                console.log("error trying to full authenticate user");
-            } else {
-                data = response.data;
-                self.setToken(data.token);
-                self.set("email", data.email);
-                localStorage.setItem("accessToken", data.token);
-                localStorage.setItem("userUUID", data.uuid);
-                localStorage.setItem("userEmail", data.email);
-                var userData = {
-                    username: data.username,
-                    email: data.email,
-                    name: data.name,
-                    uuid: data.uuid
-                };
-                var options = {
-                    client: self,
-                    data: userData
-                };
-                user = new Usergrid.Entity(options);
-                organizations = data.organizations;
-                var org = "";
-                try {
-                    var existingOrg = self.get("orgName");
-                    org = organizations[existingOrg] ? organizations[existingOrg] : organizations[Object.keys(organizations)[0]];
-                    self.set("orgName", org.name);
-                } catch (e) {
-                    err = true;
-                    if (self.logging) {
-                        console.log("error selecting org");
-                    }
-                }
-                applications = self.parseApplicationsArray(org);
-                self.selectFirstApp(applications);
-                self.setObject("organizations", organizations);
-                self.setObject("applications", applications);
-            }
-            doCallback(callback, [ err, data, user, organizations, applications ], self);
-        });
-    };
-    /*
-   *  A public method to log in an app user with facebook - stores the token for later use
-   *
-   *  @method loginFacebook
-   *  @public
-   *  @params {string} username
-   *  @params {string} password
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.loginFacebook = function(facebookToken, callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "auth/facebook",
-            qs: {
-                fb_access_token: facebookToken
-            }
-        };
-        this.request(options, function(err, data) {
-            var user = {};
-            if (err && self.logging) {
-                console.log("error trying to log user in");
-            } else {
-                var options = {
-                    client: self,
-                    data: data.user
-                };
-                user = new Usergrid.Entity(options);
-                self.setToken(data.access_token);
-            }
-            doCallback(callback, [ err, data, user ], self);
-        });
-    };
-    /*
-   *  A public method to get the currently logged in user entity
-   *
-   *  @method getLoggedInUser
-   *  @public
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.getLoggedInUser = function(callback) {
-        var self = this;
-        if (!this.getToken()) {
-            doCallback(callback, [ new UsergridError("Access Token not set"), null, self ], self);
-        } else {
-            var options = {
-                method: "GET",
-                endpoint: "users/me"
-            };
-            this.request(options, function(err, response) {
-                if (err) {
-                    if (self.logging) {
-                        console.log("error trying to log user in");
-                    }
-                    console.error(err, response);
-                    doCallback(callback, [ err, response, self ], self);
+            if (!_.isEmpty(cursor)) {
+                var cursorString = "cursor" + UsergridQueryOperator.EQUAL + cursor;
+                if (_.isEmpty(encodedStringValue)) {
+                    encodedStringValue = cursorString;
                 } else {
-                    var options = {
-                        client: self,
-                        data: response.getEntity()
-                    };
-                    var user = new Usergrid.Entity(options);
-                    doCallback(callback, [ null, response, user ], self);
+                    encodedStringValue += "&" + cursorString;
                 }
-            });
-        }
-    };
-    /*
-   *  A public method to test if a user is logged in - does not guarantee that the token is still valid,
-   *  but rather that one exists
-   *
-   *  @method isLoggedIn
-   *  @public
-   *  @return {boolean} Returns true the user is logged in (has token and uuid), false if not
-   */
-    Usergrid.Client.prototype.isLoggedIn = function() {
-        var token = this.getToken();
-        return "undefined" !== typeof token && token !== null;
-    };
-    /*
-   *  A public method to log out an app user - clears all user fields from client
-   *
-   *  @method logout
-   *  @public
-   *  @return none
-   */
-    Usergrid.Client.prototype.logout = function() {
-        this.setToken();
-    };
-    /*
-   *  A public method to destroy access tokens on the server
-   *
-   *  @method logout
-   *  @public
-   *  @param {string} username	the user associated with the token to revoke
-   *  @param {string} token set to 'null' to revoke the token of the currently logged in user
-   *    or set to token value to revoke a specific token
-   *  @param {string} revokeAll set to 'true' to revoke all tokens for the user
-   *  @return none
-   */
-    Usergrid.Client.prototype.destroyToken = function(username, token, revokeAll, callback) {
-        var options = {
-            client: self,
-            method: "PUT"
-        };
-        if (revokeAll === true) {
-            options.endpoint = "users/" + username + "/revoketokens";
-        } else if (token === null) {
-            options.endpoint = "users/" + username + "/revoketoken?token=" + this.getToken();
-        } else {
-            options.endpoint = "users/" + username + "/revoketoken?token=" + token;
-        }
-        this.request(options, function(err, data) {
-            if (err) {
-                if (self.logging) {
-                    console.log("error destroying access token");
-                }
-                doCallback(callback, [ err, data, null ], self);
-            } else {
-                if (revokeAll === true) {
-                    console.log("all user tokens invalidated");
+            }
+            if (!_.isEmpty(requirementsString)) {
+                var qLString = "ql=" + encodeURIComponent(requirementsString);
+                if (_.isEmpty(encodedStringValue)) {
+                    encodedStringValue = qLString;
                 } else {
-                    console.log("token invalidated");
+                    encodedStringValue += "&" + qLString;
                 }
-                doCallback(callback, [ err, data, null ], self);
             }
-        });
-    };
-    /*
-   *  A public method to log out an app user - clears all user fields from client
-   *  and destroys the access token on the server.
-   *
-   *  @method logout
-   *  @public
-   *  @param {string} username the user associated with the token to revoke
-   *  @param {string} token set to 'null' to revoke the token of the currently logged in user
-   *   or set to token value to revoke a specific token
-   *  @param {string} revokeAll set to 'true' to revoke all tokens for the user
-   *  @return none
-   */
-    Usergrid.Client.prototype.logoutAndDestroyToken = function(username, token, revokeAll, callback) {
-        if (username === null) {
-            console.log("username required to revoke tokens");
-        } else {
-            this.destroyToken(username, token, revokeAll, callback);
-            if (revokeAll === true || token === this.getToken() || token === null) {
-                this.setToken(null);
+            if (!_.isEmpty(encodedStringValue)) {
+                encodedStringValue = "?" + encodedStringValue;
             }
+            return !_.isEmpty(encodedStringValue) ? encodedStringValue : undefined;
         }
-    };
-    /*
-   *  A private method to build the curl call to display on the command line
-   *
-   *  @method buildCurlCall
-   *  @private
-   *  @param {object} options
-   *  @return {string} curl
-   */
-    Usergrid.Client.prototype.buildCurlCall = function(options) {
-        var curl = [ "curl" ];
-        var method = (options.method || "GET").toUpperCase();
-        var body = options.body;
-        var uri = options.uri;
-        curl.push("-X");
-        curl.push([ "POST", "PUT", "DELETE" ].indexOf(method) >= 0 ? method : "GET");
-        curl.push(uri);
-        if ("object" === typeof body && Object.keys(body).length > 0 && [ "POST", "PUT" ].indexOf(method) !== -1) {
-            curl.push("-d");
-            curl.push("'" + JSON.stringify(body) + "'");
+    });
+    Object.defineProperty(self, "and", {
+        get: function() {
+            query = self.andJoin("");
+            return self;
         }
-        curl = curl.join(" ");
-        console.log(curl);
-        return curl;
-    };
-    Usergrid.Client.prototype.getDisplayImage = function(email, picture, size) {
-        size = size || 50;
-        var image = "https://apigee.com/usergrid/images/user_profile.png";
-        try {
-            if (picture) {
-                image = picture;
-            } else if (email.length) {
-                image = "https://secure.gravatar.com/avatar/" + MD5(email) + "?s=" + size + encodeURI("&d=https://apigee.com/usergrid/images/user_profile.png");
-            }
-        } catch (e) {} finally {
-            return image;
+    });
+    Object.defineProperty(self, "or", {
+        get: function() {
+            query = self.orJoin();
+            return self;
         }
-    };
-    global[name] = Usergrid.Client;
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
+    });
+    Object.defineProperty(self, "not", {
+        get: function() {
+            __nextIsNot = true;
+            return self;
         }
-        return exports;
-    };
-    return global[name];
-})();
+    });
+    return self;
+};
 
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridRequest = function(options) {
     var self = this;
-    var client = Usergrid.validateAndRetrieveClient(options);
+    var client = UsergridHelpers.validateAndRetrieveClient(options);
     if (!_.isString(options.type) && !_.isString(options.path) && !_.isString(options.uri)) {
         throw new Error('one of "type" (collection name), "path", or "uri" parameters are required when initializing a UsergridRequest');
     }
@@ -17207,684 +6139,6 @@ var UsergridRequest = function(options) {
     return self;
 };
 
-var ENTITY_SYSTEM_PROPERTIES = [ "metadata", "created", "modified", "oldpassword", "newpassword", "type", "activated", "uuid" ];
-
-/*
- *  A class to Model a Usergrid Entity.
- *  Set the type and uuid of entity in the 'data' json object
- *
- *  @constructor
- *  @param {object} options {client:client, data:{'type':'collection_type', uuid:'uuid', 'key':'value'}}
- */
-Usergrid.Entity = function(options) {
-    this._data = {};
-    this._client = undefined;
-    if (options) {
-        this.set(options.data || {});
-        this._client = options.client || {};
-    }
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Entity
- *
- *  @method isEntity
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.Entity.isEntity = function(obj) {
-    return obj && obj instanceof Usergrid.Entity;
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Entity
- *  That has been saved.
- *
- *  @method isPersistedEntity
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.Entity.isPersistedEntity = function(obj) {
-    return isEntity(obj) && isUUID(obj.get("uuid"));
-};
-
-/*
- *  returns a serialized version of the entity object
- *
- *  Note: use the client.restoreEntity() function to restore
- *
- *  @method serialize
- *  @return {string} data
- */
-Usergrid.Entity.prototype.serialize = function() {
-    return JSON.stringify(this._data);
-};
-
-/*
- *  gets a specific field or the entire data object. If null or no argument
- *  passed, will return all data, else, will return a specific field
- *
- *  @method get
- *  @param {string} field
- *  @return {string} || {object} data
- */
-Usergrid.Entity.prototype.get = function(key) {
-    var value;
-    if (arguments.length === 0) {
-        value = this._data;
-    } else if (arguments.length > 1) {
-        key = [].slice.call(arguments).reduce(function(p, c, i, a) {
-            if (c instanceof Array) {
-                p = p.concat(c);
-            } else {
-                p.push(c);
-            }
-            return p;
-        }, []);
-    }
-    if (key instanceof Array) {
-        var self = this;
-        value = key.map(function(k) {
-            return self.get(k);
-        });
-    } else if ("undefined" !== typeof key) {
-        value = this._data[key];
-    }
-    return value;
-};
-
-/*
- *  adds a specific key value pair or object to the Entity's data
- *  is additive - will not overwrite existing values unless they
- *  are explicitly specified
- *
- *  @method set
- *  @param {string} key || {object}
- *  @param {string} value
- *  @return none
- */
-Usergrid.Entity.prototype.set = function(key, value) {
-    if (typeof key === "object") {
-        for (var field in key) {
-            this._data[field] = key[field];
-        }
-    } else if (typeof key === "string") {
-        if (value === null) {
-            delete this._data[key];
-        } else {
-            this._data[key] = value;
-        }
-    } else {
-        this._data = {};
-    }
-};
-
-Usergrid.Entity.prototype.getEndpoint = function() {
-    var type = this.get("type"), nameProperties = [ "uuid", "name" ], name;
-    if (type === undefined) {
-        throw new UsergridError("cannot fetch entity, no entity type specified", "no_type_specified");
-    } else if (/^users?$/.test(type)) {
-        nameProperties.unshift("username");
-    }
-    name = this.get(nameProperties).filter(function(x) {
-        return x !== null && "undefined" !== typeof x;
-    }).shift();
-    return name ? [ type, name ].join("/") : type;
-};
-
-/*
- *  Saves the entity back to the database
- *
- *  @method save
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, response, self)
- */
-Usergrid.Entity.prototype.save = function(callback) {
-    var self = this, type = this.get("type"), method = "POST", entityId = this.get("uuid"), changePassword, entityData = this.get(), options = {
-        method: method,
-        endpoint: type
-    };
-    if (entityId) {
-        options.method = "PUT";
-        options.endpoint += "/" + entityId;
-    }
-    options.body = Object.keys(entityData).filter(function(key) {
-        return ENTITY_SYSTEM_PROPERTIES.indexOf(key) === -1;
-    }).reduce(function(data, key) {
-        data[key] = entityData[key];
-        return data;
-    }, {});
-    self._client.request(options, function(err, response) {
-        var entity = response.getEntity();
-        if (entity) {
-            self.set(entity);
-            self.set("type", /^\//.test(response.path) ? response.path.substring(1) : response.path);
-        }
-        if (err && self._client.logging) {
-            console.log("could not save entity");
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *
- * Updates the user's password
- */
-Usergrid.Entity.prototype.changePassword = function(oldpassword, newpassword, callback) {
-    var self = this;
-    if ("function" === typeof oldpassword && callback === undefined) {
-        callback = oldpassword;
-        oldpassword = self.get("oldpassword");
-        newpassword = self.get("newpassword");
-    }
-    self.set({
-        password: null,
-        oldpassword: null,
-        newpassword: null
-    });
-    if (/^users?$/.test(self.get("type")) && oldpassword && newpassword) {
-        var options = {
-            method: "PUT",
-            endpoint: "users/" + self.get("uuid") + "/password",
-            body: {
-                uuid: self.get("uuid"),
-                username: self.get("username"),
-                oldpassword: oldpassword,
-                newpassword: newpassword
-            }
-        };
-        self._client.request(options, function(err, response) {
-            if (err && self._client.logging) {
-                console.log("could not update user");
-            }
-            doCallback(callback, [ err, response, self ], self);
-        });
-    } else {
-        throw new UsergridInvalidArgumentError("Invalid arguments passed to 'changePassword'");
-    }
-};
-
-/*
- *  refreshes the entity by making a GET call back to the database
- *
- *  @method fetch
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Entity.prototype.fetch = function(callback) {
-    var endpoint, self = this;
-    endpoint = this.getEndpoint();
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        var entity = response.getEntity();
-        if (entity) {
-            self.set(entity);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  deletes the entity from the database - will only delete
- *  if the object has a valid uuid
- *
- *  @method destroy
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.destroy = function(callback) {
-    var self = this;
-    var endpoint = this.getEndpoint();
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (!err) {
-            self.set(null);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  connects one entity to another
- *
- *  @method connect
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.connect = function(connection, entity, callback) {
-    this.addOrRemoveConnection("POST", connection, entity, callback);
-};
-
-/*
- *  disconnects one entity from another
- *
- *  @method disconnect
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.disconnect = function(connection, entity, callback) {
-    this.addOrRemoveConnection("DELETE", connection, entity, callback);
-};
-
-/*
- *  adds or removes a connection between two entities
- *
- *  @method addOrRemoveConnection
- *  @public
- *  @param {string} method
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.addOrRemoveConnection = function(method, connection, entity, callback) {
-    var self = this;
-    if ([ "POST", "DELETE" ].indexOf(method.toUpperCase()) == -1) {
-        throw new UsergridInvalidArgumentError("invalid method for connection call. must be 'POST' or 'DELETE'");
-    }
-    var connecteeType = entity.get("type");
-    var connectee = this.getEntityId(entity);
-    if (!connectee) {
-        throw new UsergridInvalidArgumentError("connectee could not be identified");
-    }
-    var connectorType = this.get("type");
-    var connector = this.getEntityId(this);
-    if (!connector) {
-        throw new UsergridInvalidArgumentError("connector could not be identified");
-    }
-    var endpoint = [ connectorType, connector, connection, connecteeType, connectee ].join("/");
-    var options = {
-        method: method,
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err && self._client.logging) {
-            console.log("There was an error with the connection call");
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  returns a unique identifier for an entity
- *
- *  @method connect
- *  @public
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.getEntityId = function(entity) {
-    var id;
-    if (isUUID(entity.get("uuid"))) {
-        id = entity.get("uuid");
-    } else if (this.get("type") === "users" || this.get("type") === "user") {
-        id = entity.get("username");
-    } else {
-        id = entity.get("name");
-    }
-    return id;
-};
-
-/*
- *  gets an entities connections
- *
- *  @method getConnections
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data, connections)
- *
- */
-Usergrid.Entity.prototype.getConnections = function(connection, callback) {
-    var self = this;
-    var connectorType = this.get("type");
-    var connector = this.getEntityId(this);
-    if (!connector) {
-        if (typeof callback === "function") {
-            var error = "Error in getConnections - no uuid specified.";
-            if (self._client.logging) {
-                console.log(error);
-            }
-            doCallback(callback, [ true, error ], self);
-        }
-        return;
-    }
-    var endpoint = connectorType + "/" + connector + "/" + connection + "/";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        self[connection] = {};
-        var length = data && data.entities ? data.entities.length : 0;
-        for (var i = 0; i < length; i++) {
-            if (data.entities[i].type === "user") {
-                self[connection][data.entities[i].username] = data.entities[i];
-            } else {
-                self[connection][data.entities[i].name] = data.entities[i];
-            }
-        }
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getGroups = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/groups";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        self.groups = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getActivities = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/activities";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-        }
-        self.activities = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getFollowing = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/following";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user following");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-            var image = self._client.getDisplayImage(data.entities[entity].email, data.entities[entity].picture);
-            data.entities[entity]._portal_image_icon = image;
-        }
-        self.following = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getFollowers = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/followers";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user followers");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-            var image = self._client.getDisplayImage(data.entities[entity].email, data.entities[entity].picture);
-            data.entities[entity]._portal_image_icon = image;
-        }
-        self.followers = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Client.prototype.createRole = function(roleName, permissions, callback) {
-    var options = {
-        type: "role",
-        name: roleName
-    };
-    this.createEntity(options, function(err, response, entity) {
-        if (err) {
-            doCallback(callback, [ err, response, self ]);
-        } else {
-            entity.assignPermissions(permissions, function(err, data) {
-                if (err) {
-                    doCallback(callback, [ err, response, self ]);
-                } else {
-                    doCallback(callback, [ err, data, data.data ], self);
-                }
-            });
-        }
-    });
-};
-
-Usergrid.Entity.prototype.getRoles = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/roles";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user roles");
-        }
-        self.roles = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.assignRole = function(roleName, callback) {
-    var self = this;
-    var type = self.get("type");
-    var collection = type + "s";
-    var entityID;
-    if (type == "user" && this.get("username") != null) {
-        entityID = self.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = self.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = self.get("uuid");
-    }
-    if (type != "users" && type != "groups") {
-        doCallback(callback, [ new UsergridError("entity must be a group or user", "invalid_entity_type"), null, this ], this);
-    }
-    var endpoint = "roles/" + roleName + "/" + collection + "/" + entityID;
-    var options = {
-        method: "POST",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err) {
-            console.log("Could not assign role.");
-        }
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-Usergrid.Entity.prototype.removeRole = function(roleName, callback) {
-    var self = this;
-    var type = self.get("type");
-    var collection = type + "s";
-    var entityID;
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    if (type != "users" && type != "groups") {
-        doCallback(callback, [ new UsergridError("entity must be a group or user", "invalid_entity_type"), null, this ], this);
-    }
-    var endpoint = "roles/" + roleName + "/" + collection + "/" + entityID;
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err) {
-            console.log("Could not assign role.");
-        }
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-Usergrid.Entity.prototype.assignPermissions = function(permissions, callback) {
-    var self = this;
-    var entityID;
-    var type = this.get("type");
-    if (type != "user" && type != "users" && type != "group" && type != "groups" && type != "role" && type != "roles") {
-        doCallback(callback, [ new UsergridError("entity must be a group, user, or role", "invalid_entity_type"), null, this ], this);
-    }
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    var endpoint = type + "/" + entityID + "/permissions";
-    var options = {
-        method: "POST",
-        endpoint: endpoint,
-        body: {
-            permission: permissions
-        }
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not assign permissions");
-        }
-        doCallback(callback, [ err, data, data.data ], self);
-    });
-};
-
-Usergrid.Entity.prototype.removePermissions = function(permissions, callback) {
-    var self = this;
-    var entityID;
-    var type = this.get("type");
-    if (type != "user" && type != "users" && type != "group" && type != "groups" && type != "role" && type != "roles") {
-        doCallback(callback, [ new UsergridError("entity must be a group, user, or role", "invalid_entity_type"), null, this ], this);
-    }
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    var endpoint = type + "/" + entityID + "/permissions";
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint,
-        qs: {
-            permission: permissions
-        }
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not remove permissions");
-        }
-        doCallback(callback, [ err, data, data.params.permission ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getPermissions = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/permissions";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user permissions");
-        }
-        var permissions = [];
-        if (data.data) {
-            var perms = data.data;
-            var count = 0;
-            for (var i in perms) {
-                count++;
-                var perm = perms[i];
-                var parts = perm.split(":");
-                var ops_part = "";
-                var path_part = parts[0];
-                if (parts.length > 1) {
-                    ops_part = parts[0];
-                    path_part = parts[1];
-                }
-                ops_part = ops_part.replace("*", "get,post,put,delete");
-                var ops = ops_part.split(",");
-                var ops_object = {};
-                ops_object.get = "no";
-                ops_object.post = "no";
-                ops_object.put = "no";
-                ops_object.delete = "no";
-                for (var j in ops) {
-                    ops_object[ops[j]] = "yes";
-                }
-                permissions.push({
-                    operations: ops_object,
-                    path: path_part,
-                    perm: perm
-                });
-            }
-        }
-        self.permissions = permissions;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridAuth = function(token, expiry) {
@@ -17962,19 +6216,6 @@ var UsergridUserAuth = function(options) {
 
 UsergridHelpers.inherits(UsergridUserAuth, UsergridAuth);
 
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridEntity = function() {
@@ -18058,7 +6299,7 @@ UsergridEntity.prototype = {
     },
     reload: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         client.GET(this, function(usergridResponse) {
             UsergridHelpers.updateEntityFromRemote(this, usergridResponse);
@@ -18067,7 +6308,7 @@ UsergridEntity.prototype = {
     },
     save: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         var uuid = this.uuid;
         if (uuid === undefined) {
@@ -18084,7 +6325,7 @@ UsergridEntity.prototype = {
     },
     remove: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         client.DELETE(this, function(usergridResponse) {
             callback(usergridResponse, this);
@@ -18095,7 +6336,7 @@ UsergridEntity.prototype = {
     },
     uploadAsset: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         client.uploadAsset(this, this.asset, function(asset, usergridResponse) {
             UsergridHelpers.updateEntityFromRemote(this, usergridResponse);
@@ -18105,45 +6346,32 @@ UsergridEntity.prototype = {
     },
     downloadAsset: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         var self = this;
         client.downloadAsset(this, callback);
     },
     connect: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         args[0] = this;
         return client.connect.apply(client, args);
     },
     disconnect: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         args[0] = this;
         return client.disconnect.apply(client, args);
     },
     getConnections: function() {
         var args = UsergridHelpers.flattenArgs(arguments);
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         args.shift();
         args.splice(1, 0, this);
         return client.getConnections.apply(client, args);
     }
 };
 
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridUser = function(obj) {
@@ -18159,7 +6387,7 @@ var UsergridUser = function(obj) {
 
 UsergridUser.CheckAvailable = function() {
     var args = UsergridHelpers.flattenArgs(arguments);
-    var client = Usergrid.validateAndRetrieveClient(args);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
     if (args[0] instanceof UsergridClient) {
         args.shift();
     }
@@ -18189,7 +6417,7 @@ UsergridUser.prototype.uniqueId = function() {
 UsergridUser.prototype.create = function() {
     var self = this;
     var args = UsergridHelpers.flattenArgs(arguments);
-    var client = Usergrid.validateAndRetrieveClient(args);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
     var callback = UsergridHelpers.callback(args);
     client.POST(self, function(usergridResponse) {
         delete self.password;
@@ -18202,7 +6430,7 @@ UsergridUser.prototype.login = function() {
     var self = this;
     var args = UsergridHelpers.flattenArgs(arguments);
     var callback = UsergridHelpers.callback(args);
-    var client = Usergrid.validateAndRetrieveClient(args);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
     client.POST({
         path: "token",
         body: UsergridHelpers.userLoginBody(self)
@@ -18212,7 +6440,7 @@ UsergridUser.prototype.login = function() {
             var responseJSON = usergridResponse.responseJSON;
             self.auth = new UsergridUserAuth(self);
             self.auth.token = responseJSON.access_token;
-            self.auth.expiry = Usergrid.calculateExpiry(responseJSON.expires_in);
+            self.auth.expiry = UsergridHelpers.calculateExpiry(responseJSON.expires_in);
             self.auth.tokenTtl = responseJSON.expires_in;
         }
         callback(self.auth, self, usergridResponse);
@@ -18239,7 +6467,7 @@ UsergridUser.prototype.logout = function() {
             token: self.auth.token
         };
     }
-    var client = Usergrid.validateAndRetrieveClient(args);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
     return client.PUT({
         path: revokeTokenPath,
         queryParams: queryParams
@@ -18251,7 +6479,7 @@ UsergridUser.prototype.logout = function() {
 
 UsergridUser.prototype.logoutAllSessions = function() {
     var args = UsergridHelpers.flattenArgs(arguments);
-    args = _.concat([ Usergrid.validateAndRetrieveClient(args), true ], args);
+    args = _.concat([ UsergridHelpers.validateAndRetrieveClient(args), true ], args);
     return this.logout.apply(this, args);
 };
 
@@ -18259,7 +6487,7 @@ UsergridUser.prototype.resetPassword = function() {
     var self = this;
     var args = UsergridHelpers.flattenArgs(arguments);
     var callback = UsergridHelpers.callback(args);
-    var client = Usergrid.validateAndRetrieveClient(args);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
     if (args[0] instanceof UsergridClient) {
         args.shift();
     }
@@ -18278,988 +6506,6 @@ UsergridUser.prototype.resetPassword = function() {
     });
 };
 
-/*
- *  The Collection class models Usergrid Collections.  It essentially
- *  acts as a container for holding Entity objects, while providing
- *  additional funcitonality such as paging, and saving
- *
- *  @constructor
- *  @param {string} options - configuration object
- *  @return {Collection} collection
- */
-Usergrid.Collection = function(options) {
-    if (options) {
-        this._client = options.client;
-        this._type = options.type;
-        this.qs = options.qs || {};
-        this._list = options.list || [];
-        this._iterator = options.iterator || -1;
-        this._previous = options.previous || [];
-        this._next = options.next || null;
-        this._cursor = options.cursor || null;
-        if (options.list) {
-            var count = options.list.length;
-            for (var i = 0; i < count; i++) {
-                var entity = this._client.restoreEntity(options.list[i]);
-                this._list[i] = entity;
-            }
-        }
-    }
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Collection
- *
- *  @method isCollection
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.isCollection = function(obj) {
-    return obj && obj instanceof Usergrid.Collection;
-};
-
-/*
- *  gets the data from the collection object for serialization
- *
- *  @method serialize
- *  @return {object} data
- */
-Usergrid.Collection.prototype.serialize = function() {
-    var data = {};
-    data.type = this._type;
-    data.qs = this.qs;
-    data.iterator = this._iterator;
-    data.previous = this._previous;
-    data.next = this._next;
-    data.cursor = this._cursor;
-    this.resetEntityPointer();
-    var i = 0;
-    data.list = [];
-    while (this.hasNextEntity()) {
-        var entity = this.getNextEntity();
-        data.list[i] = entity.serialize();
-        i++;
-    }
-    data = JSON.stringify(data);
-    return data;
-};
-
-/*Usergrid.Collection.prototype.addCollection = function (collectionName, options, callback) {
-  self = this;
-  options.client = this._client;
-  var collection = new Usergrid.Collection(options, function(err, data) {
-    if (typeof(callback) === 'function') {
-
-      collection.resetEntityPointer();
-      while(collection.hasNextEntity()) {
-        var user = collection.getNextEntity();
-        var email = user.get('email');
-        var image = self._client.getDisplayImage(user.get('email'), user.get('picture'));
-        user._portal_image_icon = image;
-      }
-
-      self[collectionName] = collection;
-      doCallback(callback, [err, collection], self);
-    }
-  });
-};*/
-/*
- *  Populates the collection from the server
- *
- *  @method fetch
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.fetch = function(callback) {
-    var self = this;
-    var qs = this.qs;
-    if (this._cursor) {
-        qs.cursor = this._cursor;
-    } else {
-        delete qs.cursor;
-    }
-    var options = {
-        method: "GET",
-        endpoint: this._type,
-        qs: this.qs
-    };
-    this._client.request(options, function(err, response) {
-        if (err && self._client.logging) {
-            console.log("error getting collection");
-        } else {
-            self.saveCursor(response.cursor || null);
-            self.resetEntityPointer();
-            self._list = response.getEntities().filter(function(entity) {
-                return isUUID(entity.uuid);
-            }).map(function(entity) {
-                var ent = new Usergrid.Entity({
-                    client: self._client
-                });
-                ent.set(entity);
-                ent.type = self._type;
-                return ent;
-            });
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  Adds a new Entity to the collection (saves, then adds to the local object)
- *
- *  @method addNewEntity
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data, entity)
- */
-Usergrid.Collection.prototype.addEntity = function(entityObject, callback) {
-    var self = this;
-    entityObject.type = this._type;
-    this._client.createEntity(entityObject, function(err, response, entity) {
-        if (!err) {
-            self.addExistingEntity(entity);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-Usergrid.Collection.prototype.addExistingEntity = function(entity) {
-    var count = this._list.length;
-    this._list[count] = entity;
-};
-
-/*
- *  Removes the Entity from the collection, then destroys the object on the server
- *
- *  @method destroyEntity
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.destroyEntity = function(entity, callback) {
-    var self = this;
-    entity.destroy(function(err, response) {
-        if (err) {
-            if (self._client.logging) {
-                console.log("could not destroy entity");
-            }
-            doCallback(callback, [ err, response, self ], self);
-        } else {
-            self.fetch(callback);
-        }
-        self.removeEntity(entity);
-    });
-};
-
-/*
- * Filters the list of entities based on the supplied criteria function
- * works like Array.prototype.filter
- *
- *  @method getEntitiesByCriteria
- *  @param {function} criteria  A function that takes each entity as an argument and returns true or false
- *  @return {Entity[]} returns a list of entities that caused the criteria function to return true
- */
-Usergrid.Collection.prototype.getEntitiesByCriteria = function(criteria) {
-    return this._list.filter(criteria);
-};
-
-/*
- * Returns the first entity from the list of entities based on the supplied criteria function
- * works like Array.prototype.filter
- *
- *  @method getEntitiesByCriteria
- *  @param {function} criteria  A function that takes each entity as an argument and returns true or false
- *  @return {Entity[]} returns a list of entities that caused the criteria function to return true
- */
-Usergrid.Collection.prototype.getEntityByCriteria = function(criteria) {
-    return this.getEntitiesByCriteria(criteria).shift();
-};
-
-/*
- * Removed an entity from the collection without destroying it on the server
- *
- *  @method removeEntity
- *  @param {object} entity
- *  @return {Entity} returns the removed entity or undefined if it was not found
- */
-Usergrid.Collection.prototype.removeEntity = function(entity) {
-    var removedEntity = this.getEntityByCriteria(function(item) {
-        return entity.uuid === item.get("uuid");
-    });
-    delete this._list[this._list.indexOf(removedEntity)];
-    return removedEntity;
-};
-
-/*
- *  Looks up an Entity by UUID
- *
- *  @method getEntityByUUID
- *  @param {string} UUID
- *  @param {function} callback
- *  @return {callback} callback(err, data, entity)
- */
-Usergrid.Collection.prototype.getEntityByUUID = function(uuid, callback) {
-    var entity = this.getEntityByCriteria(function(item) {
-        return item.get("uuid") === uuid;
-    });
-    if (entity) {
-        doCallback(callback, [ null, entity, entity ], this);
-    } else {
-        var options = {
-            data: {
-                type: this._type,
-                uuid: uuid
-            },
-            client: this._client
-        };
-        entity = new Usergrid.Entity(options);
-        entity.fetch(callback);
-    }
-};
-
-/*
- *  Returns the first Entity of the Entity list - does not affect the iterator
- *
- *  @method getFirstEntity
- *  @return {object} returns an entity object
- */
-Usergrid.Collection.prototype.getFirstEntity = function() {
-    var count = this._list.length;
-    if (count > 0) {
-        return this._list[0];
-    }
-    return null;
-};
-
-/*
- *  Returns the last Entity of the Entity list - does not affect the iterator
- *
- *  @method getLastEntity
- *  @return {object} returns an entity object
- */
-Usergrid.Collection.prototype.getLastEntity = function() {
-    var count = this._list.length;
-    if (count > 0) {
-        return this._list[count - 1];
-    }
-    return null;
-};
-
-/*
- *  Entity iteration -Checks to see if there is a "next" entity
- *  in the list.  The first time this method is called on an entity
- *  list, or after the resetEntityPointer method is called, it will
- *  return true referencing the first entity in the list
- *
- *  @method hasNextEntity
- *  @return {boolean} true if there is a next entity, false if not
- */
-Usergrid.Collection.prototype.hasNextEntity = function() {
-    var next = this._iterator + 1;
-    var hasNextElement = next >= 0 && next < this._list.length;
-    if (hasNextElement) {
-        return true;
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Gets the "next" entity in the list.  The first
- *  time this method is called on an entity list, or after the method
- *  resetEntityPointer is called, it will return the,
- *  first entity in the list
- *
- *  @method hasNextEntity
- *  @return {object} entity
- */
-Usergrid.Collection.prototype.getNextEntity = function() {
-    this._iterator++;
-    var hasNextElement = this._iterator >= 0 && this._iterator <= this._list.length;
-    if (hasNextElement) {
-        return this._list[this._iterator];
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Checks to see if there is a "previous"
- *  entity in the list.
- *
- *  @method hasPrevEntity
- *  @return {boolean} true if there is a previous entity, false if not
- */
-Usergrid.Collection.prototype.hasPrevEntity = function() {
-    var previous = this._iterator - 1;
-    var hasPreviousElement = previous >= 0 && previous < this._list.length;
-    if (hasPreviousElement) {
-        return true;
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Gets the "previous" entity in the list.
- *
- *  @method getPrevEntity
- *  @return {object} entity
- */
-Usergrid.Collection.prototype.getPrevEntity = function() {
-    this._iterator--;
-    var hasPreviousElement = this._iterator >= 0 && this._iterator <= this._list.length;
-    if (hasPreviousElement) {
-        return this._list[this._iterator];
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Resets the iterator back to the beginning
- *  of the list
- *
- *  @method resetEntityPointer
- *  @return none
- */
-Usergrid.Collection.prototype.resetEntityPointer = function() {
-    this._iterator = -1;
-};
-
-/*
- * Method to save off the cursor just returned by the last API call
- *
- * @public
- * @method saveCursor
- * @return none
- */
-Usergrid.Collection.prototype.saveCursor = function(cursor) {
-    if (this._next !== cursor) {
-        this._next = cursor;
-    }
-};
-
-/*
- * Resets the paging pointer (back to original page)
- *
- * @public
- * @method resetPaging
- * @return none
- */
-Usergrid.Collection.prototype.resetPaging = function() {
-    this._previous = [];
-    this._next = null;
-    this._cursor = null;
-};
-
-/*
- *  Paging -  checks to see if there is a next page od data
- *
- *  @method hasNextPage
- *  @return {boolean} returns true if there is a next page of data, false otherwise
- */
-Usergrid.Collection.prototype.hasNextPage = function() {
-    return this._next;
-};
-
-/*
- *  Paging - advances the cursor and gets the next
- *  page of data from the API.  Stores returned entities
- *  in the Entity list.
- *
- *  @method getNextPage
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.getNextPage = function(callback) {
-    if (this.hasNextPage()) {
-        this._previous.push(this._cursor);
-        this._cursor = this._next;
-        this._list = [];
-        this.fetch(callback);
-    }
-};
-
-/*
- *  Paging -  checks to see if there is a previous page od data
- *
- *  @method hasPreviousPage
- *  @return {boolean} returns true if there is a previous page of data, false otherwise
- */
-Usergrid.Collection.prototype.hasPreviousPage = function() {
-    return this._previous.length > 0;
-};
-
-/*
- *  Paging - reverts the cursor and gets the previous
- *  page of data from the API.  Stores returned entities
- *  in the Entity list.
- *
- *  @method getPreviousPage
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.getPreviousPage = function(callback) {
-    if (this.hasPreviousPage()) {
-        this._next = null;
-        this._cursor = this._previous.pop();
-        this._list = [];
-        this.fetch(callback);
-    }
-};
-
-/*
- *  A class to model a Usergrid group.
- *  Set the path in the options object.
- *
- *  @constructor
- *  @param {object} options {client:client, data: {'key': 'value'}, path:'path'}
- */
-Usergrid.Group = function(options, callback) {
-    this._path = options.path;
-    this._list = [];
-    this._client = options.client;
-    this._data = options.data || {};
-    this._data.type = "groups";
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- *  Note: This only accounts for data on the group object itself.
- *  You need to use add and remove to manipulate group membership.
- */
-Usergrid.Group.prototype = new Usergrid.Entity();
-
-/*
- *  Fetches current group data, and members.
- *
- *  @method fetch
- *  @public
- *  @param {function} callback
- *  @returns {function} callback(err, data)
- */
-Usergrid.Group.prototype.fetch = function(callback) {
-    var self = this;
-    var groupEndpoint = "groups/" + this._path;
-    var memberEndpoint = "groups/" + this._path + "/users";
-    var groupOptions = {
-        method: "GET",
-        endpoint: groupEndpoint
-    };
-    var memberOptions = {
-        method: "GET",
-        endpoint: memberEndpoint
-    };
-    this._client.request(groupOptions, function(err, response) {
-        if (err) {
-            if (self._client.logging) {
-                console.log("error getting group");
-            }
-            doCallback(callback, [ err, response ], self);
-        } else {
-            var entities = response.getEntities();
-            if (entities && entities.length) {
-                var groupresponse = entities.shift();
-                self._client.request(memberOptions, function(err, response) {
-                    if (err && self._client.logging) {
-                        console.log("error getting group users");
-                    } else {
-                        self._list = response.getEntities().filter(function(entity) {
-                            return isUUID(entity.uuid);
-                        }).map(function(entity) {
-                            return new Usergrid.Entity({
-                                type: entity.type,
-                                client: self._client,
-                                uuid: entity.uuid,
-                                response: entity
-                            });
-                        });
-                    }
-                    doCallback(callback, [ err, response, self ], self);
-                });
-            }
-        }
-    });
-};
-
-/*
- *  Retrieves the members of a group.
- *
- *  @method members
- *  @public
- *  @param {function} callback
- *  @return {function} callback(err, data);
- */
-Usergrid.Group.prototype.members = function(callback) {
-    return this._list;
-};
-
-/*
- *  Adds an existing user to the group, and refreshes the group object.
- *
- *  Options object: {user: user_entity}
- *
- *  @method add
- *  @public
- *  @params {object} options
- *  @param {function} callback
- *  @return {function} callback(err, data)
- */
-Usergrid.Group.prototype.add = function(options, callback) {
-    var self = this;
-    if (options.user) {
-        options = {
-            method: "POST",
-            endpoint: "groups/" + this._path + "/users/" + options.user.get("username")
-        };
-        this._client.request(options, function(error, response) {
-            if (error) {
-                doCallback(callback, [ error, response, self ], self);
-            } else {
-                self.fetch(callback);
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("no user specified", "no_user_specified"), null, this ], this);
-    }
-};
-
-/*
- *  Removes a user from a group, and refreshes the group object.
- *
- *  Options object: {user: user_entity}
- *
- *  @method remove
- *  @public
- *  @params {object} options
- *  @param {function} callback
- *  @return {function} callback(err, data)
- */
-Usergrid.Group.prototype.remove = function(options, callback) {
-    var self = this;
-    if (options.user) {
-        options = {
-            method: "DELETE",
-            endpoint: "groups/" + this._path + "/users/" + options.user.username
-        };
-        this._client.request(options, function(error, response) {
-            if (error) {
-                doCallback(callback, [ error, response, self ], self);
-            } else {
-                self.fetch(callback);
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("no user specified", "no_user_specified"), null, this ], this);
-    }
-};
-
-/*
- * Gets feed for a group.
- *
- * @public
- * @method feed
- * @param {function} callback
- * @returns {callback} callback(err, data, activities)
- */
-Usergrid.Group.prototype.feed = function(callback) {
-    var self = this;
-    var options = {
-        method: "GET",
-        endpoint: "groups/" + this._path + "/feed"
-    };
-    this._client.request(options, function(err, response) {
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- * Creates activity and posts to group feed.
- *
- * options object: {user: user_entity, content: "activity content"}
- *
- * @public
- * @method createGroupActivity
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, entity)
- */
-Usergrid.Group.prototype.createGroupActivity = function(options, callback) {
-    var self = this;
-    var user = options.user;
-    var entity = new Usergrid.Entity({
-        client: this._client,
-        data: {
-            actor: {
-                displayName: user.get("username"),
-                uuid: user.get("uuid"),
-                username: user.get("username"),
-                email: user.get("email"),
-                picture: user.get("picture"),
-                image: {
-                    duration: 0,
-                    height: 80,
-                    url: user.get("picture"),
-                    width: 80
-                }
-            },
-            verb: "post",
-            content: options.content,
-            type: "groups/" + this._path + "/activities"
-        }
-    });
-    entity.save(function(err, response, entity) {
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-/*
- *  A class to model a Usergrid event.
- *
- *  @constructor
- *  @param {object} options {timestamp:0, category:'value', counters:{name : value}}
- *  @returns {callback} callback(err, event)
- */
-Usergrid.Counter = function(options) {
-    this._client = options.client;
-    this._data = options.data || {};
-    this._data.category = options.category || "UNKNOWN";
-    this._data.timestamp = options.timestamp || 0;
-    this._data.type = "events";
-    this._data.counters = options.counters || {};
-};
-
-var COUNTER_RESOLUTIONS = [ "all", "minute", "five_minutes", "half_hour", "hour", "six_day", "day", "week", "month" ];
-
-/*
- *  Inherit from Usergrid.Entity.
- *  Note: This only accounts for data on the group object itself.
- *  You need to use add and remove to manipulate group membership.
- */
-Usergrid.Counter.prototype = new Usergrid.Entity();
-
-/*
- * overrides Entity.prototype.fetch. Returns all data for counters
- * associated with the object as specified in the constructor
- *
- * @public
- * @method increment
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.fetch = function(callback) {
-    this.getData({}, callback);
-};
-
-/*
- * increments the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method increment
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.increment = function(options, callback) {
-    var self = this, name = options.name, value = options.value;
-    if (!name) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("'name' for increment, decrement must be a number"), null, self ], self);
-    } else if (isNaN(value)) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("'value' for increment, decrement must be a number"), null, self ], self);
-    } else {
-        self._data.counters[name] = parseInt(value) || 1;
-        return self.save(callback);
-    }
-};
-
-/*
- * decrements the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method decrement
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.decrement = function(options, callback) {
-    var self = this, name = options.name, value = options.value;
-    self.increment({
-        name: name,
-        value: -(parseInt(value) || 1)
-    }, callback);
-};
-
-/*
- * resets the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method reset
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.reset = function(options, callback) {
-    var self = this, name = options.name;
-    self.increment({
-        name: name,
-        value: 0
-    }, callback);
-};
-
-/*
- * gets data for one or more counters over a given
- * time period at a specified resolution
- *
- * options object: {
- *                   counters: ['counter1', 'counter2', ...],
- *                   start: epoch timestamp or ISO date string,
- *                   end: epoch timestamp or ISO date string,
- *                   resolution: one of ('all', 'minute', 'five_minutes', 'half_hour', 'hour', 'six_day', 'day', 'week', or 'month')
- *                   }
- *
- * @public
- * @method getData
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.getData = function(options, callback) {
-    var start_time, end_time, start = options.start || 0, end = options.end || Date.now(), resolution = (options.resolution || "all").toLowerCase(), counters = options.counters || Object.keys(this._data.counters), res = (resolution || "all").toLowerCase();
-    if (COUNTER_RESOLUTIONS.indexOf(res) === -1) {
-        res = "all";
-    }
-    start_time = getSafeTime(start);
-    end_time = getSafeTime(end);
-    var self = this;
-    var params = Object.keys(counters).map(function(counter) {
-        return [ "counter", encodeURIComponent(counters[counter]) ].join("=");
-    });
-    params.push("resolution=" + res);
-    params.push("start_time=" + String(start_time));
-    params.push("end_time=" + String(end_time));
-    var endpoint = "counters?" + params.join("&");
-    this._client.request({
-        endpoint: endpoint
-    }, function(err, data) {
-        if (data.counters && data.counters.length) {
-            data.counters.forEach(function(counter) {
-                self._data.counters[counter.name] = counter.value || counter.values;
-            });
-        }
-        return doCallback(callback, [ err, data, self ], self);
-    });
-};
-
-function getSafeTime(prop) {
-    var time;
-    switch (typeof prop) {
-      case "undefined":
-        time = Date.now();
-        break;
-
-      case "number":
-        time = prop;
-        break;
-
-      case "string":
-        time = isNaN(prop) ? Date.parse(prop) : parseInt(prop);
-        break;
-
-      default:
-        time = Date.parse(prop.toString());
-    }
-    return time;
-}
-
-/*
- *  A class to model a Usergrid folder.
- *
- *  @constructor
- *  @param {object} options {name:"MyPhotos", path:"/user/uploads", owner:"00000000-0000-0000-0000-000000000000" }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder = function(options, callback) {
-    var self = this, messages = [];
-    console.log("FOLDER OPTIONS", options);
-    self._client = options.client;
-    self._data = options.data || {};
-    self._data.type = "folders";
-    var missingData = [ "name", "owner", "path" ].some(function(required) {
-        return !(required in self._data);
-    });
-    if (missingData) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("Invalid asset data: 'name', 'owner', and 'path' are required properties."), null, self ], self);
-    }
-    self.save(function(err, response) {
-        if (err) {
-            doCallback(callback, [ new UsergridError(response), response, self ], self);
-        } else {
-            if (response && response.entities && response.entities.length) {
-                self.set(response.entities[0]);
-            }
-            doCallback(callback, [ null, response, self ], self);
-        }
-    });
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- */
-Usergrid.Folder.prototype = new Usergrid.Entity();
-
-/*
- *  fetch the folder and associated assets
- *
- *  @method fetch
- *  @public
- *  @param {function} callback(err, self)
- *  @returns {callback} callback(err, self)
- */
-Usergrid.Folder.prototype.fetch = function(callback) {
-    var self = this;
-    Usergrid.Entity.prototype.fetch.call(self, function(err, data) {
-        console.log("self", self.get());
-        console.log("data", data);
-        if (!err) {
-            self.getAssets(function(err, response) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(response), resonse, self ], self);
-                } else {
-                    doCallback(callback, [ null, self ], self);
-                }
-            });
-        } else {
-            doCallback(callback, [ null, data, self ], self);
-        }
-    });
-};
-
-/*
- *  Add an asset to the folder.
- *
- *  @method addAsset
- *  @public
- *  @param {object} options {asset:(uuid || Usergrid.Asset || {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }) }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder.prototype.addAsset = function(options, callback) {
-    var self = this;
-    if ("asset" in options) {
-        var asset = null;
-        switch (typeof options.asset) {
-          case "object":
-            asset = options.asset;
-            if (!(asset instanceof Usergrid.Entity)) {
-                asset = new Usergrid.Asset(asset);
-            }
-            break;
-
-          case "string":
-            if (isUUID(options.asset)) {
-                asset = new Usergrid.Asset({
-                    client: self._client,
-                    data: {
-                        uuid: options.asset,
-                        type: "assets"
-                    }
-                });
-            }
-            break;
-        }
-        if (asset && asset instanceof Usergrid.Entity) {
-            asset.fetch(function(err, data) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(data), data, self ], self);
-                } else {
-                    var endpoint = [ "folders", self.get("uuid"), "assets", asset.get("uuid") ].join("/");
-                    var options = {
-                        method: "POST",
-                        endpoint: endpoint
-                    };
-                    self._client.request(options, callback);
-                }
-            });
-        }
-    } else {
-        doCallback(callback, [ new UsergridInvalidArgumentError("No asset specified"), null, self ], self);
-    }
-};
-
-/*
- *  Remove an asset from the folder.
- *
- *  @method removeAsset
- *  @public
- *  @param {object} options {asset:(uuid || Usergrid.Asset || {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }) }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder.prototype.removeAsset = function(options, callback) {
-    var self = this;
-    if ("asset" in options) {
-        var asset = null;
-        switch (typeof options.asset) {
-          case "object":
-            asset = options.asset;
-            break;
-
-          case "string":
-            if (isUUID(options.asset)) {
-                asset = new Usergrid.Asset({
-                    client: self._client,
-                    data: {
-                        uuid: options.asset,
-                        type: "assets"
-                    }
-                });
-            }
-            break;
-        }
-        if (asset && asset !== null) {
-            var endpoint = [ "folders", self.get("uuid"), "assets", asset.get("uuid") ].join("/");
-            self._client.request({
-                method: "DELETE",
-                endpoint: endpoint
-            }, function(err, response) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(response), response, self ], self);
-                } else {
-                    doCallback(callback, [ null, response, self ], self);
-                }
-            });
-        }
-    } else {
-        doCallback(callback, [ new UsergridInvalidArgumentError("No asset specified"), null, self ], self);
-    }
-};
-
-/*
- *  List the assets in the folder.
- *
- *  @method getAssets
- *  @public
- *  @returns {callback} callback(err, assets)
- */
-Usergrid.Folder.prototype.getAssets = function(callback) {
-    return this.getConnections("assets", callback);
-};
-
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridResponseError = function(responseErrorObject) {
@@ -19331,7 +6577,7 @@ UsergridResponse.prototype = {
         if (!self.responseJSON.cursor) {
             callback();
         }
-        var client = Usergrid.validateAndRetrieveClient(args);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
         var type = _.last(_.get(self, "responseJSON.path").split("/"));
         var limit = _.first(_.get(this, "responseJSON.params.limit"));
         var query = new UsergridQuery(type).cursor(this.responseJSON.cursor).limit(limit);
@@ -19339,19 +6585,6 @@ UsergridResponse.prototype = {
     }
 };
 
-/*
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
 "use strict";
 
 var UsergridAsset = function(fileOrBlob) {
@@ -19365,339 +6598,3 @@ var UsergridAsset = function(fileOrBlob) {
     self.contentType = fileOrBlob.type;
     return self;
 };
-
-/*
- *  XMLHttpRequest.prototype.sendAsBinary polyfill
- *  from: https://developer.mozilla.org/en-US/docs/DOM/XMLHttpRequest#sendAsBinary()
- *
- *  @method sendAsBinary
- *  @param {string} sData
- */
-if (!XMLHttpRequest.prototype.sendAsBinary) {
-    XMLHttpRequest.prototype.sendAsBinary = function(sData) {
-        var nBytes = sData.length, ui8Data = new Uint8Array(nBytes);
-        for (var nIdx = 0; nIdx < nBytes; nIdx++) {
-            ui8Data[nIdx] = sData.charCodeAt(nIdx) & 255;
-        }
-        this.send(ui8Data);
-    };
-}
-
-/*
- *  A class to model a Usergrid asset.
- *
- *  @constructor
- *  @param {object} options {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset = function(options, callback) {
-    var self = this, messages = [];
-    self._client = options.client;
-    self._data = options.data || {};
-    self._data.type = "assets";
-    var missingData = [ "name", "owner", "path" ].some(function(required) {
-        return !(required in self._data);
-    });
-    if (missingData) {
-        doCallback(callback, [ new UsergridError("Invalid asset data: 'name', 'owner', and 'path' are required properties."), null, self ], self);
-    } else {
-        self.save(function(err, data) {
-            if (err) {
-                doCallback(callback, [ new UsergridError(data), data, self ], self);
-            } else {
-                if (data && data.entities && data.entities.length) {
-                    self.set(data.entities[0]);
-                }
-                doCallback(callback, [ null, data, self ], self);
-            }
-        });
-    }
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- */
-Usergrid.Asset.prototype = new Usergrid.Entity();
-
-/*
- *  Add an asset to a folder.
- *
- *  @method connect
- *  @public
- *  @param {object} options {folder:"F01DE600-0000-0000-0000-000000000000"}
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset.prototype.addToFolder = function(options, callback) {
-    var self = this, error = null;
-    if ("folder" in options && isUUID(options.folder)) {
-        var folder = Usergrid.Folder({
-            uuid: options.folder
-        }, function(err, folder) {
-            if (err) {
-                doCallback(callback, [ UsergridError.fromResponse(folder), folder, self ], self);
-            } else {
-                var endpoint = [ "folders", folder.get("uuid"), "assets", self.get("uuid") ].join("/");
-                var options = {
-                    method: "POST",
-                    endpoint: endpoint
-                };
-                this._client.request(options, function(err, response) {
-                    if (err) {
-                        doCallback(callback, [ UsergridError.fromResponse(folder), response, self ], self);
-                    } else {
-                        doCallback(callback, [ null, folder, self ], self);
-                    }
-                });
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("folder not specified"), null, self ], self);
-    }
-};
-
-Usergrid.Entity.prototype.attachAsset = function(file, callback) {
-    if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
-        doCallback(callback, [ new UsergridError("The File APIs are not fully supported by your browser."), null, this ], this);
-        return;
-    }
-    var self = this;
-    var args = arguments;
-    var type = this._data.type;
-    var attempts = self.get("attempts");
-    if (isNaN(attempts)) {
-        attempts = 3;
-    }
-    if (type != "assets" && type != "asset") {
-        var endpoint = [ this._client.clientAppURL, type, self.get("uuid") ].join("/");
-    } else {
-        self.set("content-type", file.type);
-        self.set("size", file.size);
-        var endpoint = [ this._client.clientAppURL, "assets", self.get("uuid"), "data" ].join("/");
-    }
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", endpoint, true);
-    xhr.onerror = function(err) {
-        doCallback(callback, [ new UsergridError("The File APIs are not fully supported by your browser.") ], xhr, self);
-    };
-    xhr.onload = function(ev) {
-        if (xhr.status >= 500 && attempts > 0) {
-            self.set("attempts", --attempts);
-            setTimeout(function() {
-                self.attachAsset.apply(self, args);
-            }, 100);
-        } else if (xhr.status >= 300) {
-            self.set("attempts");
-            doCallback(callback, [ new UsergridError(JSON.parse(xhr.responseText)), xhr, self ], self);
-        } else {
-            self.set("attempts");
-            self.fetch();
-            doCallback(callback, [ null, xhr, self ], self);
-        }
-    };
-    var fr = new FileReader();
-    fr.onload = function() {
-        var binary = fr.result;
-        if (type === "assets" || type === "asset") {
-            xhr.overrideMimeType("application/octet-stream");
-            xhr.setRequestHeader("Content-Type", "application/octet-stream");
-        }
-        xhr.sendAsBinary(binary);
-    };
-    fr.readAsBinaryString(file);
-};
-
-/*
- *  Upload Asset data
- *
- *  @method upload
- *  @public
- *  @param {object} data Can be a javascript Blob or File object
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset.prototype.upload = function(data, callback) {
-    this.attachAsset(data, function(err, response) {
-        if (!err) {
-            doCallback(callback, [ null, response, self ], self);
-        } else {
-            doCallback(callback, [ new UsergridError(err), response, self ], self);
-        }
-    });
-};
-
-/*
- *  Download Asset data
- *
- *  @method download
- *  @public
- *  @returns {callback} callback(err, blob) blob is a javascript Blob object.
- */
-Usergrid.Entity.prototype.downloadAsset = function(callback) {
-    var self = this;
-    var endpoint;
-    var type = this._data.type;
-    var xhr = new XMLHttpRequest();
-    if (type != "assets" && type != "asset") {
-        endpoint = [ this._client.clientAppURL, type, self.get("uuid") ].join("/");
-    } else {
-        endpoint = [ this._client.clientAppURL, "assets", self.get("uuid"), "data" ].join("/");
-    }
-    xhr.open("GET", endpoint, true);
-    xhr.responseType = "blob";
-    xhr.onload = function(ev) {
-        var blob = xhr.response;
-        if (type != "assets" && type != "asset") {
-            doCallback(callback, [ null, blob, xhr ], self);
-        } else {
-            doCallback(callback, [ null, xhr, self ], self);
-        }
-    };
-    xhr.onerror = function(err) {
-        callback(true, err);
-        doCallback(callback, [ new UsergridError(err), xhr, self ], self);
-    };
-    if (type != "assets" && type != "asset") {
-        xhr.setRequestHeader("Accept", self._data["file-metadata"]["content-type"]);
-    } else {
-        xhr.overrideMimeType(self.get("content-type"));
-    }
-    xhr.send();
-};
-
-/*
- *  Download Asset data
- *
- *  @method download
- *  @public
- *  @returns {callback} callback(err, blob) blob is a javascript Blob object.
- */
-Usergrid.Asset.prototype.download = function(callback) {
-    this.downloadAsset(function(err, response) {
-        if (!err) {
-            doCallback(callback, [ null, response, self ], self);
-        } else {
-            doCallback(callback, [ new UsergridError(err), response, self ], self);
-        }
-    });
-};
-
-/**
- * Created by ryan bridges on 2014-02-05.
- */
-(function(global) {
-    var name = "UsergridError", short, _name = global[name], _short = short && short !== undefined ? global[short] : undefined;
-    /*
-     *  Instantiates a new UsergridError
-     *
-     *  @method UsergridError
-     *  @public
-     *  @params {<string>} message
-     *  @params {<string>} id       - the error code, id, or name
-     *  @params {<int>} timestamp
-     *  @params {<int>} duration
-     *  @params {<string>} exception    - the Java exception from Usergrid
-     *  @return Returns - a new UsergridError object
-     *
-     *  Example:
-     *
-     *  UsergridError(message);
-     */
-    function UsergridError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridError.prototype = new Error();
-    UsergridError.prototype.constructor = UsergridError;
-    /*
-     *  Creates a UsergridError from the JSON response returned from the backend
-     *
-     *  @method fromResponse
-     *  @public
-     *  @params {object} response - the deserialized HTTP response from the Usergrid API
-     *  @return Returns a new UsergridError object.
-     *
-     *  Example:
-     *  {
-     *  "error":"organization_application_not_found",
-     *  "timestamp":1391618508079,
-     *  "duration":0,
-     *  "exception":"org.usergrid.rest.exceptions.OrganizationApplicationNotFoundException",
-     *  "error_description":"Could not find application for yourorgname/sandboxxxxx from URI: yourorgname/sandboxxxxx"
-     *  }
-     */
-    UsergridError.fromResponse = function(response) {
-        if (response && "undefined" !== typeof response) {
-            return new UsergridError(response.error_description, response.error, response.timestamp, response.duration, response.exception);
-        } else {
-            return new UsergridError();
-        }
-    };
-    UsergridError.createSubClass = function(name) {
-        if (name in global && global[name]) return global[name];
-        global[name] = function() {};
-        global[name].name = name;
-        global[name].prototype = new UsergridError();
-        return global[name];
-    };
-    function UsergridHTTPResponseError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridHTTPResponseError.prototype = new UsergridError();
-    function UsergridInvalidHTTPMethodError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_http_method";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidHTTPMethodError.prototype = new UsergridError();
-    function UsergridInvalidURIError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_uri";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidURIError.prototype = new UsergridError();
-    function UsergridInvalidArgumentError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_argument";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidArgumentError.prototype = new UsergridError();
-    function UsergridKeystoreDatabaseUpgradeNeededError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridKeystoreDatabaseUpgradeNeededError.prototype = new UsergridError();
-    global.UsergridHTTPResponseError = UsergridHTTPResponseError;
-    global.UsergridInvalidHTTPMethodError = UsergridInvalidHTTPMethodError;
-    global.UsergridInvalidURIError = UsergridInvalidURIError;
-    global.UsergridInvalidArgumentError = UsergridInvalidArgumentError;
-    global.UsergridKeystoreDatabaseUpgradeNeededError = UsergridKeystoreDatabaseUpgradeNeededError;
-    global[name] = UsergridError;
-    if (short !== undefined) {
-        global[short] = UsergridError;
-    }
-    global[name].noConflict = function() {
-        if (_name) {
-            global[name] = _name;
-        }
-        if (short !== undefined) {
-            global[short] = _short;
-        }
-        return UsergridError;
-    };
-    return global[name];
-})(this);

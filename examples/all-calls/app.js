@@ -44,14 +44,8 @@
 *  This file contains the main program logic for All Calls App.
 */
 $(document).ready(function () {
-  //first set the org / app path (must be orgname / appname or org id / app id - can't mix names and uuids!!)
 
-  var client = new Usergrid.Client({
-    orgName:'yourorgname',
-    appName:'yourappname',
-    logging: true, //optional - turn on logging, off by default
-    buildCurl: true //optional - turn on curl commands, off by default
-  });
+  var client = new UsergridClient({orgId: "rwalsh", appId: "jssdktestapp", authMode: UsergridAuthMode.NONE});
 
   function hideAllSections(){
     $('#get-page').hide();
@@ -133,41 +127,26 @@ $(document).ready(function () {
 
   function _get() {
     var endpoint = $("#get-path").val();
-
-    var options = {
-      method:'GET',
-      endpoint:endpoint
-    };
-    client.request(options, function (err, data) {
-      //data will contain raw results from API call
+    client.GET({path:endpoint},function(usergridResponse) {
+      var err = usergridResponse.error
       if (err) {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>ERROR: '+output+'</pre>');
+        $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>'+output+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
       }
-    });
+    })
   }
 
   function _post() {
     var endpoint = $("#post-path").val();
     var data = $("#post-data").val();
     data = JSON.parse(data);
-
-    var options = {
-      method:'POST',
-      endpoint:endpoint,
-      body:data
-    };
-    client.request(options, function (err, data) {
-      //data will contain raw results from API call
+    client.POST({path:endpoint,body:data}, function (usergridResponse) {
+      var err = usergridResponse.error
       if (err) {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>ERROR: '+output+'</pre>');
+        $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>'+output+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
       }
     });
   }
@@ -176,39 +155,24 @@ $(document).ready(function () {
     var endpoint = $("#put-path").val();
     var data = $("#put-data").val();
     data = JSON.parse(data);
-
-    var options = {
-      method:'PUT',
-      endpoint:endpoint,
-      body:data
-    };
-    client.request(options, function (err, data) {
-      //data will contain raw results from API call
+    client.PUT({path:endpoint,body:data}, function (usergridResponse) {
+      var err = usergridResponse.error
       if (err) {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>ERROR: '+output+'</pre>');
+        $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>'+output+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
       }
     });
   }
 
   function _delete() {
     var endpoint = $("#delete-path").val();
-
-    var options = {
-      method:'DELETE',
-      endpoint:endpoint
-    };
-    client.request(options, function (err, data) {
-      //data will contain raw results from API call
+    client.DELETE({path:endpoint}, function (usergridResponse) {
+      var err = usergridResponse.error
       if (err) {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>ERROR: '+output+'</pre>');
+        $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>'+output+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
       }
     });
   }
@@ -216,21 +180,13 @@ $(document).ready(function () {
   function _login() {
     var username = $("#username").val();
     var password = $("#password").val();
-
-    client.login(username, password, function (err, data) {
-      //at this point, the user has been logged in succesfully and the OAuth token for the user has been stored
-      //however, in this example, we don't want to use that token for the rest of the API calls, so we will now
-      //reset it.  In your app, you will most likely not want to do this, as you are effectively logging the user
-      //out.  Our calls work because we are going against the Sandbox app, which has no restrictions on permissions.
-      client.token = null; //delete the user's token by setting it to null
+    client.authenticateUser({username:username, password:password}, function (auth,user,usergridResponse) {
+      var err = usergridResponse.error
       if (err) {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>ERROR: '+output+'</pre>');
+        $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        var output = JSON.stringify(data, null, 2);
-        $("#response").html('<pre>'+output+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.responseJSON,null,2)+'</pre>');
       }
     });
   }
-
 });

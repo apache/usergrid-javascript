@@ -17,7 +17,7 @@
  *under the License.
  * 
  * 
- * usergrid@0.11.0 2016-10-09 
+ * usergrid@2.0.0 2016-10-09 
  */
 (function(global) {
     var name = "Promise", overwrittenName = global[name], exports;
@@ -6018,7 +6018,9 @@ var UsergridQuery = function(type) {
             if (queryString !== undefined) {
                 return queryString;
             } else {
-                return "select *" + (query.length > 0 || sort !== undefined ? " where " + (query || "") + (sort || "") : "");
+                var qL = "select * " + (query.length > 0 ? "where " + (query || "") : "");
+                qL += sort !== undefined ? sort : "";
+                return qL;
             }
         }
     });
@@ -6554,7 +6556,7 @@ UsergridResponse.prototype = {
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var type = _.last(_.get(self, "responseJSON.path").split("/"));
         var limit = _.first(_.get(this, "responseJSON.params.limit"));
-        var query = new UsergridQuery(type).cursor(this.responseJSON.cursor).limit(limit);
+        var query = new UsergridQuery(type).fromString(_.get(self,'responseJSON.params.ql.0')).cursor(this.responseJSON.cursor).limit(limit);
         return client.GET(query, callback);
     }
 };

@@ -127,7 +127,7 @@ $(document).ready(function () {
 
   function _get() {
     var endpoint = $("#get-path").val();
-    client.GET({path:endpoint},function(usergridResponse) {
+    client.GET(endpoint, function(usergridResponse) {
       var err = usergridResponse.error
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
@@ -141,7 +141,7 @@ $(document).ready(function () {
     var endpoint = $("#post-path").val();
     var data = $("#post-data").val();
     data = JSON.parse(data);
-    client.POST({path:endpoint,body:data}, function (usergridResponse) {
+    client.POST(endpoint, data, function (usergridResponse) {
       var err = usergridResponse.error
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
@@ -155,7 +155,7 @@ $(document).ready(function () {
     var endpoint = $("#put-path").val();
     var data = $("#put-data").val();
     data = JSON.parse(data);
-    client.PUT({path:endpoint,body:data}, function (usergridResponse) {
+    client.PUT(endpoint, data, function (usergridResponse) {
       var err = usergridResponse.error
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
@@ -167,7 +167,7 @@ $(document).ready(function () {
 
   function _delete() {
     var endpoint = $("#delete-path").val();
-    client.DELETE({path:endpoint}, function (usergridResponse) {
+    client.DELETE(endpoint, function (usergridResponse) {
       var err = usergridResponse.error
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');

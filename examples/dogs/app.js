@@ -115,7 +115,7 @@ $(document).ready(function () {
 			    nameHelp.html(Usergrid.validation.getNameAllowedChars());
                 createDogButton.removeClass("disabled");})
 		) {
-			client.POST({type:'dogs',body:{ name:name }}, function(usergridResponse) {
+			client.POST('dogs',{ name:name }, function(usergridResponse) {
 				if (usergridResponse.error) {
                     alert('Oops! There was an error creating the dog. \n' + JSON.stringify(usergridResponse.error,null,2));
                     createDogButton.removeClass("disabled");

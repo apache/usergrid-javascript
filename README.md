@@ -433,24 +433,24 @@ var query = new UsergridQuery('devices').locationWithin(<distanceInMeters>, <lat
 Queries can be passed as parameters to GET, PUT, and DELETE requests:
 
 ```js
-Usergrid.GET(query, function(error, usergridResponse, entities) {
-    //
+Usergrid.GET(query, function(error, usergridResponse) {
+    // usergridResponse.entities is an array of UsergridEntity objects matching the specified query
 })
     
-Usergrid.PUT(query, { aNewProperty: "A new value" }, function(error, usergridResponse, entities) {
-    //
+Usergrid.PUT(query, { aNewProperty: "A new value" }, function(error, usergridResponse) {
+    // usergridResponse.entities is an array of UsergridEntity objects matching the specified query that contain aNewProperty equal to "A new value"
 })
     
-Usergrid.DELETE(query, function(error, usergridResponse, entities) {
-    //
+Usergrid.DELETE(query, function(error, usergridResponse) {
+    // usergridResponse.entities is an array of UsergridEntity objects matching the specified query that are now deleted
 })
 ```
     
 While not a typical use case, sometimes it is useful to be able to create a query that works on multiple collections. Therefore, in each one of these RESTful calls, you can optionally pass a 'type' string as the first argument:
 
 ```js
-Usergrid.GET('cats', query, function(error, usergridResponse, entities) {
-    //
+Usergrid.GET('cats', query, function(error, usergridResponse) {
+    // usergridResponse.entities is an array of UsergridEntity objects matching the specified query with the type of 'cats'
 })
 ```
     
@@ -549,16 +549,14 @@ var query = new UsergridQuery('cats').eq('color', 'black').or.eq('color', 'white
 var query = new UsergridQuery().fromString("select * where color = 'black' order by name asc")
 ```
 
-## UsergridResponse object
-
-`UsergridResponse` implements several Usergrid-specific enhancements to [request](https://github.com/request/request). Notably:
+## UsergridResponse
 
 ### ok
 
 You can check `usergridResponse.ok`, a `bool` value, to see if the response was successful. Any status code < 400 returns true.
 
 ```js
-Usergrid.GET('collection', function(error, usergridResponse, entities) {
+Usergrid.GET('collection', function(error, usergridResponse) {
     if (usergridResponse.ok) {
         // woo!
     }

@@ -19,6 +19,8 @@
  * 
  * usergrid@2.0.0 2016-10-13 
  */
+"use strict";
+
 (function(global) {
     var name = "Promise", overwrittenName = global[name];
     function Promise() {
@@ -91,10 +93,11 @@
 })(this);
 
 (function() {
+    "use strict";
     var undefined;
-    var VERSION = "4.16.0";
+    var VERSION = "4.16.4";
     var LARGE_ARRAY_SIZE = 200;
-    var FUNC_ERROR_TEXT = "Expected a function";
+    var CORE_ERROR_TEXT = "Unsupported core-js use. Try https://github.com/es-shims.", FUNC_ERROR_TEXT = "Expected a function";
     var HASH_UNDEFINED = "__lodash_hash_undefined__";
     var MAX_MEMOIZE_SIZE = 500;
     var PLACEHOLDER = "__lodash_placeholder__";
@@ -106,10 +109,10 @@
     var INFINITY = 1 / 0, MAX_SAFE_INTEGER = 9007199254740991, MAX_INTEGER = 1.7976931348623157e308, NAN = 0 / 0;
     var MAX_ARRAY_LENGTH = 4294967295, MAX_ARRAY_INDEX = MAX_ARRAY_LENGTH - 1, HALF_MAX_ARRAY_LENGTH = MAX_ARRAY_LENGTH >>> 1;
     var wrapFlags = [ [ "ary", ARY_FLAG ], [ "bind", BIND_FLAG ], [ "bindKey", BIND_KEY_FLAG ], [ "curry", CURRY_FLAG ], [ "curryRight", CURRY_RIGHT_FLAG ], [ "flip", FLIP_FLAG ], [ "partial", PARTIAL_FLAG ], [ "partialRight", PARTIAL_RIGHT_FLAG ], [ "rearg", REARG_FLAG ] ];
-    var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]", weakSetTag = "[object WeakSet]";
+    var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", proxyTag = "[object Proxy]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]", weakSetTag = "[object WeakSet]";
     var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
     var reEmptyStringLeading = /\b__p \+= '';/g, reEmptyStringMiddle = /\b(__p \+=) '' \+/g, reEmptyStringTrailing = /(__e\(.*?\)|\b__t\)) \+\n'';/g;
-    var reEscapedHtml = /&(?:amp|lt|gt|quot|#39|#96);/g, reUnescapedHtml = /[&<>"'`]/g, reHasEscapedHtml = RegExp(reEscapedHtml.source), reHasUnescapedHtml = RegExp(reUnescapedHtml.source);
+    var reEscapedHtml = /&(?:amp|lt|gt|quot|#39);/g, reUnescapedHtml = /[&<>"']/g, reHasEscapedHtml = RegExp(reEscapedHtml.source), reHasUnescapedHtml = RegExp(reUnescapedHtml.source);
     var reEscape = /<%-([\s\S]+?)%>/g, reEvaluate = /<%([\s\S]+?)%>/g, reInterpolate = /<%=([\s\S]+?)%>/g;
     var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/, reLeadingDot = /^\./, rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
     var reRegExpChar = /[\\^$.*+?()[\]{}|]/g, reHasRegExpChar = RegExp(reRegExpChar.source);
@@ -716,7 +719,7 @@
     function unicodeWords(string) {
         return string.match(reUnicodeWord) || [];
     }
-    function runInContext(context) {
+    var runInContext = function runInContext(context) {
         context = context ? _.defaults(root.Object(), context, _.pick(root, contextProps)) : root;
         var Array = context.Array, Date = context.Date, Error = context.Error, Function = context.Function, Math = context.Math, Object = context.Object, RegExp = context.RegExp, String = context.String, TypeError = context.TypeError;
         var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
@@ -732,10 +735,17 @@
         var objectToString = objectProto.toString;
         var oldDash = root._;
         var reIsNative = RegExp("^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$");
-        var Buffer = moduleExports ? context.Buffer : undefined, Symbol = context.Symbol, Uint8Array = context.Uint8Array, defineProperty = Object.defineProperty, getPrototype = overArg(Object.getPrototypeOf, Object), iteratorSymbol = Symbol ? Symbol.iterator : undefined, objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
+        var Buffer = moduleExports ? context.Buffer : undefined, Symbol = context.Symbol, Uint8Array = context.Uint8Array, allocUnsafe = Buffer ? Buffer.allocUnsafe : undefined, getPrototype = overArg(Object.getPrototypeOf, Object), iteratorSymbol = Symbol ? Symbol.iterator : undefined, objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
+        var defineProperty = function() {
+            try {
+                var func = getNative(Object, "defineProperty");
+                func({}, "", {});
+                return func;
+            } catch (e) {}
+        }();
         var ctxClearTimeout = context.clearTimeout !== root.clearTimeout && context.clearTimeout, ctxNow = Date && Date.now !== root.Date.now && Date.now, ctxSetTimeout = context.setTimeout !== root.setTimeout && context.setTimeout;
         var nativeCeil = Math.ceil, nativeFloor = Math.floor, nativeGetSymbols = Object.getOwnPropertySymbols, nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined, nativeIsFinite = context.isFinite, nativeJoin = arrayProto.join, nativeKeys = overArg(Object.keys, Object), nativeMax = Math.max, nativeMin = Math.min, nativeNow = Date.now, nativeParseInt = context.parseInt, nativeRandom = Math.random, nativeReverse = arrayProto.reverse;
-        var DataView = getNative(context, "DataView"), Map = getNative(context, "Map"), Promise = getNative(context, "Promise"), Set = getNative(context, "Set"), WeakMap = getNative(context, "WeakMap"), nativeCreate = getNative(Object, "create"), nativeDefineProperty = getNative(Object, "defineProperty");
+        var DataView = getNative(context, "DataView"), Map = getNative(context, "Map"), Promise = getNative(context, "Promise"), Set = getNative(context, "Set"), WeakMap = getNative(context, "WeakMap"), nativeCreate = getNative(Object, "create");
         var metaMap = WeakMap && new WeakMap();
         var realNames = {};
         var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map), promiseCtorString = toSource(Promise), setCtorString = toSource(Set), weakMapCtorString = toSource(WeakMap);
@@ -751,6 +761,21 @@
             }
             return new LodashWrapper(value);
         }
+        var baseCreate = function() {
+            function object() {}
+            return function(proto) {
+                if (!isObject(proto)) {
+                    return {};
+                }
+                if (objectCreate) {
+                    return objectCreate(proto);
+                }
+                object.prototype = proto;
+                var result = new object();
+                object.prototype = undefined;
+                return result;
+            };
+        }();
         function baseLodash() {}
         function LodashWrapper(value, chainAll) {
             this.__wrapped__ = value;
@@ -1011,10 +1036,9 @@
         Stack.prototype.has = stackHas;
         Stack.prototype.set = stackSet;
         function arrayLikeKeys(value, inherited) {
-            var result = isArray(value) || isArguments(value) ? baseTimes(value.length, String) : [];
-            var length = result.length, skipIndexes = !!length;
+            var isArr = isArray(value), isArg = !isArr && isArguments(value), isBuff = !isArr && !isArg && isBuffer(value), isType = !isArr && !isArg && !isBuff && isTypedArray(value), skipIndexes = isArr || isArg || isBuff || isType, result = skipIndexes ? baseTimes(value.length, String) : [], length = result.length;
             for (var key in value) {
-                if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && (key == "length" || isIndex(key, length)))) {
+                if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && (key == "length" || isBuff && (key == "offset" || key == "parent") || isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || isIndex(key, length)))) {
                     result.push(key);
                 }
             }
@@ -1025,9 +1049,7 @@
             return length ? array[baseRandom(0, length - 1)] : undefined;
         }
         function arraySampleSize(array, n) {
-            var result = arrayShuffle(array);
-            result.length = baseClamp(n, 0, result.length);
-            return result;
+            return shuffleSelf(copyArray(array), baseClamp(n, 0, array.length));
         }
         function arrayShuffle(array) {
             return shuffleSelf(copyArray(array));
@@ -1039,7 +1061,7 @@
             return objValue;
         }
         function assignMergeValue(object, key, value) {
-            if (value !== undefined && !eq(object[key], value) || typeof key == "number" && value === undefined && !(key in object)) {
+            if (value !== undefined && !eq(object[key], value) || value === undefined && !(key in object)) {
                 baseAssignValue(object, key, value);
             }
         }
@@ -1137,9 +1159,7 @@
                 return stacked;
             }
             stack.set(value, result);
-            if (!isArr) {
-                var props = isFull ? getAllKeys(value) : keys(value);
-            }
+            var props = isArr ? undefined : (isFull ? getAllKeys : keys)(value);
             arrayEach(props || value, function(subValue, key) {
                 if (props) {
                     key = subValue;
@@ -1168,9 +1188,6 @@
                 }
             }
             return true;
-        }
-        function baseCreate(proto) {
-            return isObject(proto) ? objectCreate(proto) : {};
         }
         function baseDelay(func, wait, args) {
             if (typeof func != "function") {
@@ -1362,6 +1379,9 @@
             var func = object == null ? object : object[toKey(path)];
             return func == null ? undefined : apply(func, object, args);
         }
+        function baseIsArguments(value) {
+            return isObjectLike(value) && objectToString.call(value) == argsTag;
+        }
         function baseIsArrayBuffer(value) {
             return isObjectLike(value) && objectToString.call(value) == arrayBufferTag;
         }
@@ -1388,6 +1408,13 @@
                 othTag = othTag == argsTag ? objectTag : othTag;
             }
             var objIsObj = objTag == objectTag, othIsObj = othTag == objectTag, isSameTag = objTag == othTag;
+            if (isSameTag && isBuffer(object)) {
+                if (!isBuffer(other)) {
+                    return false;
+                }
+                objIsArr = true;
+                objIsObj = false;
+            }
             if (isSameTag && !objIsObj) {
                 stack || (stack = new Stack());
                 return objIsArr || isTypedArray(object) ? equalArrays(object, other, equalFunc, customizer, bitmask, stack) : equalByTag(object, other, objTag, equalFunc, customizer, bitmask, stack);
@@ -1524,14 +1551,7 @@
             if (object === source) {
                 return;
             }
-            if (!(isArray(source) || isTypedArray(source))) {
-                var props = baseKeysIn(source);
-            }
-            arrayEach(props || source, function(srcValue, key) {
-                if (props) {
-                    key = srcValue;
-                    srcValue = source[key];
-                }
+            baseFor(source, function(srcValue, key) {
                 if (isObject(srcValue)) {
                     stack || (stack = new Stack());
                     baseMergeDeep(object, source, key, srcIndex, baseMerge, customizer, stack);
@@ -1542,7 +1562,7 @@
                     }
                     assignMergeValue(object, key, newValue);
                 }
-            });
+            }, keysIn);
         }
         function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, stack) {
             var objValue = object[key], srcValue = source[key], stacked = stack.get(srcValue);
@@ -1553,24 +1573,28 @@
             var newValue = customizer ? customizer(objValue, srcValue, key + "", object, source, stack) : undefined;
             var isCommon = newValue === undefined;
             if (isCommon) {
+                var isArr = isArray(srcValue), isBuff = !isArr && isBuffer(srcValue), isTyped = !isArr && !isBuff && isTypedArray(srcValue);
                 newValue = srcValue;
-                if (isArray(srcValue) || isTypedArray(srcValue)) {
+                if (isArr || isBuff || isTyped) {
                     if (isArray(objValue)) {
                         newValue = objValue;
                     } else if (isArrayLikeObject(objValue)) {
                         newValue = copyArray(objValue);
-                    } else {
+                    } else if (isBuff) {
                         isCommon = false;
-                        newValue = baseClone(srcValue, true);
+                        newValue = cloneBuffer(srcValue, true);
+                    } else if (isTyped) {
+                        isCommon = false;
+                        newValue = cloneTypedArray(srcValue, true);
+                    } else {
+                        newValue = [];
                     }
                 } else if (isPlainObject(srcValue) || isArguments(srcValue)) {
+                    newValue = objValue;
                     if (isArguments(objValue)) {
                         newValue = toPlainObject(objValue);
                     } else if (!isObject(objValue) || srcIndex && isFunction(objValue)) {
-                        isCommon = false;
-                        newValue = baseClone(srcValue, true);
-                    } else {
-                        newValue = objValue;
+                        newValue = initCloneObject(srcValue);
                     }
                 } else {
                     isCommon = false;
@@ -1698,6 +1722,13 @@
         function baseRest(func, start) {
             return setToString(overRest(func, start, identity), func + "");
         }
+        function baseSample(collection) {
+            return arraySample(values(collection));
+        }
+        function baseSampleSize(collection, n) {
+            var array = values(collection);
+            return shuffleSelf(array, baseClamp(n, 0, array.length));
+        }
         function baseSet(object, path, value, customizer) {
             if (!isObject(object)) {
                 return object;
@@ -1722,14 +1753,17 @@
             metaMap.set(func, data);
             return func;
         };
-        var baseSetToString = !nativeDefineProperty ? identity : function(func, string) {
-            return nativeDefineProperty(func, "toString", {
+        var baseSetToString = !defineProperty ? identity : function(func, string) {
+            return defineProperty(func, "toString", {
                 configurable: true,
                 enumerable: false,
                 value: constant(string),
                 writable: true
             });
         };
+        function baseShuffle(collection) {
+            return shuffleSelf(values(collection));
+        }
         function baseSlice(array, start, end) {
             var index = -1, length = array.length;
             if (start < 0) {
@@ -1819,6 +1853,9 @@
         function baseToString(value) {
             if (typeof value == "string") {
                 return value;
+            }
+            if (isArray(value)) {
+                return arrayMap(value, baseToString) + "";
             }
             if (isSymbol(value)) {
                 return symbolToString ? symbolToString.call(value) : "";
@@ -1925,7 +1962,7 @@
             if (isDeep) {
                 return buffer.slice();
             }
-            var result = new buffer.constructor(buffer.length);
+            var length = buffer.length, result = allocUnsafe ? allocUnsafe(length) : new buffer.constructor(length);
             buffer.copy(result);
             return result;
         }
@@ -2937,13 +2974,15 @@
                 return func.apply(undefined, arguments);
             };
         }
-        function shuffleSelf(array) {
+        function shuffleSelf(array, size) {
             var index = -1, length = array.length, lastIndex = length - 1;
-            while (++index < length) {
+            size = size === undefined ? length : size;
+            while (++index < size) {
                 var rand = baseRandom(index, lastIndex), value = array[rand];
                 array[rand] = array[index];
                 array[index] = value;
             }
+            array.length = size;
             return array;
         }
         var stringToPath = memoizeCapped(function(string) {
@@ -3579,7 +3618,8 @@
             return func(collection, negate(getIteratee(predicate, 3)));
         }
         function sample(collection) {
-            return arraySample(isArrayLike(collection) ? collection : values(collection));
+            var func = isArray(collection) ? arraySample : baseSample;
+            return func(collection);
         }
         function sampleSize(collection, n, guard) {
             if (guard ? isIterateeCall(collection, n, guard) : n === undefined) {
@@ -3587,10 +3627,12 @@
             } else {
                 n = toInteger(n);
             }
-            return arraySampleSize(isArrayLike(collection) ? collection : values(collection), n);
+            var func = isArray(collection) ? arraySampleSize : baseSampleSize;
+            return func(collection, n);
         }
         function shuffle(collection) {
-            return shuffleSelf(isArrayLike(collection) ? copyArray(collection) : values(collection));
+            var func = isArray(collection) ? arrayShuffle : baseShuffle;
+            return func(collection);
         }
         function size(collection) {
             if (collection == null) {
@@ -3911,9 +3953,11 @@
         var gte = createRelationalOperation(function(value, other) {
             return value >= other;
         });
-        function isArguments(value) {
-            return isArrayLikeObject(value) && hasOwnProperty.call(value, "callee") && (!propertyIsEnumerable.call(value, "callee") || objectToString.call(value) == argsTag);
-        }
+        var isArguments = baseIsArguments(function() {
+            return arguments;
+        }()) ? baseIsArguments : function(value) {
+            return isObjectLike(value) && hasOwnProperty.call(value, "callee") && !propertyIsEnumerable.call(value, "callee");
+        };
         var isArray = Array.isArray;
         var isArrayBuffer = nodeIsArrayBuffer ? baseUnary(nodeIsArrayBuffer) : baseIsArrayBuffer;
         function isArrayLike(value) {
@@ -3931,7 +3975,7 @@
             return value != null && value.nodeType === 1 && isObjectLike(value) && !isPlainObject(value);
         }
         function isEmpty(value) {
-            if (isArrayLike(value) && (isArray(value) || typeof value == "string" || typeof value.splice == "function" || isBuffer(value) || isArguments(value))) {
+            if (isArrayLike(value) && (isArray(value) || typeof value == "string" || typeof value.splice == "function" || isBuffer(value) || isTypedArray(value) || isArguments(value))) {
                 return !value.length;
             }
             var tag = getTag(value);
@@ -3939,7 +3983,7 @@
                 return !value.size;
             }
             if (isPrototype(value)) {
-                return !nativeKeys(value).length;
+                return !baseKeys(value).length;
             }
             for (var key in value) {
                 if (hasOwnProperty.call(value, key)) {
@@ -3967,7 +4011,7 @@
         }
         function isFunction(value) {
             var tag = isObject(value) ? objectToString.call(value) : "";
-            return tag == funcTag || tag == genTag;
+            return tag == funcTag || tag == genTag || tag == proxyTag;
         }
         function isInteger(value) {
             return typeof value == "number" && value == toInteger(value);
@@ -3995,7 +4039,7 @@
         }
         function isNative(value) {
             if (isMaskable(value)) {
-                throw new Error("This method is not supported with core-js. Try https://github.com/es-shims.");
+                throw new Error(CORE_ERROR_TEXT);
             }
             return baseIsNative(value);
         }
@@ -4251,21 +4295,19 @@
         var toPairs = createToPairs(keys);
         var toPairsIn = createToPairs(keysIn);
         function transform(object, iteratee, accumulator) {
-            var isArr = isArray(object) || isTypedArray(object);
+            var isArr = isArray(object), isArrLike = isArr || isBuffer(object) || isTypedArray(object);
             iteratee = getIteratee(iteratee, 4);
             if (accumulator == null) {
-                if (isArr || isObject(object)) {
-                    var Ctor = object.constructor;
-                    if (isArr) {
-                        accumulator = isArray(object) ? new Ctor() : [];
-                    } else {
-                        accumulator = isFunction(Ctor) ? baseCreate(getPrototype(object)) : {};
-                    }
+                var Ctor = object && object.constructor;
+                if (isArrLike) {
+                    accumulator = isArr ? new Ctor() : [];
+                } else if (isObject(object)) {
+                    accumulator = isFunction(Ctor) ? baseCreate(getPrototype(object)) : {};
                 } else {
                     accumulator = {};
                 }
             }
-            (isArr ? arrayEach : baseForOwn)(object, function(value, index, object) {
+            (isArrLike ? arrayEach : baseForOwn)(object, function(value, index, object) {
                 return iteratee(accumulator, value, index, object);
             });
             return accumulator;
@@ -4411,7 +4453,7 @@
             } else if (radix) {
                 radix = +radix;
             }
-            return nativeParseInt(toString(string), radix || 0);
+            return nativeParseInt(toString(string).replace(reTrimStart, ""), radix || 0);
         }
         function repeat(string, n, guard) {
             if (guard ? isIterateeCall(string, n, guard) : n === undefined) {
@@ -5286,7 +5328,7 @@
             lodash.prototype[iteratorSymbol] = wrapperToIterator;
         }
         return lodash;
-    }
+    };
     var _ = runInContext();
     if (typeof define == "function" && typeof define.amd == "object" && define.amd) {
         root._ = _;
@@ -5300,6 +5342,8 @@
         root._ = _;
     }
 }).call(this);
+
+"use strict";
 
 var UsergridAuthMode = Object.freeze({
     NONE: "none",
@@ -6329,24 +6373,13 @@ UsergridEntity.prototype = {
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         var currentAsset = self.asset;
-        var uuid = self.uuid;
-        if (uuid === undefined) {
-            client.POST(self, function(usergridResponse) {
-                UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
-                if (self.hasAsset) {
-                    self.asset = currentAsset;
-                }
-                callback(usergridResponse, self);
-            }.bind(self));
-        } else {
-            client.PUT(self, function(usergridResponse) {
-                UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
-                if (self.hasAsset) {
-                    self.asset = currentAsset;
-                }
-                callback(usergridResponse, self);
-            }.bind(self));
-        }
+        client.PUT(self, function(usergridResponse) {
+            UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
+            if (self.hasAsset) {
+                self.asset = currentAsset;
+            }
+            callback(usergridResponse, self);
+        }.bind(self));
     },
     remove: function() {
         var self = this;

@@ -330,8 +330,7 @@ configs.forEach(function(config) {
                     usergridResponse.entities.forEach(function (entity) {
                         entity.should.be.an.Object().with.property('testUuid').equal(body.testUuid)
                     });
-                    var deleteQuery = new UsergridQuery(config.test.collection).eq('uuid', usergridResponse.entities[0].uuid).or.eq('uuid', usergridResponse.entities[1].uuid);
-                    sleepFor(config.defaultLongSleepTime);
+                    sleepFor(config.defaultLongSleepTime + config.defaultSleepTime);
                     client.DELETE(query, function (delResponse) {
                         delResponse.entities.should.be.an.Array().with.lengthOf(usergridResponse.entities.length);
                         done()

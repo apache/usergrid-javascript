@@ -7,8 +7,8 @@ var targetedConfigs = {
         "clientId": "YXA6KPq8cIsPEea0i-W5Jx8cgw",
         "clientSecret": "YXA6WaT7qsxh_eRS3ryBresi-HwoQAQ",
         "target": "1.0",
-        defaultSleepTime:0,
-        defaultLongSleepTime:0,
+        "defaultSleepTime":0,
+        "defaultLongSleepTime":0,
         "test": {
             "collection": "nodejs",
             "email": "authtest@test.com",
@@ -23,8 +23,8 @@ var targetedConfigs = {
         "clientId": "YXA6WMhAuFJTEeWoggrRE9kXrQ",
         "clientSecret": "YXA6zZbat7PKgOlN73rpByc36LWaUhw",
         "target": "2.1",
-        defaultSleepTime:200,
-        defaultLongSleepTime:600,
+        "defaultSleepTime":200,
+        "defaultLongSleepTime":600,
         "test": {
             "collection": "nodejs",
             "email": "authtest@test.com",

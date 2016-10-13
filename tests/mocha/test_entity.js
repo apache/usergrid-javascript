@@ -30,7 +30,9 @@ configs.forEach(function(config) {
                     name: 'Cosmo',
                     foo: 'baz'
                 });
-                entity.putProperty('name', 'Bazinga');
+                should(function() {
+                    entity.putProperty('name', 'Bazinga');
+                }).throw();
                 entity.should.have.property('name').deepEqual('Cosmo');
             })
         });
@@ -62,15 +64,16 @@ configs.forEach(function(config) {
                     name: 'Cosmo',
                     foo: 'baz'
                 });
-                entity.putProperties({
-                    name: 'Bazinga',
-                    uuid: 'BadUuid',
-                    bar: 'qux'
-                });
+                should(function() {
+                    entity.putProperties({
+                        name: 'Bazinga',
+                        uuid: 'BadUuid',
+                        bar: 'qux'
+                    });
+                }).throw();
                 entity.should.containEql({
                     type: 'cat',
                     name: 'Cosmo',
-                    bar: 'qux',
                     foo: 'baz'
                 })
             })

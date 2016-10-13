@@ -17,10 +17,10 @@
  *under the License.
  * 
  * 
- * usergrid@2.0.0 2016-10-12 
+ * usergrid@2.0.0 2016-10-13 
  */
 (function(global) {
-    var name = "Promise", overwrittenName = global[name], exports;
+    var name = "Promise", overwrittenName = global[name];
     function Promise() {
         this.complete = false;
         this.result = null;
@@ -40,7 +40,9 @@
         this.complete = true;
         this.result = result;
         if (this.callbacks) {
-            for (var i = 0; i < this.callbacks.length; i++) this.callbacks[i](result);
+            _.forEach(this.callbacks, function(callback) {
+                callback(result);
+            });
             this.callbacks.length = 0;
         }
     };
@@ -5330,9 +5332,17 @@ var UsergridQuerySortOrder = Object.freeze({
     DESC: "desc"
 });
 
+"use strict";
+
+var UsergridApplicationJSONHeaderValue = "application/json";
+
 (function(global) {
     var name = "UsergridHelpers", overwrittenName = global[name];
     function UsergridHelpers() {}
+    UsergridHelpers.DefaultHeaders = Object.freeze({
+        "Content-Type": UsergridApplicationJSONHeaderValue,
+        Accept: UsergridApplicationJSONHeaderValue
+    });
     UsergridHelpers.validateAndRetrieveClient = function(args) {
         var client = undefined;
         if (args instanceof UsergridClient) {
@@ -5470,16 +5480,15 @@ var UsergridQuerySortOrder = Object.freeze({
     };
     UsergridHelpers.parseResponseHeaders = function(headerStr) {
         var headers = {};
-        if (!headerStr) {
-            return headers;
-        }
-        var headerPairs = headerStr.split("\r\n");
-        for (var i = 0; i < headerPairs.length; i++) {
-            var headerPair = headerPairs[i];
-            var index = headerPair.indexOf(": ");
-            if (index > 0) {
-                var key = headerPair.substring(0, index).toLowerCase();
-                headers[key] = headerPair.substring(index + 2);
+        if (headerStr) {
+            var headerPairs = headerStr.split("\r\n");
+            for (var i = 0; i < headerPairs.length; i++) {
+                var headerPair = headerPairs[i];
+                var index = headerPair.indexOf(": ");
+                if (index > 0) {
+                    var key = headerPair.substring(0, index).toLowerCase();
+                    headers[key] = headerPair.substring(index + 2);
+                }
             }
         }
         return headers;
@@ -5510,8 +5519,7 @@ var UsergridQuerySortOrder = Object.freeze({
     };
     UsergridHelpers.headers = function(client, options, defaultHeaders) {
         var returnHeaders = {};
-        _.assign(returnHeaders, defaultHeaders);
-        _.assign(returnHeaders, options.headers);
+        _.defaults(returnHeaders, options.headers, defaultHeaders);
         _.assign(returnHeaders, {
             "User-Agent": "usergrid-js/v" + UsergridSDKVersion
         });
@@ -6071,11 +6079,6 @@ var UsergridQuery = function(type) {
 
 "use strict";
 
-var UsergridRequestDefaultHeaders = Object.freeze({
-    "Content-Type": "application/json",
-    Accept: "application/json"
-});
-
 var UsergridRequest = function(options) {
     var self = this;
     var client = UsergridHelpers.validateAndRetrieveClient(options);
@@ -6093,20 +6096,20 @@ var UsergridRequest = function(options) {
     self.asset = options.asset || undefined;
     self.query = options.query;
     self.queryParams = options.queryParams || options.qs;
-    var defaultHeadersToUse = self.asset === undefined ? UsergridRequestDefaultHeaders : {};
+    var defaultHeadersToUse = self.asset === undefined ? UsergridHelpers.DefaultHeaders : {};
     self.headers = UsergridHelpers.headers(client, options, defaultHeadersToUse);
     if (self.query !== undefined) {
         self.uri += UsergridHelpers.normalize(self.query.encodedStringValue, {});
     }
     if (self.queryParams !== undefined) {
         _.forOwn(self.queryParams, function(value, key) {
-            self.uri += "?" + encodeURIComponent(key) + "=" + encodeURIComponent(value);
+            self.uri += "?" + encodeURIComponent(key) + UsergridQueryOperator.EQUAL + encodeURIComponent(value);
         });
         self.uri = UsergridHelpers.normalize(self.uri, {});
     }
     if (self.asset !== undefined) {
         self.body = new FormData();
-        self.body.append("file", self.asset.data);
+        self.body.append(self.asset.filename, self.asset.data);
     } else {
         try {
             if (_.isPlainObject(self.body)) {
@@ -6131,23 +6134,23 @@ UsergridRequest.prototype.sendRequest = function() {
         _.forOwn(self.headers, function(value, key) {
             xmlHttpRequest.setRequestHeader(key, value);
         });
-        if (self.method === UsergridHttpMethod.GET && _.get(self.headers, "Accept") !== "application/json") {
+        if (self.method === UsergridHttpMethod.GET && _.get(self.headers, "Accept") !== UsergridApplicationJSONHeaderValue) {
             xmlHttpRequest.responseType = "blob";
         }
         xmlHttpRequest.send(self.body);
         return promise;
-    }.bind(self);
+    };
     var responsePromise = function(xmlRequest) {
         var promise = new Promise();
         var usergridResponse = new UsergridResponse(xmlRequest, self);
         promise.done(usergridResponse);
         return promise;
-    }.bind(self);
+    };
     var onCompletePromise = function(response) {
         var promise = new Promise();
         promise.done(response);
         self.callback(response);
-    }.bind(self);
+    };
     Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
     return self;
 };
@@ -6365,9 +6368,8 @@ UsergridEntity.prototype = {
         if (_.has(self, "asset.contentType")) {
             client.uploadAsset(self, callback);
         } else {
-            var response = new UsergridResponse();
-            response.error = new UsergridResponseError({
-                error: "asset_not_found",
+            var response = new UsergridResponse.responseWithError({
+                name: "asset_not_found",
                 description: "The specified entity does not have a valid asset attached"
             });
             callback(null, response, self);
@@ -6381,9 +6383,8 @@ UsergridEntity.prototype = {
         if (_.has(self, "asset.contentType")) {
             client.downloadAsset(self, callback);
         } else {
-            var response = new UsergridResponse();
-            response.error = new UsergridResponseError({
-                error: "asset_not_found",
+            var response = new UsergridResponse.responseWithError({
+                name: "asset_not_found",
                 description: "The specified entity does not have a valid asset attached"
             });
             callback(null, response, self);
@@ -6460,7 +6461,7 @@ UsergridUser.prototype.create = function() {
     client.POST(self, function(usergridResponse) {
         delete self.password;
         _.assign(self, usergridResponse.user);
-        callback(usergridResponse);
+        callback(usergridResponse, usergridResponse.user);
     }.bind(self));
 };
 
@@ -6489,15 +6490,13 @@ UsergridUser.prototype.logout = function() {
     var client = UsergridHelpers.validateAndRetrieveClient(args);
     var callback = UsergridHelpers.callback(args);
     if (!self.auth || !self.auth.isValid) {
-        var response = new UsergridResponse();
-        response.error = new UsergridResponseError({
-            error: "no_valid_token",
+        var response = new UsergridResponse.responseWithError({
+            name: "no_valid_token",
             description: "this user does not have a valid token"
         });
         callback(response);
     } else {
         var revokeAll = _.first(args.filter(_.isBoolean)) || false;
-        var revokeTokenPath = [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/");
         var queryParams = undefined;
         if (!revokeAll) {
             queryParams = {
@@ -6506,7 +6505,7 @@ UsergridUser.prototype.logout = function() {
         }
         var requestOptions = {
             client: client,
-            path: revokeTokenPath,
+            path: [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/"),
             method: UsergridHttpMethod.PUT,
             queryParams: queryParams,
             callback: function(usergridResponse) {
@@ -6540,22 +6539,30 @@ UsergridUser.prototype.resetPassword = function() {
     if (!body.oldpassword || !body.newpassword) {
         throw new Error('"oldPassword" and "newPassword" properties are required when resetting a user password');
     }
-    client.PUT([ "users", self.uniqueId(), "password" ].join("/"), body, function(usergridResponse) {
-        callback(usergridResponse);
-    });
+    client.PUT([ "users", self.uniqueId(), "password" ].join("/"), body, callback);
 };
 
 "use strict";
 
-var UsergridResponseError = function(responseErrorObject) {
+var UsergridResponseError = function(options) {
     var self = this;
-    if (_.has(responseErrorObject, "error") === false) {
-        return;
-    }
-    self.name = responseErrorObject.error;
-    self.description = _.get(responseErrorObject, "error_description") || responseErrorObject.description;
-    self.exception = responseErrorObject.exception;
+    _.assign(self, options);
     return self;
+};
+
+UsergridResponseError.fromJSON = function(responseErrorObject) {
+    var usergridResponseError = undefined;
+    var error = {
+        name: _.get(responseErrorObject, "error")
+    };
+    if (error.name !== undefined) {
+        _.assign(error, {
+            exception: _.get(responseErrorObject, "exception"),
+            description: _.get(responseErrorObject, "error_description") || _.get(responseErrorObject, "description")
+        });
+        usergridResponseError = new UsergridResponseError(error);
+    }
+    return usergridResponseError;
 };
 
 var UsergridResponse = function(xmlRequest, usergridRequest) {
@@ -6569,46 +6576,21 @@ var UsergridResponse = function(xmlRequest, usergridRequest) {
         var responseContentType = _.get(self.headers, "content-type");
         if (responseContentType === "application/json") {
             try {
-                var responseText = xmlRequest.responseText;
-                var responseJSON = JSON.parse(responseText);
+                var responseJSON = JSON.parse(xmlRequest.responseText);
             } catch (e) {
                 responseJSON = {};
             }
-            if (self.ok) {
-                if (responseJSON !== undefined) {
-                    _.assign(self, {
-                        responseJSON: _.cloneDeep(responseJSON)
-                    });
-                    if (_.has(responseJSON, "entities")) {
-                        var entities = _.map(responseJSON.entities, function(en) {
-                            var entity = new UsergridEntity(en);
-                            if (entity.isUser) {
-                                entity = new UsergridUser(entity);
-                            }
-                            return entity;
-                        });
-                        _.assign(self, {
-                            entities: entities
-                        });
-                        delete self.responseJSON.entities;
-                        self.first = _.first(entities) || undefined;
-                        self.entity = self.first;
-                        self.last = _.last(entities) || undefined;
-                        if (_.get(self, "responseJSON.path") === "/users") {
-                            self.user = self.first;
-                            self.users = self.entities;
-                        }
-                        Object.defineProperty(self, "hasNextPage", {
-                            get: function() {
-                                return _.has(self, "responseJSON.cursor");
-                            }
-                        });
-                        UsergridHelpers.setReadOnly(self.responseJSON);
-                    }
+            self.parseResponseJSON(responseJSON);
+            Object.defineProperty(self, "cursor", {
+                get: function() {
+                    return _.get(self, "responseJSON.cursor");
                 }
-            } else {
-                self.error = new UsergridResponseError(responseJSON);
-            }
+            });
+            Object.defineProperty(self, "hasNextPage", {
+                get: function() {
+                    return self.cursor !== undefined;
+                }
+            });
         } else {
             self.asset = new UsergridAsset(xmlRequest.response);
         }
@@ -6616,21 +6598,65 @@ var UsergridResponse = function(xmlRequest, usergridRequest) {
     return self;
 };
 
+UsergridResponse.responseWithError = function(options) {
+    var usergridResponse = new UsergridResponse();
+    usergridResponse.error = new UsergridResponseError(options);
+    return usergridResponse;
+};
+
 UsergridResponse.prototype = {
+    parseResponseJSON: function(responseJSON) {
+        var self = this;
+        if (responseJSON !== undefined) {
+            _.assign(self, {
+                responseJSON: _.cloneDeep(responseJSON)
+            });
+            if (self.ok) {
+                var entitiesJSON = _.get(responseJSON, "entities");
+                if (entitiesJSON) {
+                    var entities = _.map(entitiesJSON, function(entityJSON) {
+                        var entity = new UsergridEntity(entityJSON);
+                        if (entity.isUser) {
+                            entity = new UsergridUser(entity);
+                        }
+                        return entity;
+                    });
+                    _.assign(self, {
+                        entities: entities
+                    });
+                    delete self.responseJSON.entities;
+                    self.first = _.first(entities) || undefined;
+                    self.entity = self.first;
+                    self.last = _.last(entities) || undefined;
+                    if (_.get(responseJSON, "path") === "/users") {
+                        self.user = self.first;
+                        self.users = self.entities;
+                    }
+                    UsergridHelpers.setReadOnly(self.responseJSON);
+                }
+            } else {
+                self.error = UsergridResponseError.fromJSON(responseJSON);
+            }
+        }
+    },
     loadNextPage: function() {
         var self = this;
-        var args = UsergridHelpers.flattenArgs(arguments);
-        var callback = UsergridHelpers.callback(args);
-        var cursor = _.get(self, "responseJSON.cursor");
+        var cursor = self.cursor;
         if (!cursor) {
-            callback();
+            callback(UsergridResponse.responseWithError({
+                name: "cursor_not_found",
+                description: "Cursor must be present in order perform loadNextPage()."
+            }));
+        } else {
+            var args = UsergridHelpers.flattenArgs(arguments);
+            var callback = UsergridHelpers.callback(args);
+            var client = UsergridHelpers.validateAndRetrieveClient(args);
+            var type = _.last(_.get(self, "responseJSON.path").split("/"));
+            var limit = _.first(_.get(self, "responseJSON.params.limit"));
+            var ql = _.first(_.get(self, "responseJSON.params.ql"));
+            var query = new UsergridQuery(type).fromString(ql).cursor(cursor).limit(limit);
+            client.GET(query, callback);
         }
-        var client = UsergridHelpers.validateAndRetrieveClient(args);
-        var type = _.last(_.get(self, "responseJSON.path").split("/"));
-        var limit = _.first(_.get(this, "responseJSON.params.limit"));
-        var ql = _.first(_.get(this, "responseJSON.params.ql"));
-        var query = new UsergridQuery(type).fromString(ql).cursor(cursor).limit(limit);
-        return client.GET(query, callback);
     }
 };
 

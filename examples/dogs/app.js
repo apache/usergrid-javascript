@@ -17,7 +17,7 @@ $(document).ready(function () {
 	  var client = new UsergridClient({orgId: "rwalsh", appId: "jssdktestapp", authMode: UsergridAuthMode.NONE}),
 		  lastResponse,
 		  lastQueryUsed,
-		  previousCursors = []
+		  previousCursors = [];
 
       var message = $('#message'),
           nextButton = $('#next-button'),
@@ -27,12 +27,12 @@ $(document).ready(function () {
           newDog = $('#new-dog'),
           newDogButton = $('#new-dog-button'),
           createDogButton = $('#create-dog'),
-          cancelCreateDogButton = $('#cancel-create-dog')
+          cancelCreateDogButton = $('#cancel-create-dog');
 
 	  nextButton.bind('click', function() {
           message.html('');
-          previousCursors.push(lastQueryUsed._cursor)
-          lastQueryUsed = new UsergridQuery('dogs').desc('created').cursor(_.get(lastResponse,'responseJSON.cursor'))
+          previousCursors.push(lastQueryUsed._cursor);
+          lastQueryUsed = new UsergridQuery('dogs').desc('created').cursor(_.get(lastResponse,'responseJSON.cursor'));
           lastResponse.loadNextPage(client,function(usergridResponse) {
               handleGETDogResponse(usergridResponse)
           })
@@ -40,9 +40,9 @@ $(document).ready(function () {
 
 	  previousButton.bind('click', function() {
           message.html('');
-		  var cursor = previousCursors.pop()
+		  var cursor = previousCursors.pop();
 		  if( cursor === '' ) {
-			  previousCursors = ''
+			  previousCursors = '';
 			  cursor = undefined
 		  }
 		  drawDogs(cursor)
@@ -67,7 +67,7 @@ $(document).ready(function () {
 	  });
 
 	  function drawDogs(cursor) {
-		lastQueryUsed = new UsergridQuery('dogs').desc('created')
+		lastQueryUsed = new UsergridQuery('dogs').desc('created');
 		if( cursor !== undefined && !_.isEmpty(cursor) ) {
 			lastQueryUsed.cursor(cursor)
 		}
@@ -77,7 +77,7 @@ $(document).ready(function () {
 	  }
 
 	  function handleGETDogResponse(usergridResponse) {
-          lastResponse = usergridResponse
+          lastResponse = usergridResponse;
           if(lastResponse.error) {
               alert('there was an error getting the dogs');
           } else {
@@ -87,7 +87,7 @@ $(document).ready(function () {
 
               _.forEach(lastResponse.entities,function(dog) {
                   myDogList.append('<li>'+ dog.name + '</li>');
-              })
+              });
 
               if (lastResponse.hasNextPage) {
                   nextButton.show();
@@ -103,7 +103,7 @@ $(document).ready(function () {
 
           var name = $("#name").val(),
               nameHelp = $("#name-help"),
-              nameControl = $("#name-control")
+              nameControl = $("#name-control");
 
           nameHelp.hide();
           nameControl.removeClass('error');
@@ -124,7 +124,7 @@ $(document).ready(function () {
                     newDog.hide();
                     dogsList.show();
                     createDogButton.removeClass("disabled");
-                    previousCursors = []
+                    previousCursors = [];
                     drawDogs();
 				}
 			})

@@ -34,7 +34,7 @@ module.exports = function(grunt) {
  * \n\
  * \n\
  * <%= meta.package.name %>@<%= meta.package.version %> <%= grunt.template.today('yyyy-mm-dd') %> \n\
- */\n"
+ */\n";
 
 	// Project configuration.
 	grunt.initConfig({

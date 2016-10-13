@@ -7,6 +7,8 @@ var targetedConfigs = {
         "clientId": "YXA6KPq8cIsPEea0i-W5Jx8cgw",
         "clientSecret": "YXA6WaT7qsxh_eRS3ryBresi-HwoQAQ",
         "target": "1.0",
+        defaultSleepTime:0,
+        defaultLongSleepTime:0,
         "test": {
             "collection": "nodejs",
             "email": "authtest@test.com",
@@ -21,6 +23,8 @@ var targetedConfigs = {
         "clientId": "YXA6WMhAuFJTEeWoggrRE9kXrQ",
         "clientSecret": "YXA6zZbat7PKgOlN73rpByc36LWaUhw",
         "target": "2.1",
+        defaultSleepTime:200,
+        defaultLongSleepTime:600,
         "test": {
             "collection": "nodejs",
             "email": "authtest@test.com",
@@ -31,9 +35,9 @@ var targetedConfigs = {
 
 };
 
-var configs = []
-configs.push(_.get(targetedConfigs,'1.0'))
-// configs.push(_.get(targetedConfigs,'2.1'))
+var configs = [];
+configs.push(_.get(targetedConfigs,'1.0'));
+configs.push(_.get(targetedConfigs,'2.1'));
 
 var testFile = {
     uri:'https://raw.githubusercontent.com/apache/usergrid-javascript/master/tests/resources/images/apigee.png',
@@ -41,20 +45,16 @@ var testFile = {
     contentType: 'image/png'
 };
 
-var _slow = 3000, _timeout = 4000, defaultSleepTime = 200;
+// Test slow and timeout times.  Timeout is set to 0 meaning tests will not timeout, though this might not be ideal.
+var _slow = 400,
+    _timeout = 0;
 
 function sleepFor( sleepDuration ){
-    if( defaultSleepTime > 0 ) {
+    if( sleepDuration > 0 ) {
         var now = new Date().getTime();
         while(new Date().getTime() < now + sleepDuration){ /* do nothing */ }
     }
 }
-
-beforeEach(function(done) {
-    this.slow(_slow);
-    this.timeout(_timeout);
-    done();
-});
 
 function randomWord() {
     var text = "";

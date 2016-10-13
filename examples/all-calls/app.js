@@ -128,7 +128,7 @@ $(document).ready(function () {
   function _get() {
     var endpoint = $("#get-path").val();
     client.GET(endpoint, function(usergridResponse) {
-      var err = usergridResponse.error
+      var err = usergridResponse.error;
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
@@ -142,7 +142,7 @@ $(document).ready(function () {
     var data = $("#post-data").val();
     data = JSON.parse(data);
     client.POST(endpoint, data, function (usergridResponse) {
-      var err = usergridResponse.error
+      var err = usergridResponse.error;
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
@@ -156,7 +156,7 @@ $(document).ready(function () {
     var data = $("#put-data").val();
     data = JSON.parse(data);
     client.PUT(endpoint, data, function (usergridResponse) {
-      var err = usergridResponse.error
+      var err = usergridResponse.error;
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
@@ -168,7 +168,7 @@ $(document).ready(function () {
   function _delete() {
     var endpoint = $("#delete-path").val();
     client.DELETE(endpoint, function (usergridResponse) {
-      var err = usergridResponse.error
+      var err = usergridResponse.error;
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
@@ -181,7 +181,7 @@ $(document).ready(function () {
     var username = $("#username").val();
     var password = $("#password").val();
     client.authenticateUser({username:username, password:password}, function (auth,user,usergridResponse) {
-      var err = usergridResponse.error
+      var err = usergridResponse.error;
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {

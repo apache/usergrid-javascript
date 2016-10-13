@@ -47,14 +47,14 @@ configs.forEach(function(config) {
             });
 
             before(function (done) {
-                entity.save(client, function (response) {
+                entity.save(client, function (error,response) {
                     response.ok.should.be.true();
                     entity.should.have.property('uuid');
                     done()
                 })
             });
             after(function (done) {
-                entity.remove(client, function (response) {
+                entity.remove(client, function (error,response) {
                     response.ok.should.be.true();
                     entity.uuid.should.be.equal(response.entity.uuid);
                     entity.name.should.be.equal(response.entity.name);
@@ -62,7 +62,7 @@ configs.forEach(function(config) {
                 })
             });
             it('should upload a binary asset to an entity', function (done) {
-                client.uploadAsset(entity, asset, function (asset, assetResponse, entityWithAsset) {
+                client.uploadAsset(entity, asset, function (error, assetResponse, entityWithAsset) {
                     assetResponse.statusCode.should.equal(200);
                     entityWithAsset.uuid.should.be.equal(entity.uuid);
                     entityWithAsset.name.should.be.equal(entity.name);
@@ -81,7 +81,7 @@ configs.forEach(function(config) {
             });
 
             before(function (done) {
-                entity.save(client, function (response) {
+                entity.save(client, function (error,response) {
                     response.ok.should.be.true();
                     entity.should.have.property('uuid');
                     done()
@@ -90,7 +90,7 @@ configs.forEach(function(config) {
 
             after(function (done) {
 
-                entity.remove(client, function (response) {
+                entity.remove(client, function (error,response) {
                     response.ok.should.be.true();
                     entity.uuid.should.be.equal(response.entity.uuid);
                     entity.name.should.be.equal(response.entity.name);
@@ -101,8 +101,8 @@ configs.forEach(function(config) {
             it('should upload a binary asset to an existing entity', function (done) {
 
                 entity.attachAsset(asset);
-                entity.save(client, function (response) {
-                    entity.uploadAsset(client, function (asset, assetResponse, entityWithAsset) {
+                entity.save(client, function () {
+                    entity.uploadAsset(client, function (error, assetResponse, entityWithAsset) {
                         assetResponse.statusCode.should.equal(200);
                         entityWithAsset.uuid.should.be.equal(entity.uuid);
                         entityWithAsset.name.should.be.equal(entity.name);
@@ -114,7 +114,7 @@ configs.forEach(function(config) {
                 })
             });
             it('should download a binary asset to an existing entity', function (done) {
-                entity.downloadAsset(client, function (asset, assetResponse, entityWithAsset) {
+                entity.downloadAsset(client, function (error, assetResponse, entityWithAsset) {
                     assetResponse.statusCode.should.equal(200);
                     entityWithAsset.uuid.should.be.equal(entity.uuid);
                     entityWithAsset.name.should.be.equal(entity.name);

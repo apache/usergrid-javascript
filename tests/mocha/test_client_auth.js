@@ -17,10 +17,10 @@ configs.forEach(function(config) {
             before(function (done) {
                 // authenticate app and remove sandbox permissions
                 client.setAppAuth(config.clientId, config.clientSecret);
-                client.authenticateApp(function (response) {
+                client.authenticateApp(function () {
                     token = client.appAuth.token;
                     var permissionsQuery = new UsergridQuery('roles/guest/permissions').urlTerm('permission', 'get,post,put,delete:/**');
-                    client.usingAuth(client.appAuth).DELETE(permissionsQuery, function (response) {
+                    client.usingAuth(client.appAuth).DELETE(permissionsQuery, function () {
                         done()
                     })
                 })
@@ -28,7 +28,7 @@ configs.forEach(function(config) {
 
             it('should fall back to using no authentication when currentUser is not authenticated and authFallback is set to NONE', function (done) {
                 client.authMode = UsergridAuthMode.NONE;
-                client.GET('users', function (usergridResponse) {
+                client.GET('users', function (error,usergridResponse) {
                     should(client.currentUser).be.undefined();
                     usergridResponse.request.headers.should.not.have.property('authorization');
                     usergridResponse.error.name.should.equal('unauthorized');
@@ -39,7 +39,7 @@ configs.forEach(function(config) {
 
             it('should fall back to using the app token when currentUser is not authenticated and authFallback is set to APP', function (done) {
                 client.authMode = UsergridAuthMode.APP;
-                client.GET('users', function (usergridResponse) {
+                client.GET('users', function (error,usergridResponse) {
                     should(client.currentUser).be.undefined();
                     usergridResponse.request.headers.should.have.property('authorization').equal('Bearer ' + token);
                     usergridResponse.ok.should.be.true();
@@ -50,7 +50,7 @@ configs.forEach(function(config) {
 
             after(function (done) {
                 client.authMode = UsergridAuthMode.NONE;
-                client.usingAuth(client.appAuth).POST('roles/guest/permissions', {'permission': 'get,post,put,delete:/**'}, function (usergridResponse) {
+                client.usingAuth(client.appAuth).POST('roles/guest/permissions', {'permission': 'get,post,put,delete:/**'}, function () {
                     done()
                 })
             })
@@ -61,7 +61,7 @@ configs.forEach(function(config) {
             var response, token, client = getClient();
             before(function (done) {
                 client.setAppAuth(config.clientId, config.clientSecret);
-                client.authenticateApp(function (usergridResponse) {
+                client.authenticateApp(function (error,usergridResponse) {
                     response = usergridResponse;
                     token = client.appAuth.token;
                     done()
@@ -106,7 +106,7 @@ configs.forEach(function(config) {
                 isolatedClient.authenticateApp({
                     clientId: config.clientId,
                     clientSecret: config.clientSecret
-                }, function (reponse) {
+                }, function () {
                     isolatedClient.appAuth.should.have.property('token');
                     done()
                 })
@@ -120,7 +120,7 @@ configs.forEach(function(config) {
                 });
                 var ttlInMilliseconds = 500000;
                 var appAuth = new UsergridAppAuth(config.clientId, config.clientSecret, ttlInMilliseconds);
-                isolatedClient.authenticateApp(appAuth, function (response) {
+                isolatedClient.authenticateApp(appAuth, function (error,response) {
                     isolatedClient.appAuth.should.have.property('token');
                     response.responseJSON.expires_in.should.equal(ttlInMilliseconds / 1000);
                     done()
@@ -132,8 +132,8 @@ configs.forEach(function(config) {
                 failClient.authenticateApp({
                     clientId: 'BADCLIENTID',
                     clientSecret: 'BADCLIENTSECRET'
-                }, function (response) {
-                    response.error.should.containDeep({
+                }, function (error,response) {
+                    error.should.containDeep({
                         name: 'invalid_grant',
                         description: 'invalid username or password'
                     });
@@ -147,8 +147,8 @@ configs.forEach(function(config) {
                 failClient.authenticateApp(new UsergridAppAuth({
                     clientId: 'BADCLIENTID',
                     clientSecret: 'BADCLIENTSECRET'
-                }), function (response) {
-                    response.error.should.containDeep({
+                }), function (error,response) {
+                    error.should.containDeep({
                         name: 'invalid_grant',
                         description: 'invalid username or password'
                     });
@@ -160,8 +160,8 @@ configs.forEach(function(config) {
 
             it('should not set client.appAuth when authenticating with a bad UsergridAppAuth instance (using arguments)', function (done) {
                 var failClient = new UsergridClient({orgId: config.orgId, appId: config.appId, baseUrl: config.baseUrl});
-                failClient.authenticateApp(new UsergridAppAuth('BADCLIENTID', 'BADCLIENTSECRET'), function (response) {
-                    response.error.should.containDeep({
+                failClient.authenticateApp(new UsergridAppAuth('BADCLIENTID', 'BADCLIENTSECRET'), function (error,response) {
+                    error.should.containDeep({
                         name: 'invalid_grant',
                         description: 'invalid username or password'
                     });
@@ -180,9 +180,9 @@ configs.forEach(function(config) {
                     username: config.test.username,
                     password: config.test.password,
                     email: email
-                }, function (auth, user, usergridResponse) {
+                }, function (error, usergridResponse, authToken) {
                     response = usergridResponse;
-                    token = auth.token;
+                    token = authToken
                     done()
                 })
             });
@@ -239,7 +239,7 @@ configs.forEach(function(config) {
                     username: config.test.username,
                     password: config.test.password,
                     email: config.test.email
-                }, false, function (response) {
+                }, false, function (error,response) {
                     should(noCurrentUserClient.currentUser).be.undefined();
                     done()
                 })
@@ -249,9 +249,9 @@ configs.forEach(function(config) {
                 var newClient = new UsergridClient({orgId: config.orgId, appId: config.appId, baseUrl: config.baseUrl});
                 var ttlInMilliseconds = 500000;
                 var userAuth = new UsergridUserAuth(config.test.username, config.test.password, ttlInMilliseconds);
-                newClient.authenticateUser(userAuth, function (auth, user, usergridResponse) {
+                newClient.authenticateUser(userAuth, function (error, usergridResponse, authToken) {
                     usergridResponse.ok.should.be.true();
-                    newClient.currentUser.auth.token.should.equal(auth.token);
+                    newClient.currentUser.auth.token.should.equal(authToken);
                     usergridResponse.responseJSON.expires_in.should.equal(ttlInMilliseconds / 1000);
                     done()
                 })
@@ -299,8 +299,8 @@ configs.forEach(function(config) {
                 client.authenticateUser({
                     username: config.test.username,
                     password: config.test.password
-                }, function (auth, user, response) {
-                    authFromToken = new UsergridAuth(auth.token);
+                }, function (error, response, token) {
+                    authFromToken = new UsergridAuth(token);
                     done()
                 })
             });
@@ -308,7 +308,7 @@ configs.forEach(function(config) {
             it('should authenticate using an ad-hoc token', function (done) {
                 authFromToken.isValid.should.be.true();
                 authFromToken.should.have.property('token');
-                client.usingAuth(authFromToken).GET('/users/me', function (usergridResponse) {
+                client.usingAuth(authFromToken).GET('/users/me', function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
                     usergridResponse.should.have.property('user').which.is.an.instanceof(UsergridUser);
                     usergridResponse.user.should.have.property('uuid');
@@ -323,7 +323,7 @@ configs.forEach(function(config) {
 
             it('should send an unauthenticated request when UsergridAuth.NO_AUTH is passed to .usingAuth()', function (done) {
                 client.authMode = UsergridAuthMode.NONE;
-                client.GET('/users/me', function (usergridResponse) {
+                client.GET('/users/me', function (error,usergridResponse) {
                     usergridResponse.ok.should.be.false();
                     usergridResponse.request.headers.should.not.have.property('authentication');
                     usergridResponse.should.not.have.property('user');
@@ -332,7 +332,7 @@ configs.forEach(function(config) {
             });
 
             it('should send an unauthenticated request when no arguments are passed to .usingAuth()', function (done) {
-                client.usingAuth().GET('/users/me', function (usergridResponse) {
+                client.usingAuth().GET('/users/me', function (error,usergridResponse) {
                     usergridResponse.ok.should.be.false();
                     usergridResponse.request.headers.should.not.have.property('authentication');
                     usergridResponse.should.not.have.property('user');

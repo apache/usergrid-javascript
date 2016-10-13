@@ -19,7 +19,7 @@ configs.forEach(function(config) {
                 entitiesArray.push(entity)
             }
             client.POST({
-                body: entitiesArray, callback: function (postResponse) {
+                body: entitiesArray, callback: function (error,postResponse) {
                     postResponse.entities.should.be.an.Array().with.lengthOf(entitiesArray.length);
                     entitiesArray = postResponse.entities;
                     done()
@@ -28,7 +28,7 @@ configs.forEach(function(config) {
         });
 
         before(function (done) {
-            client.GET(config.test.collection, function (usergridResponse) {
+            client.GET(config.test.collection, function (error,usergridResponse) {
                 _response = usergridResponse;
                 done()
             })
@@ -69,7 +69,7 @@ configs.forEach(function(config) {
 
         describe('error', function () {
             it('should be a UsergridResponseError object', function (done) {
-                client.GET(config.test.collection, 'BADNAMEORUUID', function (usergridResponse) {
+                client.GET(config.test.collection, 'BADNAMEORUUID', function (error,usergridResponse) {
                     usergridResponse.error.should.be.an.instanceof(UsergridResponseError);
                     done()
                 })
@@ -79,9 +79,9 @@ configs.forEach(function(config) {
         describe('users', function () {
             it('response.users should be an array of UsergridUser objects', function (done) {
                 client.setAppAuth(config.clientId, config.clientSecret, config.tokenTtl);
-                client.authenticateApp(function (response) {
+                client.authenticateApp(function (error,response) {
                     should(response.error).be.undefined();
-                    client.GET('users', function (usergridResponse) {
+                    client.GET('users', function (error,usergridResponse) {
                         usergridResponse.ok.should.be.true();
                         usergridResponse.users.should.be.an.Array();
                         usergridResponse.users.forEach(function (user) {
@@ -98,9 +98,9 @@ configs.forEach(function(config) {
 
             it('response.user should be a UsergridUser object and have a valid uuid matching the first object in response.users', function (done) {
                 client.setAppAuth(config.clientId, config.clientSecret, config.tokenTtl);
-                client.authenticateApp(function (response) {
+                client.authenticateApp(function (error,response) {
                     should(response.error).be.undefined();
-                    client.GET('users', function (usergridResponse) {
+                    client.GET('users', function (error,usergridResponse) {
                         user = usergridResponse.user;
                         user.should.be.an.instanceof(UsergridUser).with.property('uuid').equal(_.first(usergridResponse.entities).uuid);
                         done()
@@ -142,14 +142,14 @@ configs.forEach(function(config) {
 
         describe('hasNextPage', function () {
             it('should be true when more entities exist', function (done) {
-                client.GET({type: config.test.collection}, function (usergridResponse) {
+                client.GET({type: config.test.collection}, function (error,usergridResponse) {
                     usergridResponse.hasNextPage.should.be.true();
                     done()
                 })
             });
 
             it('should be false when no more entities exist', function (done) {
-                client.GET({type: 'users'}, function (usergridResponse) {
+                client.GET({type: 'users'}, function (error,usergridResponse) {
                     usergridResponse.responseJSON.count.should.be.lessThan(10);
                     usergridResponse.hasNextPage.should.not.be.true();
                     done()
@@ -161,14 +161,14 @@ configs.forEach(function(config) {
             var firstResponse;
 
             before(function (done) {
-                client.GET({type: config.test.collection}, function (usergridResponse) {
+                client.GET({type: config.test.collection}, function (error,usergridResponse) {
                     firstResponse = usergridResponse;
                     done()
                 })
             });
 
             it('should load a new page of entities by passing an instance of UsergridClient', function (done) {
-                firstResponse.loadNextPage(client, function (usergridResponse) {
+                firstResponse.loadNextPage(client, function (error,usergridResponse) {
                     usergridResponse.first.uuid.should.not.equal(firstResponse.first.uuid);
                     usergridResponse.entities.length.should.equal(10);
                     done()

@@ -278,14 +278,14 @@ configs.forEach(function(config) {
         describe('save()', function () {
 
             it('should POST an entity without a uuid', function (done) {
-                entity.save(client, function (response) {
+                entity.save(client, function (error,response) {
                     response.entity.should.have.property('uuid');
                     done()
                 })
             });
             it('should PUT an entity without a uuid', function (done) {
                 entity.putProperty('saveTest', now);
-                entity.save(client, function (response) {
+                entity.save(client, function (error,response) {
                     response.entity.should.have.property('saveTest').equal(now);
                     done()
                 })
@@ -297,9 +297,9 @@ configs.forEach(function(config) {
             it('should refresh an entity with the latest server copy of itself', function (done) {
                 var modified = entity.modified;
                 entity.putProperty('reloadTest', now);
-                client.PUT(entity, function (putResponse) {
+                client.PUT(entity, function (error,putResponse) {
                     entity.modified.should.equal(modified);
-                    entity.reload(client, function (reloadResponse) {
+                    entity.reload(client, function (error,reloadResponse) {
                         entity.reloadTest.should.equal(now);
                         entity.modified.should.not.equal(modified);
                         done()
@@ -311,7 +311,7 @@ configs.forEach(function(config) {
         describe('remove()', function () {
 
             it('should remove an entity from the server', function (done) {
-                entity.remove(client, function (deleteResponse) {
+                entity.remove(client, function (error,deleteResponse) {
                     deleteResponse.ok.should.be.true();
                     // best practice is to destroy the 'entity' instance here, because it no longer exists on the server
                     entity = null;
@@ -333,7 +333,7 @@ configs.forEach(function(config) {
                         "name": "testEntityConnectOne"
                     }, {
                         "name": "testEntityConnectTwo"
-                    }], callback: function (postResponse) {
+                    }], callback: function (error,postResponse) {
                         response = postResponse;
                         entity1 = response.first;
                         entity2 = response.last;
@@ -344,10 +344,10 @@ configs.forEach(function(config) {
 
             it('should connect entities by passing a target UsergridEntity object as a parameter', function (done) {
                 var relationship = "foos";
-                entity1.connect(client, relationship, entity2, function (usergridResponse) {
+                entity1.connect(client, relationship, entity2, function (error,usergridResponse) {
                     sleepFor(config.defaultSleepTime);
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "",
                             config.test.collection,
@@ -365,10 +365,10 @@ configs.forEach(function(config) {
             it('should connect entities by passing target uuid as a parameter', function (done) {
                 var relationship = "bars";
 
-                entity1.connect(client, relationship, entity2.uuid, function (usergridResponse) {
+                entity1.connect(client, relationship, entity2.uuid, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
                     sleepFor(config.defaultSleepTime);
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "",
                             config.test.collection,
@@ -386,10 +386,10 @@ configs.forEach(function(config) {
             it('should connect entities by passing target type and name as parameters', function (done) {
                 var relationship = "bazzes";
 
-                entity1.connect(client, relationship, entity2.type, entity2.name, function (usergridResponse) {
+                entity1.connect(client, relationship, entity2.type, entity2.name, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
                     sleepFor(config.defaultSleepTime);
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "",
                             config.test.collection,
@@ -419,7 +419,7 @@ configs.forEach(function(config) {
 
             before(function (done) {
                 sleepFor(config.defaultLongSleepTime);
-                client.GET(query, function (usergridResponse) {
+                client.GET(query, function (error,usergridResponse) {
                     response = usergridResponse;
                     done()
                 })
@@ -431,7 +431,7 @@ configs.forEach(function(config) {
 
                 var relationship = "foos";
 
-                entity1.getConnections(client, UsergridDirection.OUT, relationship, function (usergridResponse) {
+                entity1.getConnections(client, UsergridDirection.OUT, relationship, function (error,usergridResponse) {
                     usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                         "",
                         config.test.collection,
@@ -451,7 +451,7 @@ configs.forEach(function(config) {
 
                 var relationship = "foos";
 
-                entity2.getConnections(client, UsergridDirection.IN, relationship, function (usergridResponse) {
+                entity2.getConnections(client, UsergridDirection.IN, relationship, function (error,usergridResponse) {
                     usergridResponse.first.metadata.connections[relationship].should.equal(UsergridHelpers.urljoin(
                         "",
                         config.test.collection,
@@ -473,7 +473,7 @@ configs.forEach(function(config) {
                 query = new UsergridQuery(config.test.collection).eq('name', 'testEntityConnectOne').or.eq('name', 'testEntityConnectTwo').asc('name');
 
             before(function (done) {
-                client.GET(query, function (usergridResponse) {
+                client.GET(query, function (error,usergridResponse) {
                     response = usergridResponse;
                     entity1 = response.first;
                     entity2 = response.last;
@@ -482,7 +482,7 @@ configs.forEach(function(config) {
             });
             after(function (done) {
                 var deleteQuery = new UsergridQuery(config.test.collection).eq('uuid', entity1.uuid).or.eq('uuid', entity2.uuid);
-                client.DELETE(deleteQuery, function (delResponse) {
+                client.DELETE(deleteQuery, function (error,delResponse) {
                     delResponse.entities.should.be.an.Array().with.lengthOf(2);
                     done()
                 })
@@ -490,9 +490,9 @@ configs.forEach(function(config) {
 
             it('should disconnect entities by passing a target UsergridEntity object as a parameter', function (done) {
                 var relationship = "foos";
-                entity1.disconnect(client, relationship, entity2, function (usergridResponse) {
+                entity1.disconnect(client, relationship, entity2, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -501,9 +501,9 @@ configs.forEach(function(config) {
 
             it('should disconnect entities by passing target uuid as a parameter', function (done) {
                 var relationship = "bars";
-                entity1.disconnect(client, relationship, entity2.uuid, function (usergridResponse) {
+                entity1.disconnect(client, relationship, entity2.uuid, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -512,9 +512,9 @@ configs.forEach(function(config) {
 
             it('should disconnect entities by passing target type and name as parameters', function (done) {
                 var relationship = "bazzes";
-                entity1.disconnect(client, relationship, entity2.type, entity2.name, function (usergridResponse) {
+                entity1.disconnect(client, relationship, entity2.type, entity2.name, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -536,7 +536,7 @@ configs.forEach(function(config) {
             var asset;
 
             before(function (done) {
-                assetEntity.save(client, function (response) {
+                assetEntity.save(client, function (error,response) {
                     response.ok.should.be.true();
                     assetEntity.should.have.property('uuid');
                     done()
@@ -565,7 +565,7 @@ configs.forEach(function(config) {
             });
 
             it('should upload an image asset to the remote entity', function (done) {
-                assetEntity.uploadAsset(client, function (asset, usergridResponse, entity) {
+                assetEntity.uploadAsset(client, function (error, usergridResponse, entity) {
                     entity.should.have.property('file-metadata');
                     entity['file-metadata'].should.have.property('content-type').equal(testFile.contentType);
                     entity['file-metadata'].should.have.property('content-length').equal(testFile.contentLength);
@@ -582,7 +582,7 @@ configs.forEach(function(config) {
             });
 
             it('should download a an image from the remote entity', function (done) {
-                assetEntity.downloadAsset(client, function (asset, usergridResponse, entityWithAsset) {
+                assetEntity.downloadAsset(client, function (error, usergridResponse, entityWithAsset) {
                     entityWithAsset.should.have.property('asset').which.is.an.instanceof(UsergridAsset);
                     entityWithAsset.asset.should.have.property('contentType').equal(assetEntity['file-metadata']['content-type']);
                     entityWithAsset.asset.should.have.property('contentLength').equal(assetEntity['file-metadata']['content-length']);

@@ -13,7 +13,7 @@ configs.forEach(function(config) {
         describe('name, description, exception', function () {
 
             before(function (done) {
-                client.GET(config.test.collection, 'BADNAMEORUUID', function (usergridResponse) {
+                client.GET(config.test.collection, 'BADNAMEORUUID', function (error,usergridResponse) {
                     _response = usergridResponse;
                     done()
                 })
@@ -31,7 +31,7 @@ configs.forEach(function(config) {
 
         describe('undefined check', function () {
             it('response.error should be undefined on a successful response', function (done) {
-                client.GET(config.test.collection, function (usergridResponse) {
+                client.GET(config.test.collection, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
                     should(usergridResponse.error).be.undefined();
                     done()

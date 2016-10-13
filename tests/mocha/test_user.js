@@ -52,7 +52,7 @@ configs.forEach(function(config) {
                     username: _username1,
                     password: config.test.password
                 });
-                user.create(client, function (usergridResponse) {
+                user.create(client, function (error,usergridResponse) {
                     usergridResponse.error.should.not.be.null();
                     usergridResponse.error.should.containDeep({
                         name: 'duplicate_unique_property_exists'
@@ -68,14 +68,14 @@ configs.forEach(function(config) {
                     username: username,
                     password: config.test.password
                 });
-                user.create(client, function (usergridResponse) {
+                user.create(client, function (error,usergridResponse) {
                     user.username.should.equal(username);
                     user.should.have.property('uuid')//.which.is.a.uuid()
                     user.should.have.property('created');
                     user.should.have.property('activated').true();
                     user.should.not.have.property('password');
                     // cleanup
-                    user.remove(client, function (response) {
+                    user.remove(client, function (error,response) {
                         done()
                     })
                 });
@@ -85,8 +85,8 @@ configs.forEach(function(config) {
         describe('login()', function () {
             it("it should log in the user '" + _username1 + "' and receive a token", function (done) {
                 _user1.password = config.test.password;
-                _user1.login(client, function (auth, user, response) {
-                    _user1.auth.should.have.property('token').equal(auth.token);
+                _user1.login(client, function (error, response, token) {
+                    _user1.auth.should.have.property('token').equal(token);
                     _user1.should.not.have.property('password');
                     _user1.auth.should.not.have.property('password');
                     done()
@@ -97,7 +97,7 @@ configs.forEach(function(config) {
         describe('logout()', function () {
 
             it("it should log out " + _username1 + " and destroy the saved UsergridUserAuth instance", function (done) {
-                _user1.logout(client, function (response) {
+                _user1.logout(client, function (error,response) {
                     response.ok.should.be.true();
                     response.responseJSON.action.should.equal("revoked user token");
                     _user1.auth.isValid.should.be.false();
@@ -106,7 +106,7 @@ configs.forEach(function(config) {
             });
 
             it("it should return an error when attempting to log out a user that does not have a valid token", function (done) {
-                _user1.logout(client, function (response) {
+                _user1.logout(client, function (error,response) {
                     response.error.name.should.equal('no_valid_token');
                     done()
                 })
@@ -116,8 +116,8 @@ configs.forEach(function(config) {
         describe('logoutAllSessions()', function () {
             it("it should log out all tokens for the user " + _username1 + " destroy the saved UsergridUserAuth instance", function (done) {
                 _user1.password = config.test.password;
-                _user1.login(client, function (auth, user, response) {
-                    _user1.logoutAllSessions(client, function (response) {
+                _user1.login(client, function (error, response, token) {
+                    _user1.logoutAllSessions(client, function (error,response) {
                         response.ok.should.be.true();
                         response.responseJSON.action.should.equal("revoked user tokens");
                         _user1.auth.isValid.should.be.false();
@@ -130,7 +130,7 @@ configs.forEach(function(config) {
         describe('resetPassword()', function () {
 
             it("it should reset the password for " + _username1 + " by passing parameters", function (done) {
-                _user1.resetPassword(client, config.test.password, '2cool4u', function (response) {
+                _user1.resetPassword(client, config.test.password, '2cool4u', function (error,response) {
                     response.ok.should.be.true();
                     response.responseJSON.action.should.equal("set user password");
                     done()
@@ -141,7 +141,7 @@ configs.forEach(function(config) {
                 _user1.resetPassword(client, {
                     oldPassword: '2cool4u',
                     newPassword: config.test.password
-                }, function (response) {
+                }, function (error,response) {
                     response.ok.should.be.true();
                     response.responseJSON.action.should.equal("set user password");
                     done()
@@ -152,7 +152,7 @@ configs.forEach(function(config) {
                 _user1.resetPassword(client, {
                     oldPassword: 'BADOLDPASSWORD',
                     newPassword: config.test.password
-                }, function (response) {
+                }, function (error,response) {
                     response.ok.should.be.false();
                     response.error.name.should.equal('auth_invalid_username_or_password');
                     _user1.remove(client, function () {
@@ -177,7 +177,7 @@ configs.forEach(function(config) {
             it("it should return true for username " + config.test.username, function (done) {
                 UsergridUser.CheckAvailable(client, {
                     username: config.test.username
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.true();
                     done()
                 })
@@ -186,7 +186,7 @@ configs.forEach(function(config) {
             it("it should return true for email " + config.test.email, function (done) {
                 UsergridUser.CheckAvailable(client, {
                     email: config.test.email
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.true();
                     done()
                 })
@@ -196,7 +196,7 @@ configs.forEach(function(config) {
                 UsergridUser.CheckAvailable(client, {
                     email: config.test.email,
                     username: nonExistentUsername
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.true();
                     done()
                 })
@@ -206,7 +206,7 @@ configs.forEach(function(config) {
                 UsergridUser.CheckAvailable(client, {
                     email: nonExistentEmail,
                     username: config.test.username
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.true();
                     done()
                 })
@@ -216,7 +216,7 @@ configs.forEach(function(config) {
                 UsergridUser.CheckAvailable(client, {
                     email: config.test.email,
                     username: config.test.useranme
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.true();
                     done()
                 })
@@ -225,7 +225,7 @@ configs.forEach(function(config) {
             it("it should return false for non-existent email " + nonExistentEmail, function (done) {
                 UsergridUser.CheckAvailable(client, {
                     email: nonExistentEmail
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.false();
                     done()
                 })
@@ -234,7 +234,7 @@ configs.forEach(function(config) {
             it("it should return false for non-existent username " + nonExistentUsername, function (done) {
                 UsergridUser.CheckAvailable(client, {
                     username: nonExistentUsername
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.false();
                     done()
                 })
@@ -244,7 +244,7 @@ configs.forEach(function(config) {
                 UsergridUser.CheckAvailable(client, {
                     email: nonExistentEmail,
                     username: nonExistentUsername
-                }, function (response, exists) {
+                }, function (error,response, exists) {
                     exists.should.be.false();
                     done()
                 })

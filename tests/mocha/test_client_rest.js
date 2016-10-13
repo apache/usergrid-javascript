@@ -18,7 +18,7 @@ configs.forEach(function(config) {
                     type: config.test.collection, body: {
                         author: 'Sir Arthur Conan Doyle'
                     }
-                }, function (usergridResponse) {
+                }, function (error,usergridResponse) {
                     response = usergridResponse;
                     _uuid = usergridResponse.entity.uuid;
                     done()
@@ -54,10 +54,10 @@ configs.forEach(function(config) {
                     cuisine: "pizza"
                 });
 
-                client.POST(entity, function (usergridResponse) {
+                client.POST(entity, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('restaurant').equal(entity.restaurant);
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(usergridResponse.entity, function (delResponse) {
+                    client.DELETE(usergridResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
                     })
@@ -69,10 +69,10 @@ configs.forEach(function(config) {
                     type: config.test.collection,
                     name: randomWord()
                 });
-                client.POST(entity, function (usergridResponse) {
+                client.POST(entity, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('name').equal(entity.name);
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(usergridResponse.entity, function (delResponse) {
+                    client.DELETE(usergridResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
                     })
@@ -87,10 +87,10 @@ configs.forEach(function(config) {
                         cuisine: "pizza"
                     }
                 };
-                client.POST(options, function (usergridResponse) {
+                client.POST(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('restaurant').equal("Dino's Deep Dish");
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(usergridResponse.entity, function (delResponse) {
+                    client.DELETE(usergridResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
                     })
@@ -105,10 +105,10 @@ configs.forEach(function(config) {
                         cuisine: "pizza"
                     }
                 };
-                client.POST(options, function (usergridResponse) {
+                client.POST(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('restaurant').equal("Dino's Deep Dish");
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(usergridResponse.entity, function (delResponse) {
+                    client.DELETE(usergridResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
                     })
@@ -129,7 +129,7 @@ configs.forEach(function(config) {
                 ];
 
                 client.POST({
-                    body: entities, callback: function (usergridResponse) {
+                    body: entities, callback: function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(2);
                         _.forEach(usergridResponse.entities, function (entity) {
                             entity.should.be.an.Object().with.property('restaurant').equal(entity.restaurant)
@@ -148,9 +148,9 @@ configs.forEach(function(config) {
                     }
                 };
 
-                client.POST(options, function (usergridResponse) {
+                client.POST(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('restaurant').equal(usergridResponse.entity.restaurant);
-                    usergridResponse.entity.remove(client, function (delResponse) {
+                    usergridResponse.entity.remove(client, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
                     })
@@ -162,7 +162,7 @@ configs.forEach(function(config) {
 
             var response;
             before(function (done) {
-                client.GET({type: config.test.collection}, function (usergridResponse) {
+                client.GET({type: config.test.collection}, function (error,usergridResponse) {
                     response = usergridResponse;
                     done()
                 })
@@ -195,7 +195,7 @@ configs.forEach(function(config) {
 
             it('each entity should match the search criteria when passing a UsergridQuery object', function (done) {
                 var query = new UsergridQuery(config.test.collection).eq('author', 'Sir Arthur Conan Doyle');
-                client.GET(query, function (usergridResponse) {
+                client.GET(query, function (error,usergridResponse) {
                     usergridResponse.entities.should.be.an.Array().with.lengthOf(1);
                     usergridResponse.entities.forEach(function (entity) {
                         entity.should.be.an.Object().with.property('author').equal('Sir Arthur Conan Doyle')
@@ -205,7 +205,7 @@ configs.forEach(function(config) {
             });
 
             it('a single entity should be retrieved when specifying a uuid', function (done) {
-                client.GET(config.test.collection, response.entity.uuid, function (usergridResponse) {
+                client.GET(config.test.collection, response.entity.uuid, function (error,usergridResponse) {
                     usergridResponse.should.have.property('entity').which.is.an.instanceof(UsergridEntity);
                     usergridResponse.entities.should.be.an.Array().with.a.lengthOf(1);
                     done()
@@ -218,13 +218,13 @@ configs.forEach(function(config) {
             var response;
 
             before(function (done) {
-                client.PUT(config.test.collection, _uuid, {narrator: 'Peter Doyle'}, function (usergridResponse) {
+                client.PUT(config.test.collection, _uuid, {narrator: 'Peter Doyle'}, function (error,usergridResponse) {
                     response = usergridResponse;
                     done()
                 })
             });
             after(function (done) {
-                client.DELETE(response.entity, function (delResponse) {
+                client.DELETE(response.entity, function (error,delResponse) {
                     delResponse.entity.should.have.property('uuid').equal(response.entity.uuid);
                     done()
                 })
@@ -257,13 +257,13 @@ configs.forEach(function(config) {
                     author: 'Frank Mills'
                 });
 
-                client.PUT(newEntity, function (usergridResponse) {
+                client.PUT(newEntity, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object();
                     usergridResponse.entity.should.be.an.instanceof(UsergridEntity).with.property('uuid')//.which.is.a.uuid()
                     usergridResponse.entity.should.have.property('author').equal('Frank Mills');
                     usergridResponse.entity.created.should.equal(usergridResponse.entity.modified);
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(usergridResponse.entity, function (delResponse) {
+                    client.DELETE(usergridResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.be.an.Object();
                         delResponse.entity.should.have.property('uuid').equal(usergridResponse.entity.uuid);
                         done()
@@ -281,7 +281,7 @@ configs.forEach(function(config) {
                     }
                 });
 
-                client.PUT(updateEntity, function (usergridResponse) {
+                client.PUT(updateEntity, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('publisher').deepEqual(updateEntity.publisher);
                     done()
                 })
@@ -296,7 +296,7 @@ configs.forEach(function(config) {
                         updateByPassingTypeAndBody: true
                     }
                 };
-                client.PUT(options, function (usergridResponse) {
+                client.PUT(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('updateByPassingTypeAndBody').equal(true);
                     done()
                 })
@@ -312,7 +312,7 @@ configs.forEach(function(config) {
                         updateByPassingBodyIncludingType: true
                     }
                 };
-                client.PUT(options, function (usergridResponse) {
+                client.PUT(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('updateByPassingBodyIncludingType').equal(true);
                     done()
                 })
@@ -325,13 +325,13 @@ configs.forEach(function(config) {
                 };
 
                 sleepFor(config.defaultSleepTime);
-                client.PUT(query, body, function (usergridResponse) {
+                client.PUT(query, body, function (error,usergridResponse) {
                     usergridResponse.entities.should.be.an.Array().with.lengthOf(2);
                     usergridResponse.entities.forEach(function (entity) {
                         entity.should.be.an.Object().with.property('testUuid').equal(body.testUuid)
                     });
                     sleepFor(config.defaultLongSleepTime + config.defaultSleepTime);
-                    client.DELETE(query, function (delResponse) {
+                    client.DELETE(query, function (error,delResponse) {
                         delResponse.entities.should.be.an.Array().with.lengthOf(usergridResponse.entities.length);
                         done()
                     })
@@ -348,7 +348,7 @@ configs.forEach(function(config) {
                     }
                 };
 
-                client.PUT(options, function (usergridResponse) {
+                client.PUT(options, function (error,usergridResponse) {
                     usergridResponse.entity.should.be.an.Object().with.property('relatedUuid').equal(options.body.relatedUuid);
                     done()
                 })
@@ -360,7 +360,7 @@ configs.forEach(function(config) {
             var response;
             before(function (done) {
                 client.DELETE(config.test.collection, _uuid, function () {
-                    client.GET(config.test.collection, _uuid, function (usergridResponse) {
+                    client.GET(config.test.collection, _uuid, function (error,usergridResponse) {
                         response = usergridResponse;
                         done()
                     })
@@ -386,14 +386,14 @@ configs.forEach(function(config) {
                     command: "CTRL+ALT+DEL"
                 });
 
-                client.POST(entity, function (postResponse) {
+                client.POST(entity, function (error,postResponse) {
                     postResponse.entity.should.have.property('uuid');
                     postResponse.entity.should.have.property('command').equal('CTRL+ALT+DEL');
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(postResponse.entity, function (delResponse) {
+                    client.DELETE(postResponse.entity, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(postResponse.entity.uuid);
                         sleepFor(config.defaultSleepTime);
-                        client.GET(config.test.collection, postResponse.entity.uuid, function (getResponse) {
+                        client.GET(config.test.collection, postResponse.entity.uuid, function (error,getResponse) {
                             getResponse.ok.should.be.false();
                             getResponse.error.name.should.equal((config.target === '1.0') ? 'service_resource_not_found' : 'entity_not_found');
                             done()
@@ -407,14 +407,14 @@ configs.forEach(function(config) {
                     command: "CTRL+ALT+DEL"
                 };
 
-                client.POST(config.test.collection, body, function (postResponse) {
+                client.POST(config.test.collection, body, function (error,postResponse) {
                     postResponse.entity.should.have.property('uuid');
                     postResponse.entity.should.have.property('command').equal('CTRL+ALT+DEL');
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(config.test.collection, postResponse.entity.uuid, function (delResponse) {
+                    client.DELETE(config.test.collection, postResponse.entity.uuid, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(postResponse.entity.uuid);
                         sleepFor(config.defaultSleepTime);
-                        client.GET(config.test.collection, postResponse.entity.uuid, function (getResponse) {
+                        client.GET(config.test.collection, postResponse.entity.uuid, function (error,getResponse) {
                             getResponse.error.name.should.equal((config.target === '1.0') ? 'service_resource_not_found' : 'entity_not_found');
                             done()
                         })
@@ -431,13 +431,13 @@ configs.forEach(function(config) {
                 var query = new UsergridQuery(config.test.collection).eq('command', 'CMD');
 
                 client.POST({
-                    body: [entity, entity, entity, entity], callback: function (postResponse) {
+                    body: [entity, entity, entity, entity], callback: function (error,postResponse) {
                         postResponse.entities.should.be.an.Array().with.lengthOf(4);
                         sleepFor(config.defaultLongSleepTime);
-                        client.DELETE(query, function (delResponse) {
+                        client.DELETE(query, function (error,delResponse) {
                             delResponse.entities.should.be.an.Array().with.lengthOf(4);
                             sleepFor(config.defaultLongSleepTime);
-                            client.GET(query, function (getResponse) {
+                            client.GET(query, function (error,getResponse) {
                                 getResponse.entities.should.be.an.Array().with.lengthOf(0);
                                 done()
                             })
@@ -455,15 +455,15 @@ configs.forEach(function(config) {
                     }
                 };
 
-                client.POST(options, function (postResponse) {
+                client.POST(options, function (error,postResponse) {
                     postResponse.entity.should.have.property('uuid');
                     postResponse.entity.should.have.property('restaurant').equal('IHOP');
                     postResponse.entity.should.have.property('cuisine').equal('breakfast');
                     sleepFor(config.defaultSleepTime);
-                    client.DELETE(config.test.collection, postResponse.entity.uuid, function (delResponse) {
+                    client.DELETE(config.test.collection, postResponse.entity.uuid, function (error,delResponse) {
                         delResponse.entity.should.have.property('uuid').equal(postResponse.entity.uuid);
                         sleepFor(config.defaultSleepTime);
-                        client.GET(config.test.collection, postResponse.entity.uuid, function (delResponse) {
+                        client.GET(config.test.collection, postResponse.entity.uuid, function (error,delResponse) {
                             delResponse.error.name.should.equal((config.target === '1.0') ? 'service_resource_not_found' : 'entity_not_found');
                             done()
                         })

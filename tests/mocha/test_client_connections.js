@@ -17,7 +17,7 @@ configs.forEach(function(config) {
             client.POST({
                 type: config.test.collection,
                 body: [{"name": "testClientConnectOne"}, {"name": "testClientConnectTwo"}]
-            }, function (postResponse) {
+            }, function (error,postResponse) {
                 response = postResponse;
                 entity1 = response.first;
                 entity2 = response.last;
@@ -38,9 +38,9 @@ configs.forEach(function(config) {
             it('should connect entities by passing UsergridEntity objects as parameters', function (done) {
                 var relationship = "foos";
 
-                client.connect(entity1, relationship, entity2, function (usergridResponse) {
+                client.connect(entity1, relationship, entity2, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "/",
                             config.test.collection,
@@ -58,9 +58,9 @@ configs.forEach(function(config) {
             it('should connect entities by passing a source UsergridEntity object and a target uuid', function (done) {
                 var relationship = "bars";
 
-                client.connect(entity1, relationship, entity2.uuid, function (usergridResponse) {
+                client.connect(entity1, relationship, entity2.uuid, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "/",
                             config.test.collection,
@@ -78,9 +78,9 @@ configs.forEach(function(config) {
             it('should connect entities by passing source type, source uuid, and target uuid as parameters', function (done) {
                 var relationship = "bazzes";
 
-                client.connect(entity1.type, entity1.uuid, relationship, entity2.uuid, function (usergridResponse) {
+                client.connect(entity1.type, entity1.uuid, relationship, entity2.uuid, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "/",
                             config.test.collection,
@@ -98,9 +98,9 @@ configs.forEach(function(config) {
             it('should connect entities by passing source type, source name, target type, and target name as parameters', function (done) {
                 var relationship = "quxes";
 
-                client.connect(entity1.type, entity1.name, relationship, entity2.type, entity2.name, function (usergridResponse) {
+                client.connect(entity1.type, entity1.name, relationship, entity2.type, entity2.name, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                             "/",
                             config.test.collection,
@@ -122,9 +122,9 @@ configs.forEach(function(config) {
                     to: entity2
                 };
 
-                client.connect(options, function (usergridResponse) {
+                client.connect(options, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, options.relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, options.relationship, function (error,usergridResponse) {
                         usergridResponse.first.metadata.connecting[options.relationship].should.equal(UsergridHelpers.urljoin(
                             "/",
                             config.test.collection,
@@ -153,7 +153,7 @@ configs.forEach(function(config) {
 
                 var relationship = "foos";
 
-                client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                     usergridResponse.first.metadata.connecting[relationship].should.equal(UsergridHelpers.urljoin(
                         "/",
                         config.test.collection,
@@ -171,7 +171,7 @@ configs.forEach(function(config) {
 
                 var relationship = "foos";
 
-                client.getConnections(UsergridDirection.IN, entity2, relationship, function (usergridResponse) {
+                client.getConnections(UsergridDirection.IN, entity2, relationship, function (error,usergridResponse) {
                     usergridResponse.first.metadata.connections[relationship].should.equal(UsergridHelpers.urljoin(
                         "/",
                         config.test.collection,
@@ -191,9 +191,9 @@ configs.forEach(function(config) {
 
                 var relationship = "foos";
 
-                client.disconnect(entity1, relationship, entity2, function (usergridResponse) {
+                client.disconnect(entity1, relationship, entity2, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -204,9 +204,9 @@ configs.forEach(function(config) {
 
                 var relationship = "bars";
 
-                client.disconnect(entity1.type, entity1.uuid, relationship, entity2.uuid, function (usergridResponse) {
+                client.disconnect(entity1.type, entity1.uuid, relationship, entity2.uuid, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -217,9 +217,9 @@ configs.forEach(function(config) {
 
                 var relationship = "bazzes";
 
-                client.disconnect(entity1.type, entity1.name, relationship, entity2.type, entity2.name, function (usergridResponse) {
+                client.disconnect(entity1.type, entity1.name, relationship, entity2.type, entity2.name, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })
@@ -234,9 +234,9 @@ configs.forEach(function(config) {
                     to: entity2
                 };
 
-                client.disconnect(options, function (usergridResponse) {
+                client.disconnect(options, function (error,usergridResponse) {
                     usergridResponse.ok.should.be.true();
-                    client.getConnections(UsergridDirection.OUT, entity1, options.relationship, function (usergridResponse) {
+                    client.getConnections(UsergridDirection.OUT, entity1, options.relationship, function (error,usergridResponse) {
                         usergridResponse.entities.should.be.an.Array().with.lengthOf(0);
                         done()
                     })

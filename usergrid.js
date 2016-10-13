@@ -5854,17 +5854,18 @@ UsergridClient.prototype = {
         } else if (!auth.clientId || !auth.clientSecret) {
             throw new Error("authenticateApp() failed because clientId or clientSecret are missing");
         }
-        var callback = function(usergridResponse) {
+        var callback = function(error, usergridResponse) {
+            var token = _.get(usergridResponse.responseJSON, "access_token");
+            var expiresIn = _.get(usergridResponse.responseJSON, "expires_in");
             if (usergridResponse.ok) {
                 if (!self.appAuth) {
                     self.appAuth = auth;
                 }
-                self.appAuth.token = _.get(usergridResponse.responseJSON, "access_token");
-                var expiresIn = _.get(usergridResponse.responseJSON, "expires_in");
+                self.appAuth.token = token;
                 self.appAuth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
                 self.appAuth.tokenTtl = expiresIn;
             }
-            authenticateAppCallback(usergridResponse);
+            authenticateAppCallback(error, usergridResponse, token);
         };
         var usergridRequest = UsergridHelpers.buildAppAuthRequest(self, auth, callback);
         return self.sendRequest(usergridRequest);
@@ -5875,11 +5876,11 @@ UsergridClient.prototype = {
         var callback = UsergridHelpers.callback(args);
         var setAsCurrentUser = _.last(args.filter(_.isBoolean)) !== undefined ? _.last(args.filter(_.isBoolean)) : true;
         var userToAuthenticate = new UsergridUser(options);
-        userToAuthenticate.login(self, function(auth, user, usergridResponse) {
+        userToAuthenticate.login(self, function(error, usergridResponse, token) {
             if (usergridResponse.ok && setAsCurrentUser) {
                 self.currentUser = userToAuthenticate;
             }
-            callback(auth, user, usergridResponse);
+            callback(usergridResponse.error, usergridResponse, token);
         });
     },
     downloadAsset: function() {
@@ -5892,10 +5893,10 @@ UsergridClient.prototype = {
             });
         }
         var realDownloadAssetCallback = usergridRequest.callback;
-        usergridRequest.callback = function(usergridResponse) {
+        usergridRequest.callback = function(error, usergridResponse) {
             var entity = usergridRequest.entity;
             entity.asset = usergridResponse.asset;
-            realDownloadAssetCallback(entity.asset, usergridResponse, entity);
+            realDownloadAssetCallback(error, usergridResponse, entity);
         };
         return self.sendRequest(usergridRequest);
     },
@@ -5906,7 +5907,7 @@ UsergridClient.prototype = {
             throw new Error("An UsergridAsset was not defined when attempting to call .uploadAsset()");
         }
         var realUploadAssetCallback = usergridRequest.callback;
-        usergridRequest.callback = function(usergridResponse) {
+        usergridRequest.callback = function(error, usergridResponse) {
             var requestEntity = usergridRequest.entity;
             var responseEntity = usergridResponse.entity;
             var requestAsset = usergridRequest.asset;
@@ -5917,7 +5918,7 @@ UsergridClient.prototype = {
                     responseEntity.asset = requestAsset;
                 }
             }
-            realUploadAssetCallback(requestAsset, usergridResponse, requestEntity);
+            realUploadAssetCallback(error, usergridResponse, requestEntity);
         };
         return self.sendRequest(usergridRequest);
     }
@@ -6190,10 +6191,8 @@ UsergridRequest.prototype.sendRequest = function() {
         promise.done(usergridResponse);
         return promise;
     };
-    var onCompletePromise = function(response) {
-        var promise = new Promise();
-        promise.done(response);
-        self.callback(response);
+    var onCompletePromise = function(usergridResponse) {
+        self.callback(usergridResponse.error, usergridResponse);
     };
     Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
     return self;
@@ -6362,9 +6361,9 @@ UsergridEntity.prototype = {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.GET(self, function(usergridResponse) {
+        client.GET(self, function(error, usergridResponse) {
             UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
-            callback(usergridResponse, self);
+            callback(error, usergridResponse, self);
         }.bind(self));
     },
     save: function() {
@@ -6373,12 +6372,12 @@ UsergridEntity.prototype = {
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
         var currentAsset = self.asset;
-        client.PUT(self, function(usergridResponse) {
+        client.PUT(self, function(error, usergridResponse) {
             UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
             if (self.hasAsset) {
                 self.asset = currentAsset;
             }
-            callback(usergridResponse, self);
+            callback(error, usergridResponse, self);
         }.bind(self));
     },
     remove: function() {
@@ -6386,8 +6385,8 @@ UsergridEntity.prototype = {
         var args = UsergridHelpers.flattenArgs(arguments);
         var client = UsergridHelpers.validateAndRetrieveClient(args);
         var callback = UsergridHelpers.callback(args);
-        client.DELETE(self, function(usergridResponse) {
-            callback(usergridResponse, self);
+        client.DELETE(self, function(error, usergridResponse) {
+            callback(error, usergridResponse, self);
         }.bind(self));
     },
     attachAsset: function(asset) {
@@ -6405,7 +6404,7 @@ UsergridEntity.prototype = {
                 name: "asset_not_found",
                 description: "The specified entity does not have a valid asset attached"
             });
-            callback(null, response, self);
+            callback(response.error, response, self);
         }
     },
     downloadAsset: function() {
@@ -6420,7 +6419,7 @@ UsergridEntity.prototype = {
                 name: "asset_not_found",
                 description: "The specified entity does not have a valid asset attached"
             });
-            callback(null, response, self);
+            callback(response.error, response, self);
         }
     },
     connect: function() {
@@ -6474,8 +6473,8 @@ UsergridUser.CheckAvailable = function() {
     } else {
         throw new Error("'username' or 'email' property is required when checking for available users");
     }
-    client.GET(checkQuery, function(usergridResponse) {
-        callback(usergridResponse, usergridResponse.entities.length > 0);
+    client.GET(checkQuery, function(error, usergridResponse) {
+        callback(error, usergridResponse, usergridResponse.entities.length > 0);
     });
 };
 
@@ -6491,10 +6490,10 @@ UsergridUser.prototype.create = function() {
     var args = UsergridHelpers.flattenArgs(arguments);
     var client = UsergridHelpers.validateAndRetrieveClient(args);
     var callback = UsergridHelpers.callback(args);
-    client.POST(self, function(usergridResponse) {
+    client.POST(self, function(error, usergridResponse) {
         delete self.password;
         _.assign(self, usergridResponse.user);
-        callback(usergridResponse, usergridResponse.user);
+        callback(error, usergridResponse, self);
     }.bind(self));
 };
 
@@ -6503,17 +6502,18 @@ UsergridUser.prototype.login = function() {
     var args = UsergridHelpers.flattenArgs(arguments);
     var client = UsergridHelpers.validateAndRetrieveClient(args);
     var callback = UsergridHelpers.callback(args);
-    client.POST("token", UsergridHelpers.userLoginBody(self), function(usergridResponse) {
+    client.POST("token", UsergridHelpers.userLoginBody(self), function(error, usergridResponse) {
         delete self.password;
+        var responseJSON = usergridResponse.responseJSON;
+        var token = _.get(responseJSON, "access_token");
+        var expiresIn = _.get(responseJSON, "expires_in");
         if (usergridResponse.ok) {
-            var responseJSON = usergridResponse.responseJSON;
             self.auth = new UsergridUserAuth(self);
-            self.auth.token = _.get(responseJSON, "access_token");
-            var expiresIn = _.get(responseJSON, "expires_in");
+            self.auth.token = token;
             self.auth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
             self.auth.tokenTtl = expiresIn;
         }
-        callback(self.auth, self, usergridResponse);
+        callback(error, usergridResponse, token);
     });
 };
 
@@ -6527,7 +6527,7 @@ UsergridUser.prototype.logout = function() {
             name: "no_valid_token",
             description: "this user does not have a valid token"
         });
-        callback(response);
+        callback(response.error, response);
     } else {
         var revokeAll = _.first(args.filter(_.isBoolean)) || false;
         var queryParams = undefined;
@@ -6541,9 +6541,9 @@ UsergridUser.prototype.logout = function() {
             path: [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/"),
             method: UsergridHttpMethod.PUT,
             queryParams: queryParams,
-            callback: function(usergridResponse) {
+            callback: function(error, usergridResponse) {
                 self.auth.destroy();
-                callback(usergridResponse);
+                callback(error, usergridResponse, usergridResponse.ok);
             }.bind(self)
         };
         var request = new UsergridRequest(requestOptions);

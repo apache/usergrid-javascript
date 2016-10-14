@@ -658,9 +658,66 @@ Usergrid.disconnect(entity1, 'relationship', entity2, function(error, usergridRe
     
 ## Assets
 
-Assets can be uploaded and downloaded either directly using `Usergrid.POST` or `Usergrid.PUT`, or via `UsergridEntity` convenience methods. Before uploading an asset, you will need to initialize a `UsergridAsset` instance.
+Assets can be uploaded and downloaded either directly using `Usergrid.uploadAsset()` or `Usergrid.downloadAsset()`, or via `UsergridEntity` convenience methods. Before uploading an asset, you will need to initialize a `UsergridAsset` instance.
 
 ### UsergridAsset init
 
-NEED TO WRITE THIS
+UsergridAsset's can only be initialized with [File](https://developer.mozilla.org/en-US/docs/Web/API/File) or [Blob](https://developer.mozilla.org/en-US/docs/Web/API/Blob) objects.
+
+Loading an image blob via `XMLHttpRequest`:
+
+```js
+var usergridAsset;
+var req = new XMLHttpRequest();
+req.open('GET', 'https://raw.githubusercontent.com/apache/usergrid-javascript/master/tests/resources/images/apigee.png', true);
+req.responseType = 'blob';
+req.onload = function () {
+	var blobResponse = req.response;
+	usergridAsset = new UsergridAsset(blobResponse); // asset.data will now contain the contents and info from the 'blob' response.
+};
+req.send(null);
+```
+       
+You can also access `asset.contentType` and `asset.contentLength` once data has been loaded into a `UsergridAsset`.
+    
+###Usergrid.uploadAsset() and Usergrid.downloadAsset()
+
+POST binary data to a collection by creating a new entity:
+
+```js
+var asset = new UsergridAsset(fileOrBlob);
+Usergrid.uploadAsset('collection',asset,function(error, assetResponse, entityWithAsset) {
+    // asset is now uploaded to Usergrid
+});
+```
+
+PUT binary data to an existing entity via attachAsset():
+
+
+```js
+var asset = new UsergridAsset(fileOrBlob);
+entity.attachAsset(asset);
+Usergrid.uploadAsset(entity,function(error, assetResponse, entityWithAsset) {
+    // access the asset via entity.asset
+});
+```
+
+### UsergridEntity convenience methods
+
+`entity.uploadAsset()` is a convenient way to upload an asset that is attached to an entity:
+
+```js
+var asset = new UsergridAsset(fileOrBlob)
+entity.attachAsset(asset)
+entity.uploadAsset(function(error, assetResponse, entityWithAsset) {
+    // asset is now uploaded to Usergrid
+})
+```
+    
+`entity.downloadAsset()` allows you to download a binary asset:
+
+```js
+entity.uploadAsset(function(error, assetResponse, entityWithAsset) {
+    // access the asset via entityWithAsset.asset
+})```
     

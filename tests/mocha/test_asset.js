@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 configs.forEach(function(config) {
 
     var client = new UsergridClient(config);

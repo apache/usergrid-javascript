@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 var targetedConfigs = {
     "1.0": {
         "orgId": "rwalsh",

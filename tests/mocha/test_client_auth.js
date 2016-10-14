@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 configs.forEach(function(config) {
 
     describe('Client Auth Tests ' + config.target, function () {

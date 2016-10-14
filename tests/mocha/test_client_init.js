@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 describe('Client Initialization', function() {
     it('should fail to initialize without an orgId and appId', function() {
         should(function() {

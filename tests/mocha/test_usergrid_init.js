@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 configs.forEach(function(config) {
 
     describe('Usergrid init() / initSharedInstance() ' + config.target, function () {

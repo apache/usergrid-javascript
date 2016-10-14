@@ -12,6 +12,8 @@
  limitations under the License.
  */
 
+'use strict';
+
 describe('UsergridQuery', function() {
 
     describe('_type', function() {

@@ -33,8 +33,8 @@ $(document).ready(function () {
           message.html('');
           previousCursors.push(lastQueryUsed._cursor);
           lastQueryUsed = new UsergridQuery('dogs').desc('created').cursor(_.get(lastResponse,'responseJSON.cursor'));
-          lastResponse.loadNextPage(client,function(usergridResponse) {
-              handleGETDogResponse(usergridResponse)
+          lastResponse.loadNextPage(client,function(error,usergridResponse) {
+              handleGETDogResponse(error,usergridResponse)
           })
 	  });
 
@@ -71,14 +71,14 @@ $(document).ready(function () {
 		if( cursor !== undefined && !_.isEmpty(cursor) ) {
 			lastQueryUsed.cursor(cursor)
 		}
-		client.GET(lastQueryUsed,function(usergridResponse) {
-            handleGETDogResponse(usergridResponse)
+		client.GET(lastQueryUsed,function(error,usergridResponse) {
+            handleGETDogResponse(error,usergridResponse)
 		});
 	  }
 
-	  function handleGETDogResponse(usergridResponse) {
+	  function handleGETDogResponse(error,usergridResponse) {
           lastResponse = usergridResponse;
-          if(lastResponse.error) {
+          if(error) {
               alert('there was an error getting the dogs');
           } else {
               myDogList.empty();
@@ -101,23 +101,23 @@ $(document).ready(function () {
 	  function newdog() {
           createDogButton.addClass("disabled");
 
-          var name = $("#name").val(),
+          var nameInput = $("#name"),
               nameHelp = $("#name-help"),
               nameControl = $("#name-control");
 
           nameHelp.hide();
           nameControl.removeClass('error');
 
-		if (Usergrid.validation.validateName(name, function (){
-			    name.focus();
+		if (Usergrid.validation.validateName(nameInput.val(), function (){
+                nameInput.focus();
 			    nameHelp.show();
 			    nameControl.addClass('error');
 			    nameHelp.html(Usergrid.validation.getNameAllowedChars());
                 createDogButton.removeClass("disabled");})
 		) {
-			client.POST('dogs',{ name:name }, function(usergridResponse) {
-				if (usergridResponse.error) {
-                    alert('Oops! There was an error creating the dog. \n' + JSON.stringify(usergridResponse.error,null,2));
+			client.POST('dogs',{ name:nameInput.val() }, function(error,usergridResponse) {
+				if (error) {
+                    alert('Oops! There was an error creating the dog. \n' + JSON.stringify(error,null,2));
                     createDogButton.removeClass("disabled");
 				} else {
                     message.html('New dog created!');

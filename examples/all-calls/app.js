@@ -102,8 +102,7 @@ $(document).ready(function () {
 
   function _get() {
     var endpoint = $("#get-path").val();
-    client.GET(endpoint, function(usergridResponse) {
-      var err = usergridResponse.error;
+    client.GET(endpoint, function(err,usergridResponse) {
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
@@ -116,12 +115,11 @@ $(document).ready(function () {
     var endpoint = $("#post-path").val();
     var data = $("#post-data").val();
     data = JSON.parse(data);
-    client.POST(endpoint, data, function (usergridResponse) {
-      var err = usergridResponse.error;
+    client.POST(endpoint, data, function (err,usergridResponse) {
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entity,null,2)+'</pre>');
       }
     });
   }
@@ -130,24 +128,22 @@ $(document).ready(function () {
     var endpoint = $("#put-path").val();
     var data = $("#put-data").val();
     data = JSON.parse(data);
-    client.PUT(endpoint, data, function (usergridResponse) {
-      var err = usergridResponse.error;
+    client.PUT(endpoint, data, function (err,usergridResponse) {
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entity,null,2)+'</pre>');
       }
     });
   }
 
   function _delete() {
     var endpoint = $("#delete-path").val();
-    client.DELETE(endpoint, function (usergridResponse) {
-      var err = usergridResponse.error;
+    client.DELETE(endpoint, function (err,usergridResponse) {
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entities,null,2)+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse.entity,null,2)+'</pre>');
       }
     });
   }
@@ -155,12 +151,11 @@ $(document).ready(function () {
   function _login() {
     var username = $("#username").val();
     var password = $("#password").val();
-    client.authenticateUser({username:username, password:password}, function (auth,user,usergridResponse) {
-      var err = usergridResponse.error;
+    client.authenticateUser({username:username, password:password}, function (err,usergridResponse,token) {
       if (err) {
         $("#response").html('<pre>ERROR: '+JSON.stringify(err,null,2)+'</pre>');
       } else {
-        $("#response").html('<pre>'+JSON.stringify(usergridResponse.responseJSON,null,2)+'</pre>');
+        $("#response").html('<pre>'+JSON.stringify(usergridResponse,null,2)+'</pre>');
       }
     });
   }

@@ -6298,7 +6298,7 @@ var UsergridEntity = function() {
         }
     }
     if (!_.isString(self.type)) {
-        throw new Error('"type" (or "collection") parameter is required when initializing a UsergridEntity object');
+        throw new Error("'type' (or 'collection') parameter is required when initializing a UsergridEntity object");
     }
     Object.defineProperty(self, "isUser", {
         get: function() {

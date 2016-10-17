@@ -1,4 +1,3 @@
-
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -15,44 +14,66 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-
 <html>
 <head>
   <meta charset="utf-8">
   <title>Mocha Tests</title>
   <link rel="stylesheet" href="../resources/css/mocha.css" />
-  <script src="../resources/js/mocha.js"></script>
+  <script type="text/javascript" src="../../node_modules/should/should.js"></script>
+  <script type="text/javascript" src="../../node_modules/mocha/mocha.js"></script>
   <script>mocha.setup('bdd')</script>
-  <script src="../resources/js/blanket_mocha.min.js"></script>
-  <script type="text/javascript" src="../../node_modules/grunt-blanket-mocha/support/mocha-blanket.js"></script>
-	<script>
+  	<script>
       function assert(expr, msg) {
-        if (!expr) throw new Error(msg || 'failed');
+        if (!expr) {
+            throw new Error(msg || 'failed');
+        }
       }
     </script>
 
-  <script src="../../usergrid.js" data-cover></script>
-  <script src="test.js"></script>
-<!-- run mocha -->
-    <script type="text/javascript" charset="utf-8">
-    	var _onload=onload||function(){};
+  <!-- Load the individual files instead of the generated usergrid.js so we can debug it. -->
+  <!-- or comment out the files and load-->
+  <!--<script src="../../usergrid.js"></script>-->
+  <script src="../../lib/modules/util/Promise.js"></script>
+  <script src="../../lib/modules/util/lodash.js"></script>
+  <script src="../../lib/modules/UsergridEnums.js"></script>
+  <script src="../../lib/modules/util/UsergridHelpers.js"></script>
+  <script src="../../lib/modules/UsergridClient.js"></script>
+  <script src="../../lib/Usergrid.js"></script>
+  <script src="../../lib/modules/UsergridQuery.js"></script>
+  <script src="../../lib/modules/UsergridRequest.js"></script>
+  <script src="../../lib/modules/UsergridAuth.js"></script>
+  <script src="../../lib/modules/UsergridEntity.js"></script>
+  <script src="../../lib/modules/UsergridUser.js"></script>
+  <script src="../../lib/modules/UsergridResponse.js"></script>
+  <script src="../../lib/modules/UsergridAsset.js"></script>
+
+  <script src="test_helpers.js"></script>
+  <script src="test_client_init.js"></script>
+  <script src="test_usergrid_init.js"></script>
+  <script src="test_client_auth.js"></script>
+  <script src="test_client_rest.js"></script>
+  <script src="test_client_connections.js"></script>
+  <script src="test_query.js"></script>
+  <script src="test_entity.js"></script>
+  <script src="test_user.js"></script>
+  <script src="test_asset.js"></script>
+  <script src="test_response.js"></script>
+  <script src="test_response_error.js"></script>
+  <!-- run mocha -->
+  <script type="text/javascript" charset="utf-8">
+    	var _onload = onload || function(){};
         onload = function(){
         	_onload.apply(this, arguments);
 	        mocha.checkLeaks();
 	        mocha.globals(['']);
-	        var runner = mocha.run();
-	        /*runner.on('test end', function(test){
-	          console.log(test.fullTitle());
-	        });*/
+          if (navigator.userAgent.indexOf('PhantomJS') < 0) {
+            mocha.run();
+          }
 	      };
+        if (navigator.userAgent.indexOf('PhantomJS') < 0) {
+          mocha.run();
+        }
     </script>
-
-  <script>
-    if (window.PHANTOMJS) {
-        blanket.options("reporter", "../../node_modules/grunt-blanket-mocha/support/grunt-reporter.js");
-    }
-  </script>
-
 </head>
 <body>
 	<div id="mocha"></div>

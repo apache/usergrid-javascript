@@ -1,127 +1,30 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*! 
+ *Licensed to the Apache Software Foundation (ASF) under one
+ *or more contributor license agreements.  See the NOTICE file
+ *distributed with this work for additional information
+ *regarding copyright ownership.  The ASF licenses this file
+ *to you under the Apache License, Version 2.0 (the
+ *"License"); you may not use this file except in compliance
+ *with the License.  You may obtain a copy of the License at
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
  * 
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ *Unless required by applicable law or agreed to in writing,
+ *software distributed under the License is distributed on an
+ *"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *KIND, either express or implied.  See the License for the
+ *specific language governing permissions and limitations
+ *under the License.
+ * 
+ * 
+ * usergrid@2.0.0 2016-10-14 
  */
-var UsergridEventable = function() {
-    throw Error("'UsergridEventable' is not intended to be invoked directly");
-};
-
-UsergridEventable.prototype = {
-    bind: function(event, fn) {
-        this._events = this._events || {};
-        this._events[event] = this._events[event] || [];
-        this._events[event].push(fn);
-    },
-    unbind: function(event, fn) {
-        this._events = this._events || {};
-        if (event in this._events === false) return;
-        this._events[event].splice(this._events[event].indexOf(fn), 1);
-    },
-    trigger: function(event) {
-        this._events = this._events || {};
-        if (event in this._events === false) return;
-        for (var i = 0; i < this._events[event].length; i++) {
-            this._events[event][i].apply(this, Array.prototype.slice.call(arguments, 1));
-        }
-    }
-};
-
-UsergridEventable.mixin = function(destObject) {
-    var props = [ "bind", "unbind", "trigger" ];
-    for (var i = 0; i < props.length; i++) {
-        if (props[i] in destObject.prototype) {
-            console.warn("overwriting '" + props[i] + "' on '" + destObject.name + "'.");
-            console.warn("the previous version can be found at '_" + props[i] + "' on '" + destObject.name + "'.");
-            destObject.prototype["_" + props[i]] = destObject.prototype[props[i]];
-        }
-        destObject.prototype[props[i]] = UsergridEventable.prototype[props[i]];
-    }
-};
-
-(function() {
-    var name = "Logger", global = this, overwrittenName = global[name], exports;
-    /* logging */
-    function Logger(name) {
-        this.logEnabled = true;
-        this.init(name, true);
-    }
-    Logger.METHODS = [ "log", "error", "warn", "info", "debug", "assert", "clear", "count", "dir", "dirxml", "exception", "group", "groupCollapsed", "groupEnd", "profile", "profileEnd", "table", "time", "timeEnd", "trace" ];
-    Logger.prototype.init = function(name, logEnabled) {
-        this.name = name || "UNKNOWN";
-        this.logEnabled = logEnabled || true;
-        var addMethod = function(method) {
-            this[method] = this.createLogMethod(method);
-        }.bind(this);
-        Logger.METHODS.forEach(addMethod);
-    };
-    Logger.prototype.createLogMethod = function(method) {
-        return Logger.prototype.log.bind(this, method);
-    };
-    Logger.prototype.prefix = function(method, args) {
-        var prepend = "[" + method.toUpperCase() + "][" + name + "]:	";
-        if ([ "log", "error", "warn", "info" ].indexOf(method) !== -1) {
-            if ("string" === typeof args[0]) {
-                args[0] = prepend + args[0];
-            } else {
-                args.unshift(prepend);
-            }
-        }
-        return args;
-    };
-    Logger.prototype.log = function() {
-        var args = [].slice.call(arguments);
-        method = args.shift();
-        if (Logger.METHODS.indexOf(method) === -1) {
-            method = "log";
-        }
-        if (!(this.logEnabled && console && console[method])) return;
-        args = this.prefix(method, args);
-        console[method].apply(console, args);
-    };
-    Logger.prototype.setLogEnabled = function(logEnabled) {
-        this.logEnabled = logEnabled || true;
-    };
-    Logger.mixin = function(destObject) {
-        destObject.__logger = new Logger(destObject.name || "UNKNOWN");
-        var addMethod = function(method) {
-            if (method in destObject.prototype) {
-                console.warn("overwriting '" + method + "' on '" + destObject.name + "'.");
-                console.warn("the previous version can be found at '_" + method + "' on '" + destObject.name + "'.");
-                destObject.prototype["_" + method] = destObject.prototype[method];
-            }
-            destObject.prototype[method] = destObject.__logger.createLogMethod(method);
-        };
-        Logger.METHODS.forEach(addMethod);
-    };
-    global[name] = Logger;
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
-        }
-        return Logger;
-    };
-    return global[name];
-})();
+"use strict";
 
 (function(global) {
-    var name = "Promise", overwrittenName = global[name], exports;
+    var name = "Promise", overwrittenName = global[name];
     function Promise() {
         this.complete = false;
-        this.error = null;
         this.result = null;
         this.callbacks = [];
     }
@@ -130,29 +33,29 @@ UsergridEventable.mixin = function(destObject) {
             return callback.apply(context, arguments);
         };
         if (this.complete) {
-            f(this.error, this.result);
+            f(this.result);
         } else {
             this.callbacks.push(f);
         }
     };
-    Promise.prototype.done = function(error, result) {
+    Promise.prototype.done = function(result) {
         this.complete = true;
-        this.error = error;
         this.result = result;
         if (this.callbacks) {
-            for (var i = 0; i < this.callbacks.length; i++) this.callbacks[i](error, result);
+            _.forEach(this.callbacks, function(callback) {
+                callback(result);
+            });
             this.callbacks.length = 0;
         }
     };
     Promise.join = function(promises) {
-        var p = new Promise(), total = promises.length, completed = 0, errors = [], results = [];
+        var p = new Promise(), total = promises.length, completed = 0, results = [];
         function notifier(i) {
-            return function(error, result) {
+            return function(result) {
                 completed += 1;
-                errors[i] = error;
                 results[i] = result;
                 if (completed === total) {
-                    p.done(errors, results);
+                    p.done(results);
                 }
             };
         }
@@ -161,19 +64,19 @@ UsergridEventable.mixin = function(destObject) {
         }
         return p;
     };
-    Promise.chain = function(promises, error, result) {
+    Promise.chain = function(promises, result) {
         var p = new Promise();
         if (promises === null || promises.length === 0) {
-            p.done(error, result);
+            p.done(result);
         } else {
-            promises[0](error, result).then(function(res, err) {
+            promises[0](result).then(function(res) {
                 promises.splice(0, 1);
                 if (promises) {
-                    Promise.chain(promises, res, err).then(function(r, e) {
-                        p.done(r, e);
+                    Promise.chain(promises, res).then(function(r) {
+                        p.done(r);
                     });
                 } else {
-                    p.done(res, err);
+                    p.done(res);
                 }
             });
         }
@@ -190,3097 +93,6605 @@ UsergridEventable.mixin = function(destObject) {
 })(this);
 
 (function() {
-    var name = "Ajax", global = this, overwrittenName = global[name], exports;
-    function partial() {
-        var args = Array.prototype.slice.call(arguments);
-        var fn = args.shift();
-        return fn.bind(this, args);
+    "use strict";
+    var undefined;
+    var VERSION = "4.16.4";
+    var LARGE_ARRAY_SIZE = 200;
+    var CORE_ERROR_TEXT = "Unsupported core-js use. Try https://github.com/es-shims.", FUNC_ERROR_TEXT = "Expected a function";
+    var HASH_UNDEFINED = "__lodash_hash_undefined__";
+    var MAX_MEMOIZE_SIZE = 500;
+    var PLACEHOLDER = "__lodash_placeholder__";
+    var BIND_FLAG = 1, BIND_KEY_FLAG = 2, CURRY_BOUND_FLAG = 4, CURRY_FLAG = 8, CURRY_RIGHT_FLAG = 16, PARTIAL_FLAG = 32, PARTIAL_RIGHT_FLAG = 64, ARY_FLAG = 128, REARG_FLAG = 256, FLIP_FLAG = 512;
+    var UNORDERED_COMPARE_FLAG = 1, PARTIAL_COMPARE_FLAG = 2;
+    var DEFAULT_TRUNC_LENGTH = 30, DEFAULT_TRUNC_OMISSION = "...";
+    var HOT_COUNT = 500, HOT_SPAN = 16;
+    var LAZY_FILTER_FLAG = 1, LAZY_MAP_FLAG = 2, LAZY_WHILE_FLAG = 3;
+    var INFINITY = 1 / 0, MAX_SAFE_INTEGER = 9007199254740991, MAX_INTEGER = 1.7976931348623157e308, NAN = 0 / 0;
+    var MAX_ARRAY_LENGTH = 4294967295, MAX_ARRAY_INDEX = MAX_ARRAY_LENGTH - 1, HALF_MAX_ARRAY_LENGTH = MAX_ARRAY_LENGTH >>> 1;
+    var wrapFlags = [ [ "ary", ARY_FLAG ], [ "bind", BIND_FLAG ], [ "bindKey", BIND_KEY_FLAG ], [ "curry", CURRY_FLAG ], [ "curryRight", CURRY_RIGHT_FLAG ], [ "flip", FLIP_FLAG ], [ "partial", PARTIAL_FLAG ], [ "partialRight", PARTIAL_RIGHT_FLAG ], [ "rearg", REARG_FLAG ] ];
+    var argsTag = "[object Arguments]", arrayTag = "[object Array]", boolTag = "[object Boolean]", dateTag = "[object Date]", errorTag = "[object Error]", funcTag = "[object Function]", genTag = "[object GeneratorFunction]", mapTag = "[object Map]", numberTag = "[object Number]", objectTag = "[object Object]", promiseTag = "[object Promise]", proxyTag = "[object Proxy]", regexpTag = "[object RegExp]", setTag = "[object Set]", stringTag = "[object String]", symbolTag = "[object Symbol]", weakMapTag = "[object WeakMap]", weakSetTag = "[object WeakSet]";
+    var arrayBufferTag = "[object ArrayBuffer]", dataViewTag = "[object DataView]", float32Tag = "[object Float32Array]", float64Tag = "[object Float64Array]", int8Tag = "[object Int8Array]", int16Tag = "[object Int16Array]", int32Tag = "[object Int32Array]", uint8Tag = "[object Uint8Array]", uint8ClampedTag = "[object Uint8ClampedArray]", uint16Tag = "[object Uint16Array]", uint32Tag = "[object Uint32Array]";
+    var reEmptyStringLeading = /\b__p \+= '';/g, reEmptyStringMiddle = /\b(__p \+=) '' \+/g, reEmptyStringTrailing = /(__e\(.*?\)|\b__t\)) \+\n'';/g;
+    var reEscapedHtml = /&(?:amp|lt|gt|quot|#39);/g, reUnescapedHtml = /[&<>"']/g, reHasEscapedHtml = RegExp(reEscapedHtml.source), reHasUnescapedHtml = RegExp(reUnescapedHtml.source);
+    var reEscape = /<%-([\s\S]+?)%>/g, reEvaluate = /<%([\s\S]+?)%>/g, reInterpolate = /<%=([\s\S]+?)%>/g;
+    var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/, reIsPlainProp = /^\w*$/, reLeadingDot = /^\./, rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
+    var reRegExpChar = /[\\^$.*+?()[\]{}|]/g, reHasRegExpChar = RegExp(reRegExpChar.source);
+    var reTrim = /^\s+|\s+$/g, reTrimStart = /^\s+/, reTrimEnd = /\s+$/;
+    var reWrapComment = /\{(?:\n\/\* \[wrapped with .+\] \*\/)?\n?/, reWrapDetails = /\{\n\/\* \[wrapped with (.+)\] \*/, reSplitDetails = /,? & /;
+    var reAsciiWord = /[^\x00-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]+/g;
+    var reEscapeChar = /\\(\\)?/g;
+    var reEsTemplate = /\$\{([^\\}]*(?:\\.[^\\}]*)*)\}/g;
+    var reFlags = /\w*$/;
+    var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
+    var reIsBinary = /^0b[01]+$/i;
+    var reIsHostCtor = /^\[object .+?Constructor\]$/;
+    var reIsOctal = /^0o[0-7]+$/i;
+    var reIsUint = /^(?:0|[1-9]\d*)$/;
+    var reLatin = /[\xc0-\xd6\xd8-\xf6\xf8-\xff\u0100-\u017f]/g;
+    var reNoMatch = /($^)/;
+    var reUnescapedString = /['\n\r\u2028\u2029\\]/g;
+    var rsAstralRange = "\\ud800-\\udfff", rsComboMarksRange = "\\u0300-\\u036f\\ufe20-\\ufe23", rsComboSymbolsRange = "\\u20d0-\\u20f0", rsDingbatRange = "\\u2700-\\u27bf", rsLowerRange = "a-z\\xdf-\\xf6\\xf8-\\xff", rsMathOpRange = "\\xac\\xb1\\xd7\\xf7", rsNonCharRange = "\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\xbf", rsPunctuationRange = "\\u2000-\\u206f", rsSpaceRange = " \\t\\x0b\\f\\xa0\\ufeff\\n\\r\\u2028\\u2029\\u1680\\u180e\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u202f\\u205f\\u3000", rsUpperRange = "A-Z\\xc0-\\xd6\\xd8-\\xde", rsVarRange = "\\ufe0e\\ufe0f", rsBreakRange = rsMathOpRange + rsNonCharRange + rsPunctuationRange + rsSpaceRange;
+    var rsApos = "['’]", rsAstral = "[" + rsAstralRange + "]", rsBreak = "[" + rsBreakRange + "]", rsCombo = "[" + rsComboMarksRange + rsComboSymbolsRange + "]", rsDigits = "\\d+", rsDingbat = "[" + rsDingbatRange + "]", rsLower = "[" + rsLowerRange + "]", rsMisc = "[^" + rsAstralRange + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]", rsFitz = "\\ud83c[\\udffb-\\udfff]", rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")", rsNonAstral = "[^" + rsAstralRange + "]", rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsUpper = "[" + rsUpperRange + "]", rsZWJ = "\\u200d";
+    var rsLowerMisc = "(?:" + rsLower + "|" + rsMisc + ")", rsUpperMisc = "(?:" + rsUpper + "|" + rsMisc + ")", rsOptLowerContr = "(?:" + rsApos + "(?:d|ll|m|re|s|t|ve))?", rsOptUpperContr = "(?:" + rsApos + "(?:D|LL|M|RE|S|T|VE))?", reOptMod = rsModifier + "?", rsOptVar = "[" + rsVarRange + "]?", rsOptJoin = "(?:" + rsZWJ + "(?:" + [ rsNonAstral, rsRegional, rsSurrPair ].join("|") + ")" + rsOptVar + reOptMod + ")*", rsSeq = rsOptVar + reOptMod + rsOptJoin, rsEmoji = "(?:" + [ rsDingbat, rsRegional, rsSurrPair ].join("|") + ")" + rsSeq, rsSymbol = "(?:" + [ rsNonAstral + rsCombo + "?", rsCombo, rsRegional, rsSurrPair, rsAstral ].join("|") + ")";
+    var reApos = RegExp(rsApos, "g");
+    var reComboMark = RegExp(rsCombo, "g");
+    var reUnicode = RegExp(rsFitz + "(?=" + rsFitz + ")|" + rsSymbol + rsSeq, "g");
+    var reUnicodeWord = RegExp([ rsUpper + "?" + rsLower + "+" + rsOptLowerContr + "(?=" + [ rsBreak, rsUpper, "$" ].join("|") + ")", rsUpperMisc + "+" + rsOptUpperContr + "(?=" + [ rsBreak, rsUpper + rsLowerMisc, "$" ].join("|") + ")", rsUpper + "?" + rsLowerMisc + "+" + rsOptLowerContr, rsUpper + "+" + rsOptUpperContr, rsDigits, rsEmoji ].join("|"), "g");
+    var reHasUnicode = RegExp("[" + rsZWJ + rsAstralRange + rsComboMarksRange + rsComboSymbolsRange + rsVarRange + "]");
+    var reHasUnicodeWord = /[a-z][A-Z]|[A-Z]{2,}[a-z]|[0-9][a-zA-Z]|[a-zA-Z][0-9]|[^a-zA-Z0-9 ]/;
+    var contextProps = [ "Array", "Buffer", "DataView", "Date", "Error", "Float32Array", "Float64Array", "Function", "Int8Array", "Int16Array", "Int32Array", "Map", "Math", "Object", "Promise", "RegExp", "Set", "String", "Symbol", "TypeError", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "WeakMap", "_", "clearTimeout", "isFinite", "parseInt", "setTimeout" ];
+    var templateCounter = -1;
+    var typedArrayTags = {};
+    typedArrayTags[float32Tag] = typedArrayTags[float64Tag] = typedArrayTags[int8Tag] = typedArrayTags[int16Tag] = typedArrayTags[int32Tag] = typedArrayTags[uint8Tag] = typedArrayTags[uint8ClampedTag] = typedArrayTags[uint16Tag] = typedArrayTags[uint32Tag] = true;
+    typedArrayTags[argsTag] = typedArrayTags[arrayTag] = typedArrayTags[arrayBufferTag] = typedArrayTags[boolTag] = typedArrayTags[dataViewTag] = typedArrayTags[dateTag] = typedArrayTags[errorTag] = typedArrayTags[funcTag] = typedArrayTags[mapTag] = typedArrayTags[numberTag] = typedArrayTags[objectTag] = typedArrayTags[regexpTag] = typedArrayTags[setTag] = typedArrayTags[stringTag] = typedArrayTags[weakMapTag] = false;
+    var cloneableTags = {};
+    cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
+    cloneableTags[errorTag] = cloneableTags[funcTag] = cloneableTags[weakMapTag] = false;
+    var deburredLetters = {
+        "À": "A",
+        "Á": "A",
+        "Â": "A",
+        "Ã": "A",
+        "Ä": "A",
+        "Å": "A",
+        "à": "a",
+        "á": "a",
+        "â": "a",
+        "ã": "a",
+        "ä": "a",
+        "å": "a",
+        "Ç": "C",
+        "ç": "c",
+        "Ð": "D",
+        "ð": "d",
+        "È": "E",
+        "É": "E",
+        "Ê": "E",
+        "Ë": "E",
+        "è": "e",
+        "é": "e",
+        "ê": "e",
+        "ë": "e",
+        "Ì": "I",
+        "Í": "I",
+        "Î": "I",
+        "Ï": "I",
+        "ì": "i",
+        "í": "i",
+        "î": "i",
+        "ï": "i",
+        "Ñ": "N",
+        "ñ": "n",
+        "Ò": "O",
+        "Ó": "O",
+        "Ô": "O",
+        "Õ": "O",
+        "Ö": "O",
+        "Ø": "O",
+        "ò": "o",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ö": "o",
+        "ø": "o",
+        "Ù": "U",
+        "Ú": "U",
+        "Û": "U",
+        "Ü": "U",
+        "ù": "u",
+        "ú": "u",
+        "û": "u",
+        "ü": "u",
+        "Ý": "Y",
+        "ý": "y",
+        "ÿ": "y",
+        "Æ": "Ae",
+        "æ": "ae",
+        "Þ": "Th",
+        "þ": "th",
+        "ß": "ss",
+        "Ā": "A",
+        "Ă": "A",
+        "Ą": "A",
+        "ā": "a",
+        "ă": "a",
+        "ą": "a",
+        "Ć": "C",
+        "Ĉ": "C",
+        "Ċ": "C",
+        "Č": "C",
+        "ć": "c",
+        "ĉ": "c",
+        "ċ": "c",
+        "č": "c",
+        "Ď": "D",
+        "Đ": "D",
+        "ď": "d",
+        "đ": "d",
+        "Ē": "E",
+        "Ĕ": "E",
+        "Ė": "E",
+        "Ę": "E",
+        "Ě": "E",
+        "ē": "e",
+        "ĕ": "e",
+        "ė": "e",
+        "ę": "e",
+        "ě": "e",
+        "Ĝ": "G",
+        "Ğ": "G",
+        "Ġ": "G",
+        "Ģ": "G",
+        "ĝ": "g",
+        "ğ": "g",
+        "ġ": "g",
+        "ģ": "g",
+        "Ĥ": "H",
+        "Ħ": "H",
+        "ĥ": "h",
+        "ħ": "h",
+        "Ĩ": "I",
+        "Ī": "I",
+        "Ĭ": "I",
+        "Į": "I",
+        "İ": "I",
+        "ĩ": "i",
+        "ī": "i",
+        "ĭ": "i",
+        "į": "i",
+        "ı": "i",
+        "Ĵ": "J",
+        "ĵ": "j",
+        "Ķ": "K",
+        "ķ": "k",
+        "ĸ": "k",
+        "Ĺ": "L",
+        "Ļ": "L",
+        "Ľ": "L",
+        "Ŀ": "L",
+        "Ł": "L",
+        "ĺ": "l",
+        "ļ": "l",
+        "ľ": "l",
+        "ŀ": "l",
+        "ł": "l",
+        "Ń": "N",
+        "Ņ": "N",
+        "Ň": "N",
+        "Ŋ": "N",
+        "ń": "n",
+        "ņ": "n",
+        "ň": "n",
+        "ŋ": "n",
+        "Ō": "O",
+        "Ŏ": "O",
+        "Ő": "O",
+        "ō": "o",
+        "ŏ": "o",
+        "ő": "o",
+        "Ŕ": "R",
+        "Ŗ": "R",
+        "Ř": "R",
+        "ŕ": "r",
+        "ŗ": "r",
+        "ř": "r",
+        "Ś": "S",
+        "Ŝ": "S",
+        "Ş": "S",
+        "Š": "S",
+        "ś": "s",
+        "ŝ": "s",
+        "ş": "s",
+        "š": "s",
+        "Ţ": "T",
+        "Ť": "T",
+        "Ŧ": "T",
+        "ţ": "t",
+        "ť": "t",
+        "ŧ": "t",
+        "Ũ": "U",
+        "Ū": "U",
+        "Ŭ": "U",
+        "Ů": "U",
+        "Ű": "U",
+        "Ų": "U",
+        "ũ": "u",
+        "ū": "u",
+        "ŭ": "u",
+        "ů": "u",
+        "ű": "u",
+        "ų": "u",
+        "Ŵ": "W",
+        "ŵ": "w",
+        "Ŷ": "Y",
+        "ŷ": "y",
+        "Ÿ": "Y",
+        "Ź": "Z",
+        "Ż": "Z",
+        "Ž": "Z",
+        "ź": "z",
+        "ż": "z",
+        "ž": "z",
+        "Ĳ": "IJ",
+        "ĳ": "ij",
+        "Œ": "Oe",
+        "œ": "oe",
+        "ŉ": "'n",
+        "ſ": "s"
+    };
+    var htmlEscapes = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    };
+    var htmlUnescapes = {
+        "&amp;": "&",
+        "&lt;": "<",
+        "&gt;": ">",
+        "&quot;": '"',
+        "&#39;": "'"
+    };
+    var stringEscapes = {
+        "\\": "\\",
+        "'": "'",
+        "\n": "n",
+        "\r": "r",
+        "\u2028": "u2028",
+        "\u2029": "u2029"
+    };
+    var freeParseFloat = parseFloat, freeParseInt = parseInt;
+    var freeGlobal = typeof global == "object" && global && global.Object === Object && global;
+    var freeSelf = typeof self == "object" && self && self.Object === Object && self;
+    var root = freeGlobal || freeSelf || Function("return this")();
+    var freeExports = typeof exports == "object" && exports && !exports.nodeType && exports;
+    var freeModule = freeExports && typeof module == "object" && module && !module.nodeType && module;
+    var moduleExports = freeModule && freeModule.exports === freeExports;
+    var freeProcess = moduleExports && freeGlobal.process;
+    var nodeUtil = function() {
+        try {
+            return freeProcess && freeProcess.binding("util");
+        } catch (e) {}
+    }();
+    var nodeIsArrayBuffer = nodeUtil && nodeUtil.isArrayBuffer, nodeIsDate = nodeUtil && nodeUtil.isDate, nodeIsMap = nodeUtil && nodeUtil.isMap, nodeIsRegExp = nodeUtil && nodeUtil.isRegExp, nodeIsSet = nodeUtil && nodeUtil.isSet, nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
+    function addMapEntry(map, pair) {
+        map.set(pair[0], pair[1]);
+        return map;
     }
-    function Ajax() {
-        this.logger = new global.Logger(name);
-        var self = this;
-        function encode(data) {
-            var result = "";
-            if (typeof data === "string") {
-                result = data;
+    function addSetEntry(set, value) {
+        set.add(value);
+        return set;
+    }
+    function apply(func, thisArg, args) {
+        switch (args.length) {
+          case 0:
+            return func.call(thisArg);
+
+          case 1:
+            return func.call(thisArg, args[0]);
+
+          case 2:
+            return func.call(thisArg, args[0], args[1]);
+
+          case 3:
+            return func.call(thisArg, args[0], args[1], args[2]);
+        }
+        return func.apply(thisArg, args);
+    }
+    function arrayAggregator(array, setter, iteratee, accumulator) {
+        var index = -1, length = array ? array.length : 0;
+        while (++index < length) {
+            var value = array[index];
+            setter(accumulator, value, iteratee(value), array);
+        }
+        return accumulator;
+    }
+    function arrayEach(array, iteratee) {
+        var index = -1, length = array ? array.length : 0;
+        while (++index < length) {
+            if (iteratee(array[index], index, array) === false) {
+                break;
+            }
+        }
+        return array;
+    }
+    function arrayEachRight(array, iteratee) {
+        var length = array ? array.length : 0;
+        while (length--) {
+            if (iteratee(array[length], length, array) === false) {
+                break;
+            }
+        }
+        return array;
+    }
+    function arrayEvery(array, predicate) {
+        var index = -1, length = array ? array.length : 0;
+        while (++index < length) {
+            if (!predicate(array[index], index, array)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function arrayFilter(array, predicate) {
+        var index = -1, length = array ? array.length : 0, resIndex = 0, result = [];
+        while (++index < length) {
+            var value = array[index];
+            if (predicate(value, index, array)) {
+                result[resIndex++] = value;
+            }
+        }
+        return result;
+    }
+    function arrayIncludes(array, value) {
+        var length = array ? array.length : 0;
+        return !!length && baseIndexOf(array, value, 0) > -1;
+    }
+    function arrayIncludesWith(array, value, comparator) {
+        var index = -1, length = array ? array.length : 0;
+        while (++index < length) {
+            if (comparator(value, array[index])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function arrayMap(array, iteratee) {
+        var index = -1, length = array ? array.length : 0, result = Array(length);
+        while (++index < length) {
+            result[index] = iteratee(array[index], index, array);
+        }
+        return result;
+    }
+    function arrayPush(array, values) {
+        var index = -1, length = values.length, offset = array.length;
+        while (++index < length) {
+            array[offset + index] = values[index];
+        }
+        return array;
+    }
+    function arrayReduce(array, iteratee, accumulator, initAccum) {
+        var index = -1, length = array ? array.length : 0;
+        if (initAccum && length) {
+            accumulator = array[++index];
+        }
+        while (++index < length) {
+            accumulator = iteratee(accumulator, array[index], index, array);
+        }
+        return accumulator;
+    }
+    function arrayReduceRight(array, iteratee, accumulator, initAccum) {
+        var length = array ? array.length : 0;
+        if (initAccum && length) {
+            accumulator = array[--length];
+        }
+        while (length--) {
+            accumulator = iteratee(accumulator, array[length], length, array);
+        }
+        return accumulator;
+    }
+    function arraySome(array, predicate) {
+        var index = -1, length = array ? array.length : 0;
+        while (++index < length) {
+            if (predicate(array[index], index, array)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    var asciiSize = baseProperty("length");
+    function asciiToArray(string) {
+        return string.split("");
+    }
+    function asciiWords(string) {
+        return string.match(reAsciiWord) || [];
+    }
+    function baseFindKey(collection, predicate, eachFunc) {
+        var result;
+        eachFunc(collection, function(value, key, collection) {
+            if (predicate(value, key, collection)) {
+                result = key;
+                return false;
+            }
+        });
+        return result;
+    }
+    function baseFindIndex(array, predicate, fromIndex, fromRight) {
+        var length = array.length, index = fromIndex + (fromRight ? 1 : -1);
+        while (fromRight ? index-- : ++index < length) {
+            if (predicate(array[index], index, array)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+    function baseIndexOf(array, value, fromIndex) {
+        return value === value ? strictIndexOf(array, value, fromIndex) : baseFindIndex(array, baseIsNaN, fromIndex);
+    }
+    function baseIndexOfWith(array, value, fromIndex, comparator) {
+        var index = fromIndex - 1, length = array.length;
+        while (++index < length) {
+            if (comparator(array[index], value)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+    function baseIsNaN(value) {
+        return value !== value;
+    }
+    function baseMean(array, iteratee) {
+        var length = array ? array.length : 0;
+        return length ? baseSum(array, iteratee) / length : NAN;
+    }
+    function baseProperty(key) {
+        return function(object) {
+            return object == null ? undefined : object[key];
+        };
+    }
+    function basePropertyOf(object) {
+        return function(key) {
+            return object == null ? undefined : object[key];
+        };
+    }
+    function baseReduce(collection, iteratee, accumulator, initAccum, eachFunc) {
+        eachFunc(collection, function(value, index, collection) {
+            accumulator = initAccum ? (initAccum = false, value) : iteratee(accumulator, value, index, collection);
+        });
+        return accumulator;
+    }
+    function baseSortBy(array, comparer) {
+        var length = array.length;
+        array.sort(comparer);
+        while (length--) {
+            array[length] = array[length].value;
+        }
+        return array;
+    }
+    function baseSum(array, iteratee) {
+        var result, index = -1, length = array.length;
+        while (++index < length) {
+            var current = iteratee(array[index]);
+            if (current !== undefined) {
+                result = result === undefined ? current : result + current;
+            }
+        }
+        return result;
+    }
+    function baseTimes(n, iteratee) {
+        var index = -1, result = Array(n);
+        while (++index < n) {
+            result[index] = iteratee(index);
+        }
+        return result;
+    }
+    function baseToPairs(object, props) {
+        return arrayMap(props, function(key) {
+            return [ key, object[key] ];
+        });
+    }
+    function baseUnary(func) {
+        return function(value) {
+            return func(value);
+        };
+    }
+    function baseValues(object, props) {
+        return arrayMap(props, function(key) {
+            return object[key];
+        });
+    }
+    function cacheHas(cache, key) {
+        return cache.has(key);
+    }
+    function charsStartIndex(strSymbols, chrSymbols) {
+        var index = -1, length = strSymbols.length;
+        while (++index < length && baseIndexOf(chrSymbols, strSymbols[index], 0) > -1) {}
+        return index;
+    }
+    function charsEndIndex(strSymbols, chrSymbols) {
+        var index = strSymbols.length;
+        while (index-- && baseIndexOf(chrSymbols, strSymbols[index], 0) > -1) {}
+        return index;
+    }
+    function countHolders(array, placeholder) {
+        var length = array.length, result = 0;
+        while (length--) {
+            if (array[length] === placeholder) {
+                ++result;
+            }
+        }
+        return result;
+    }
+    var deburrLetter = basePropertyOf(deburredLetters);
+    var escapeHtmlChar = basePropertyOf(htmlEscapes);
+    function escapeStringChar(chr) {
+        return "\\" + stringEscapes[chr];
+    }
+    function getValue(object, key) {
+        return object == null ? undefined : object[key];
+    }
+    function hasUnicode(string) {
+        return reHasUnicode.test(string);
+    }
+    function hasUnicodeWord(string) {
+        return reHasUnicodeWord.test(string);
+    }
+    function iteratorToArray(iterator) {
+        var data, result = [];
+        while (!(data = iterator.next()).done) {
+            result.push(data.value);
+        }
+        return result;
+    }
+    function mapToArray(map) {
+        var index = -1, result = Array(map.size);
+        map.forEach(function(value, key) {
+            result[++index] = [ key, value ];
+        });
+        return result;
+    }
+    function overArg(func, transform) {
+        return function(arg) {
+            return func(transform(arg));
+        };
+    }
+    function replaceHolders(array, placeholder) {
+        var index = -1, length = array.length, resIndex = 0, result = [];
+        while (++index < length) {
+            var value = array[index];
+            if (value === placeholder || value === PLACEHOLDER) {
+                array[index] = PLACEHOLDER;
+                result[resIndex++] = index;
+            }
+        }
+        return result;
+    }
+    function setToArray(set) {
+        var index = -1, result = Array(set.size);
+        set.forEach(function(value) {
+            result[++index] = value;
+        });
+        return result;
+    }
+    function setToPairs(set) {
+        var index = -1, result = Array(set.size);
+        set.forEach(function(value) {
+            result[++index] = [ value, value ];
+        });
+        return result;
+    }
+    function strictIndexOf(array, value, fromIndex) {
+        var index = fromIndex - 1, length = array.length;
+        while (++index < length) {
+            if (array[index] === value) {
+                return index;
+            }
+        }
+        return -1;
+    }
+    function strictLastIndexOf(array, value, fromIndex) {
+        var index = fromIndex + 1;
+        while (index--) {
+            if (array[index] === value) {
+                return index;
+            }
+        }
+        return index;
+    }
+    function stringSize(string) {
+        return hasUnicode(string) ? unicodeSize(string) : asciiSize(string);
+    }
+    function stringToArray(string) {
+        return hasUnicode(string) ? unicodeToArray(string) : asciiToArray(string);
+    }
+    var unescapeHtmlChar = basePropertyOf(htmlUnescapes);
+    function unicodeSize(string) {
+        var result = reUnicode.lastIndex = 0;
+        while (reUnicode.test(string)) {
+            ++result;
+        }
+        return result;
+    }
+    function unicodeToArray(string) {
+        return string.match(reUnicode) || [];
+    }
+    function unicodeWords(string) {
+        return string.match(reUnicodeWord) || [];
+    }
+    var runInContext = function runInContext(context) {
+        context = context ? _.defaults(root.Object(), context, _.pick(root, contextProps)) : root;
+        var Array = context.Array, Date = context.Date, Error = context.Error, Function = context.Function, Math = context.Math, Object = context.Object, RegExp = context.RegExp, String = context.String, TypeError = context.TypeError;
+        var arrayProto = Array.prototype, funcProto = Function.prototype, objectProto = Object.prototype;
+        var coreJsData = context["__core-js_shared__"];
+        var maskSrcKey = function() {
+            var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || "");
+            return uid ? "Symbol(src)_1." + uid : "";
+        }();
+        var funcToString = funcProto.toString;
+        var hasOwnProperty = objectProto.hasOwnProperty;
+        var idCounter = 0;
+        var objectCtorString = funcToString.call(Object);
+        var objectToString = objectProto.toString;
+        var oldDash = root._;
+        var reIsNative = RegExp("^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$");
+        var Buffer = moduleExports ? context.Buffer : undefined, Symbol = context.Symbol, Uint8Array = context.Uint8Array, allocUnsafe = Buffer ? Buffer.allocUnsafe : undefined, getPrototype = overArg(Object.getPrototypeOf, Object), iteratorSymbol = Symbol ? Symbol.iterator : undefined, objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
+        var defineProperty = function() {
+            try {
+                var func = getNative(Object, "defineProperty");
+                func({}, "", {});
+                return func;
+            } catch (e) {}
+        }();
+        var ctxClearTimeout = context.clearTimeout !== root.clearTimeout && context.clearTimeout, ctxNow = Date && Date.now !== root.Date.now && Date.now, ctxSetTimeout = context.setTimeout !== root.setTimeout && context.setTimeout;
+        var nativeCeil = Math.ceil, nativeFloor = Math.floor, nativeGetSymbols = Object.getOwnPropertySymbols, nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined, nativeIsFinite = context.isFinite, nativeJoin = arrayProto.join, nativeKeys = overArg(Object.keys, Object), nativeMax = Math.max, nativeMin = Math.min, nativeNow = Date.now, nativeParseInt = context.parseInt, nativeRandom = Math.random, nativeReverse = arrayProto.reverse;
+        var DataView = getNative(context, "DataView"), Map = getNative(context, "Map"), Promise = getNative(context, "Promise"), Set = getNative(context, "Set"), WeakMap = getNative(context, "WeakMap"), nativeCreate = getNative(Object, "create");
+        var metaMap = WeakMap && new WeakMap();
+        var realNames = {};
+        var dataViewCtorString = toSource(DataView), mapCtorString = toSource(Map), promiseCtorString = toSource(Promise), setCtorString = toSource(Set), weakMapCtorString = toSource(WeakMap);
+        var symbolProto = Symbol ? Symbol.prototype : undefined, symbolValueOf = symbolProto ? symbolProto.valueOf : undefined, symbolToString = symbolProto ? symbolProto.toString : undefined;
+        function lodash(value) {
+            if (isObjectLike(value) && !isArray(value) && !(value instanceof LazyWrapper)) {
+                if (value instanceof LodashWrapper) {
+                    return value;
+                }
+                if (hasOwnProperty.call(value, "__wrapped__")) {
+                    return wrapperClone(value);
+                }
+            }
+            return new LodashWrapper(value);
+        }
+        var baseCreate = function() {
+            function object() {}
+            return function(proto) {
+                if (!isObject(proto)) {
+                    return {};
+                }
+                if (objectCreate) {
+                    return objectCreate(proto);
+                }
+                object.prototype = proto;
+                var result = new object();
+                object.prototype = undefined;
+                return result;
+            };
+        }();
+        function baseLodash() {}
+        function LodashWrapper(value, chainAll) {
+            this.__wrapped__ = value;
+            this.__actions__ = [];
+            this.__chain__ = !!chainAll;
+            this.__index__ = 0;
+            this.__values__ = undefined;
+        }
+        lodash.templateSettings = {
+            escape: reEscape,
+            evaluate: reEvaluate,
+            interpolate: reInterpolate,
+            variable: "",
+            imports: {
+                _: lodash
+            }
+        };
+        lodash.prototype = baseLodash.prototype;
+        lodash.prototype.constructor = lodash;
+        LodashWrapper.prototype = baseCreate(baseLodash.prototype);
+        LodashWrapper.prototype.constructor = LodashWrapper;
+        function LazyWrapper(value) {
+            this.__wrapped__ = value;
+            this.__actions__ = [];
+            this.__dir__ = 1;
+            this.__filtered__ = false;
+            this.__iteratees__ = [];
+            this.__takeCount__ = MAX_ARRAY_LENGTH;
+            this.__views__ = [];
+        }
+        function lazyClone() {
+            var result = new LazyWrapper(this.__wrapped__);
+            result.__actions__ = copyArray(this.__actions__);
+            result.__dir__ = this.__dir__;
+            result.__filtered__ = this.__filtered__;
+            result.__iteratees__ = copyArray(this.__iteratees__);
+            result.__takeCount__ = this.__takeCount__;
+            result.__views__ = copyArray(this.__views__);
+            return result;
+        }
+        function lazyReverse() {
+            if (this.__filtered__) {
+                var result = new LazyWrapper(this);
+                result.__dir__ = -1;
+                result.__filtered__ = true;
             } else {
-                var e = encodeURIComponent;
-                for (var i in data) {
-                    if (data.hasOwnProperty(i)) {
-                        result += "&" + e(i) + "=" + e(data[i]);
+                result = this.clone();
+                result.__dir__ *= -1;
+            }
+            return result;
+        }
+        function lazyValue() {
+            var array = this.__wrapped__.value(), dir = this.__dir__, isArr = isArray(array), isRight = dir < 0, arrLength = isArr ? array.length : 0, view = getView(0, arrLength, this.__views__), start = view.start, end = view.end, length = end - start, index = isRight ? end : start - 1, iteratees = this.__iteratees__, iterLength = iteratees.length, resIndex = 0, takeCount = nativeMin(length, this.__takeCount__);
+            if (!isArr || arrLength < LARGE_ARRAY_SIZE || arrLength == length && takeCount == length) {
+                return baseWrapperValue(array, this.__actions__);
+            }
+            var result = [];
+            outer: while (length-- && resIndex < takeCount) {
+                index += dir;
+                var iterIndex = -1, value = array[index];
+                while (++iterIndex < iterLength) {
+                    var data = iteratees[iterIndex], iteratee = data.iteratee, type = data.type, computed = iteratee(value);
+                    if (type == LAZY_MAP_FLAG) {
+                        value = computed;
+                    } else if (!computed) {
+                        if (type == LAZY_FILTER_FLAG) {
+                            continue outer;
+                        } else {
+                            break outer;
+                        }
                     }
+                }
+                result[resIndex++] = value;
+            }
+            return result;
+        }
+        LazyWrapper.prototype = baseCreate(baseLodash.prototype);
+        LazyWrapper.prototype.constructor = LazyWrapper;
+        function Hash(entries) {
+            var index = -1, length = entries ? entries.length : 0;
+            this.clear();
+            while (++index < length) {
+                var entry = entries[index];
+                this.set(entry[0], entry[1]);
+            }
+        }
+        function hashClear() {
+            this.__data__ = nativeCreate ? nativeCreate(null) : {};
+            this.size = 0;
+        }
+        function hashDelete(key) {
+            var result = this.has(key) && delete this.__data__[key];
+            this.size -= result ? 1 : 0;
+            return result;
+        }
+        function hashGet(key) {
+            var data = this.__data__;
+            if (nativeCreate) {
+                var result = data[key];
+                return result === HASH_UNDEFINED ? undefined : result;
+            }
+            return hasOwnProperty.call(data, key) ? data[key] : undefined;
+        }
+        function hashHas(key) {
+            var data = this.__data__;
+            return nativeCreate ? data[key] !== undefined : hasOwnProperty.call(data, key);
+        }
+        function hashSet(key, value) {
+            var data = this.__data__;
+            this.size += this.has(key) ? 0 : 1;
+            data[key] = nativeCreate && value === undefined ? HASH_UNDEFINED : value;
+            return this;
+        }
+        Hash.prototype.clear = hashClear;
+        Hash.prototype["delete"] = hashDelete;
+        Hash.prototype.get = hashGet;
+        Hash.prototype.has = hashHas;
+        Hash.prototype.set = hashSet;
+        function ListCache(entries) {
+            var index = -1, length = entries ? entries.length : 0;
+            this.clear();
+            while (++index < length) {
+                var entry = entries[index];
+                this.set(entry[0], entry[1]);
+            }
+        }
+        function listCacheClear() {
+            this.__data__ = [];
+            this.size = 0;
+        }
+        function listCacheDelete(key) {
+            var data = this.__data__, index = assocIndexOf(data, key);
+            if (index < 0) {
+                return false;
+            }
+            var lastIndex = data.length - 1;
+            if (index == lastIndex) {
+                data.pop();
+            } else {
+                splice.call(data, index, 1);
+            }
+            --this.size;
+            return true;
+        }
+        function listCacheGet(key) {
+            var data = this.__data__, index = assocIndexOf(data, key);
+            return index < 0 ? undefined : data[index][1];
+        }
+        function listCacheHas(key) {
+            return assocIndexOf(this.__data__, key) > -1;
+        }
+        function listCacheSet(key, value) {
+            var data = this.__data__, index = assocIndexOf(data, key);
+            if (index < 0) {
+                ++this.size;
+                data.push([ key, value ]);
+            } else {
+                data[index][1] = value;
+            }
+            return this;
+        }
+        ListCache.prototype.clear = listCacheClear;
+        ListCache.prototype["delete"] = listCacheDelete;
+        ListCache.prototype.get = listCacheGet;
+        ListCache.prototype.has = listCacheHas;
+        ListCache.prototype.set = listCacheSet;
+        function MapCache(entries) {
+            var index = -1, length = entries ? entries.length : 0;
+            this.clear();
+            while (++index < length) {
+                var entry = entries[index];
+                this.set(entry[0], entry[1]);
+            }
+        }
+        function mapCacheClear() {
+            this.size = 0;
+            this.__data__ = {
+                hash: new Hash(),
+                map: new (Map || ListCache)(),
+                string: new Hash()
+            };
+        }
+        function mapCacheDelete(key) {
+            var result = getMapData(this, key)["delete"](key);
+            this.size -= result ? 1 : 0;
+            return result;
+        }
+        function mapCacheGet(key) {
+            return getMapData(this, key).get(key);
+        }
+        function mapCacheHas(key) {
+            return getMapData(this, key).has(key);
+        }
+        function mapCacheSet(key, value) {
+            var data = getMapData(this, key), size = data.size;
+            data.set(key, value);
+            this.size += data.size == size ? 0 : 1;
+            return this;
+        }
+        MapCache.prototype.clear = mapCacheClear;
+        MapCache.prototype["delete"] = mapCacheDelete;
+        MapCache.prototype.get = mapCacheGet;
+        MapCache.prototype.has = mapCacheHas;
+        MapCache.prototype.set = mapCacheSet;
+        function SetCache(values) {
+            var index = -1, length = values ? values.length : 0;
+            this.__data__ = new MapCache();
+            while (++index < length) {
+                this.add(values[index]);
+            }
+        }
+        function setCacheAdd(value) {
+            this.__data__.set(value, HASH_UNDEFINED);
+            return this;
+        }
+        function setCacheHas(value) {
+            return this.__data__.has(value);
+        }
+        SetCache.prototype.add = SetCache.prototype.push = setCacheAdd;
+        SetCache.prototype.has = setCacheHas;
+        function Stack(entries) {
+            var data = this.__data__ = new ListCache(entries);
+            this.size = data.size;
+        }
+        function stackClear() {
+            this.__data__ = new ListCache();
+            this.size = 0;
+        }
+        function stackDelete(key) {
+            var data = this.__data__, result = data["delete"](key);
+            this.size = data.size;
+            return result;
+        }
+        function stackGet(key) {
+            return this.__data__.get(key);
+        }
+        function stackHas(key) {
+            return this.__data__.has(key);
+        }
+        function stackSet(key, value) {
+            var data = this.__data__;
+            if (data instanceof ListCache) {
+                var pairs = data.__data__;
+                if (!Map || pairs.length < LARGE_ARRAY_SIZE - 1) {
+                    pairs.push([ key, value ]);
+                    this.size = ++data.size;
+                    return this;
+                }
+                data = this.__data__ = new MapCache(pairs);
+            }
+            data.set(key, value);
+            this.size = data.size;
+            return this;
+        }
+        Stack.prototype.clear = stackClear;
+        Stack.prototype["delete"] = stackDelete;
+        Stack.prototype.get = stackGet;
+        Stack.prototype.has = stackHas;
+        Stack.prototype.set = stackSet;
+        function arrayLikeKeys(value, inherited) {
+            var isArr = isArray(value), isArg = !isArr && isArguments(value), isBuff = !isArr && !isArg && isBuffer(value), isType = !isArr && !isArg && !isBuff && isTypedArray(value), skipIndexes = isArr || isArg || isBuff || isType, result = skipIndexes ? baseTimes(value.length, String) : [], length = result.length;
+            for (var key in value) {
+                if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && (key == "length" || isBuff && (key == "offset" || key == "parent") || isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || isIndex(key, length)))) {
+                    result.push(key);
                 }
             }
             return result;
         }
-        function request(m, u, d) {
-            var p = new Promise(), timeout;
-            self.logger.time(m + " " + u);
-            (function(xhr) {
-                xhr.onreadystatechange = function() {
-                    if (this.readyState === 4) {
-                        self.logger.timeEnd(m + " " + u);
-                        clearTimeout(timeout);
-                        p.done(null, this);
-                    }
-                };
-                xhr.onerror = function(response) {
-                    clearTimeout(timeout);
-                    p.done(response, null);
-                };
-                xhr.oncomplete = function(response) {
-                    clearTimeout(timeout);
-                    self.logger.timeEnd(m + " " + u);
-                    self.info("%s request to %s returned %s", m, u, this.status);
-                };
-                xhr.open(m, u);
-                if (d) {
-                    if ("object" === typeof d) {
-                        d = JSON.stringify(d);
-                    }
-                    xhr.setRequestHeader("Content-Type", "application/json");
-                    xhr.setRequestHeader("Accept", "application/json");
-                }
-                timeout = setTimeout(function() {
-                    xhr.abort();
-                    p.done("API Call timed out.", null);
-                }, 3e4);
-                xhr.send(encode(d));
-            })(new XMLHttpRequest());
-            return p;
+        function arraySample(array) {
+            var length = array.length;
+            return length ? array[baseRandom(0, length - 1)] : undefined;
         }
-        this.request = request;
-        this.get = partial(request, "GET");
-        this.post = partial(request, "POST");
-        this.put = partial(request, "PUT");
-        this.delete = partial(request, "DELETE");
-    }
-    global[name] = new Ajax();
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
+        function arraySampleSize(array, n) {
+            return shuffleSelf(copyArray(array), baseClamp(n, 0, array.length));
         }
-        return exports;
-    };
-    return global[name];
-})();
-
-/*
- *  This module is a collection of classes designed to make working with
- *  the Appigee App Services API as easy as possible.
- *  Learn more at http://Usergrid.com/docs/usergrid
- *
- *   Copyright 2012 Usergrid Corporation
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- *  @author rod simpson (rod@Usergrid.com)
- *  @author matt dobson (matt@Usergrid.com)
- *  @author ryan bridges (rbridges@Usergrid.com)
- */
-window.console = window.console || {};
-
-window.console.log = window.console.log || function() {};
-
-function extend(subClass, superClass) {
-    var F = function() {};
-    F.prototype = superClass.prototype;
-    subClass.prototype = new F();
-    subClass.prototype.constructor = subClass;
-    subClass.superclass = superClass.prototype;
-    if (superClass.prototype.constructor == Object.prototype.constructor) {
-        superClass.prototype.constructor = superClass;
-    }
-    return subClass;
-}
-
-function propCopy(from, to) {
-    for (var prop in from) {
-        if (from.hasOwnProperty(prop)) {
-            if ("object" === typeof from[prop] && "object" === typeof to[prop]) {
-                to[prop] = propCopy(from[prop], to[prop]);
-            } else {
-                to[prop] = from[prop];
+        function arrayShuffle(array) {
+            return shuffleSelf(copyArray(array));
+        }
+        function assignInDefaults(objValue, srcValue, key, object) {
+            if (objValue === undefined || eq(objValue, objectProto[key]) && !hasOwnProperty.call(object, key)) {
+                return srcValue;
+            }
+            return objValue;
+        }
+        function assignMergeValue(object, key, value) {
+            if (value !== undefined && !eq(object[key], value) || value === undefined && !(key in object)) {
+                baseAssignValue(object, key, value);
             }
         }
-    }
-    return to;
-}
-
-function NOOP() {}
-
-function isValidUrl(url) {
-    if (!url) return false;
-    var doc, base, anchor, isValid = false;
-    try {
-        doc = document.implementation.createHTMLDocument("");
-        base = doc.createElement("base");
-        base.href = base || window.lo;
-        doc.head.appendChild(base);
-        anchor = doc.createElement("a");
-        anchor.href = url;
-        doc.body.appendChild(anchor);
-        isValid = !(anchor.href === "");
-    } catch (e) {
-        console.error(e);
-    } finally {
-        doc.head.removeChild(base);
-        doc.body.removeChild(anchor);
-        base = null;
-        anchor = null;
-        doc = null;
-        return isValid;
-    }
-}
-
-/*
- * Tests if the string is a uuid
- *
- * @public
- * @method isUUID
- * @param {string} uuid The string to test
- * @returns {Boolean} true if string is uuid
- */
-var uuidValueRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-function isUUID(uuid) {
-    return !uuid ? false : uuidValueRegex.test(uuid);
-}
-
-/*
- *  method to encode the query string parameters
- *
- *  @method encodeParams
- *  @public
- *  @params {object} params - an object of name value pairs that will be urlencoded
- *  @return {string} Returns the encoded string
- */
-function encodeParams(params) {
-    var queryString;
-    if (params && Object.keys(params)) {
-        queryString = [].slice.call(arguments).reduce(function(a, b) {
-            return a.concat(b instanceof Array ? b : [ b ]);
-        }, []).filter(function(c) {
-            return "object" === typeof c;
-        }).reduce(function(p, c) {
-            !(c instanceof Array) ? p = p.concat(Object.keys(c).map(function(key) {
-                return [ key, c[key] ];
-            })) : p.push(c);
-            return p;
-        }, []).reduce(function(p, c) {
-            c.length === 2 ? p.push(c) : p = p.concat(c);
-            return p;
-        }, []).reduce(function(p, c) {
-            c[1] instanceof Array ? c[1].forEach(function(v) {
-                p.push([ c[0], v ]);
-            }) : p.push(c);
-            return p;
-        }, []).map(function(c) {
-            c[1] = encodeURIComponent(c[1]);
-            return c.join("=");
-        }).join("&");
-    }
-    return queryString;
-}
-
-/*
- *  method to determine whether or not the passed variable is a function
- *
- *  @method isFunction
- *  @public
- *  @params {any} f - any variable
- *  @return {boolean} Returns true or false
- */
-function isFunction(f) {
-    return f && f !== null && typeof f === "function";
-}
-
-/*
- *  a safe wrapper for executing a callback
- *
- *  @method doCallback
- *  @public
- *  @params {Function} callback - the passed-in callback method
- *  @params {Array} params - an array of arguments to pass to the callback
- *  @params {Object} context - an optional calling context for the callback
- *  @return Returns whatever would be returned by the callback. or false.
- */
-function doCallback(callback, params, context) {
-    var returnValue;
-    if (isFunction(callback)) {
-        if (!params) params = [];
-        if (!context) context = this;
-        params.push(context);
-        returnValue = callback.apply(context, params);
-    }
-    return returnValue;
-}
-
-(function(global) {
-    var name = "Usergrid", overwrittenName = global[name];
-    var VALID_REQUEST_METHODS = [ "GET", "POST", "PUT", "DELETE" ];
-    function Usergrid() {
-        this.logger = new Logger(name);
-    }
-    Usergrid.isValidEndpoint = function(endpoint) {
-        return true;
-    };
-    Usergrid.Request = function(method, endpoint, query_params, data, callback) {
-        var p = new Promise();
-        /*
-         Create a logger
-         */
-        this.logger = new global.Logger("Usergrid.Request");
-        this.logger.time("process request " + method + " " + endpoint);
-        /*
-         Validate our input
-         */
-        this.endpoint = endpoint + "?" + encodeParams(query_params);
-        this.method = method.toUpperCase();
-        this.data = "object" === typeof data ? JSON.stringify(data) : data;
-        if (VALID_REQUEST_METHODS.indexOf(this.method) === -1) {
-            throw new UsergridInvalidHTTPMethodError("invalid request method '" + this.method + "'");
+        function assignValue(object, key, value) {
+            var objValue = object[key];
+            if (!(hasOwnProperty.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
+                baseAssignValue(object, key, value);
+            }
         }
-        /*
-         Prepare our request
-         */
-        if (!isValidUrl(this.endpoint)) {
-            this.logger.error(endpoint, this.endpoint, /^https:\/\//.test(endpoint));
-            throw new UsergridInvalidURIError("The provided endpoint is not valid: " + this.endpoint);
+        function assocIndexOf(array, key) {
+            var length = array.length;
+            while (length--) {
+                if (eq(array[length][0], key)) {
+                    return length;
+                }
+            }
+            return -1;
         }
-        /* a callback to make the request */
-        var request = function() {
-            return Ajax.request(this.method, this.endpoint, this.data);
-        }.bind(this);
-        /* a callback to process the response */
-        var response = function(err, request) {
-            return new Usergrid.Response(err, request);
-        }.bind(this);
-        /* a callback to clean up and return data to the client */
-        var oncomplete = function(err, response) {
-            p.done(err, response);
-            this.logger.info("REQUEST", err, response);
-            doCallback(callback, [ err, response ]);
-            this.logger.timeEnd("process request " + method + " " + endpoint);
-        }.bind(this);
-        /* and a promise to chain them all together */
-        Promise.chain([ request, response ]).then(oncomplete);
-        return p;
-    };
-    Usergrid.Response = function(err, response) {
-        var p = new Promise();
-        var data = null;
-        try {
-            data = JSON.parse(response.responseText);
-        } catch (e) {
-            data = {};
-        }
-        Object.keys(data).forEach(function(key) {
-            Object.defineProperty(this, key, {
-                value: data[key],
-                enumerable: true
+        function baseAggregator(collection, setter, iteratee, accumulator) {
+            baseEach(collection, function(value, key, collection) {
+                setter(accumulator, value, iteratee(value), collection);
             });
-        }.bind(this));
-        Object.defineProperty(this, "logger", {
-            enumerable: false,
-            configurable: false,
-            writable: false,
-            value: new global.Logger(name)
-        });
-        Object.defineProperty(this, "success", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: true
-        });
-        Object.defineProperty(this, "err", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: err
-        });
-        Object.defineProperty(this, "status", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: parseInt(response.status)
-        });
-        Object.defineProperty(this, "statusGroup", {
-            enumerable: false,
-            configurable: false,
-            writable: true,
-            value: this.status - this.status % 100
-        });
-        switch (this.statusGroup) {
-          case 200:
-            this.success = true;
-            break;
-
-          case 400:
-          case 500:
-          case 300:
-          case 100:
-          default:
-            this.success = false;
-            break;
+            return accumulator;
         }
-        if (this.success) {
-            p.done(null, this);
-        } else {
-            p.done(UsergridError.fromResponse(data), this);
+        function baseAssign(object, source) {
+            return object && copyObject(source, keys(source), object);
         }
-        return p;
-    };
-    Usergrid.Response.prototype.getEntities = function() {
-        var entities;
-        if (this.success) {
-            entities = this.data ? this.data.entities : this.entities;
-        }
-        return entities || [];
-    };
-    Usergrid.Response.prototype.getEntity = function() {
-        var entities = this.getEntities();
-        return entities[0];
-    };
-    Usergrid.VERSION = Usergrid.USERGRID_SDK_VERSION = "0.11.0";
-    global[name] = Usergrid;
-    global[name].noConflict = function() {
-        if (overwrittenName) {
-            global[name] = overwrittenName;
-        }
-        return Usergrid;
-    };
-    return global[name];
-})(this);
-
-(function() {
-    var name = "Client", global = this, overwrittenName = global[name], exports;
-    var AUTH_ERRORS = [ "auth_expired_session_token", "auth_missing_credentials", "auth_unverified_oath", "expired_token", "unauthorized", "auth_invalid" ];
-    Usergrid.Client = function(options) {
-        this.URI = options.URI || "https://api.usergrid.com";
-        if (options.orgName) {
-            this.set("orgName", options.orgName);
-        }
-        if (options.appName) {
-            this.set("appName", options.appName);
-        }
-        if (options.qs) {
-            this.setObject("default_qs", options.qs);
-        }
-        this.buildCurl = options.buildCurl || false;
-        this.logging = options.logging || false;
-    };
-    /*
-   *  Main function for making requests to the API.  Can be called directly.
-   *
-   *  options object:
-   *  `method` - http method (GET, POST, PUT, or DELETE), defaults to GET
-   *  `qs` - object containing querystring values to be appended to the uri
-   *  `body` - object containing entity body for POST and PUT requests
-   *  `endpoint` - API endpoint, for example 'users/fred'
-   *  `mQuery` - boolean, set to true if running management query, defaults to false
-   *
-   *  @method request
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.request = function(options, callback) {
-        var method = options.method || "GET";
-        var endpoint = options.endpoint;
-        var body = options.body || {};
-        var qs = options.qs || {};
-        var mQuery = options.mQuery || false;
-        var orgName = this.get("orgName");
-        var appName = this.get("appName");
-        var default_qs = this.getObject("default_qs");
-        var uri;
-        /*var logoutCallback=function(){
-        if (typeof(this.logoutCallback) === 'function') {
-            return this.logoutCallback(true, 'no_org_or_app_name_specified');
-        }
-    }.bind(this);*/
-        if (!mQuery && !orgName && !appName) {
-            return logoutCallback();
-        }
-        if (mQuery) {
-            uri = this.URI + "/" + endpoint;
-        } else {
-            uri = this.URI + "/" + orgName + "/" + appName + "/" + endpoint;
-        }
-        if (this.getToken()) {
-            qs.access_token = this.getToken();
-        }
-        if (default_qs) {
-            qs = propCopy(qs, default_qs);
-        }
-        var self = this;
-        var req = new Usergrid.Request(method, uri, qs, body, function(err, response) {
-            /*if (AUTH_ERRORS.indexOf(response.error) !== -1) {
-            return logoutCallback();
-        }*/
-            if (err) {
-                doCallback(callback, [ err, response, self ], self);
+        function baseAssignValue(object, key, value) {
+            if (key == "__proto__" && defineProperty) {
+                defineProperty(object, key, {
+                    configurable: true,
+                    enumerable: true,
+                    value: value,
+                    writable: true
+                });
             } else {
-                doCallback(callback, [ null, response, self ], self);
+                object[key] = value;
             }
-        });
-    };
-    /*
-   *  function for building asset urls
-   *
-   *  @method buildAssetURL
-   *  @public
-   *  @params {string} uuid
-   *  @return {string} assetURL
-   */
-    Usergrid.Client.prototype.buildAssetURL = function(uuid) {
-        var self = this;
-        var qs = {};
-        var assetURL = this.URI + "/" + this.orgName + "/" + this.appName + "/assets/" + uuid + "/data";
-        if (self.getToken()) {
-            qs.access_token = self.getToken();
         }
-        var encoded_params = encodeParams(qs);
-        if (encoded_params) {
-            assetURL += "?" + encoded_params;
-        }
-        return assetURL;
-    };
-    /*
-   *  Main function for creating new groups. Call this directly.
-   *
-   *  @method createGroup
-   *  @public
-   *  @params {string} path
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createGroup = function(options, callback) {
-        var group = new Usergrid.Group({
-            path: options.path,
-            client: this,
-            data: options
-        });
-        group.save(function(err, response) {
-            doCallback(callback, [ err, response, group ], group);
-        });
-    };
-    /*
-   *  Main function for creating new entities - should be called directly.
-   *
-   *  options object: options {data:{'type':'collection_type', 'key':'value'}, uuid:uuid}}
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createEntity = function(options, callback) {
-        var entity = new Usergrid.Entity({
-            client: this,
-            data: options
-        });
-        entity.save(function(err, response) {
-            doCallback(callback, [ err, response, entity ], entity);
-        });
-    };
-    /*
-   *  Main function for getting existing entities - should be called directly.
-   *
-   *  You must supply a uuid or (username or name). Username only applies to users.
-   *  Name applies to all custom entities
-   *
-   *  options object: options {data:{'type':'collection_type', 'name':'value', 'username':'value'}, uuid:uuid}}
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.getEntity = function(options, callback) {
-        var entity = new Usergrid.Entity({
-            client: this,
-            data: options
-        });
-        entity.fetch(function(err, response) {
-            doCallback(callback, [ err, response, entity ], entity);
-        });
-    };
-    /*
-   *  Main function for restoring an entity from serialized data.
-   *
-   *  serializedObject should have come from entityObject.serialize();
-   *
-   *  @method restoreEntity
-   *  @public
-   *  @param {string} serializedObject
-   *  @return {object} Entity Object
-   */
-    Usergrid.Client.prototype.restoreEntity = function(serializedObject) {
-        var data = JSON.parse(serializedObject);
-        var options = {
-            client: this,
-            data: data
-        };
-        var entity = new Usergrid.Entity(options);
-        return entity;
-    };
-    /*
-   *  Main function for creating new counters - should be called directly.
-   *
-   *  options object: options {timestamp:0, category:'value', counters:{name : value}}
-   *
-   *  @method createCounter
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, response, counter)
-   */
-    Usergrid.Client.prototype.createCounter = function(options, callback) {
-        var counter = new Usergrid.Counter({
-            client: this,
-            data: options
-        });
-        counter.save(callback);
-    };
-    /*
-   *  Main function for creating new assets - should be called directly.
-   *
-   *  options object: options {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000", file: FileOrBlobObject }
-   *
-   *  @method createCounter
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, response, counter)
-   */
-    Usergrid.Client.prototype.createAsset = function(options, callback) {
-        var file = options.file;
-        if (file) {
-            options.name = options.name || file.name;
-            options["content-type"] = options["content-type"] || file.type;
-            options.path = options.path || "/";
-            delete options.file;
-        }
-        var asset = new Usergrid.Asset({
-            client: this,
-            data: options
-        });
-        asset.save(function(err, response, asset) {
-            if (file && !err) {
-                asset.upload(file, callback);
-            } else {
-                doCallback(callback, [ err, response, asset ], asset);
+        function baseAt(object, paths) {
+            var index = -1, isNil = object == null, length = paths.length, result = Array(length);
+            while (++index < length) {
+                result[index] = isNil ? undefined : get(object, paths[index]);
             }
-        });
-    };
-    /*
-   *  Main function for creating new collections - should be called directly.
-   *
-   *  options object: options {client:client, type: type, qs:qs}
-   *
-   *  @method createCollection
-   *  @public
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createCollection = function(options, callback) {
-        options.client = this;
-        return new Usergrid.Collection(options, function(err, data, collection) {
-            console.log("createCollection", arguments);
-            doCallback(callback, [ err, collection, data ]);
-        });
-    };
-    /*
-   *  Main function for restoring a collection from serialized data.
-   *
-   *  serializedObject should have come from collectionObject.serialize();
-   *
-   *  @method restoreCollection
-   *  @public
-   *  @param {string} serializedObject
-   *  @return {object} Collection Object
-   */
-    Usergrid.Client.prototype.restoreCollection = function(serializedObject) {
-        var data = JSON.parse(serializedObject);
-        data.client = this;
-        var collection = new Usergrid.Collection(data);
-        return collection;
-    };
-    /*
-   *  Main function for retrieving a user's activity feed.
-   *
-   *  @method getFeedForUser
-   *  @public
-   *  @params {string} username
-   *  @param {function} callback
-   *  @return {callback} callback(err, data, activities)
-   */
-    Usergrid.Client.prototype.getFeedForUser = function(username, callback) {
-        var options = {
-            method: "GET",
-            endpoint: "users/" + username + "/feed"
-        };
-        this.request(options, function(err, data) {
-            if (err) {
-                doCallback(callback, [ err ]);
-            } else {
-                doCallback(callback, [ err, data, data.getEntities() ]);
-            }
-        });
-    };
-    /*
-   *  Function for creating new activities for the current user - should be called directly.
-   *
-   *  //user can be any of the following: "me", a uuid, a username
-   *  Note: the "me" alias will reference the currently logged in user (e.g. 'users/me/activties')
-   *
-   *  //build a json object that looks like this:
-   *  var options =
-   *  {
-   *    "actor" : {
-   *      "displayName" :"myusername",
-   *      "uuid" : "myuserid",
-   *      "username" : "myusername",
-   *      "email" : "myemail",
-   *      "picture": "http://path/to/picture",
-   *      "image" : {
-   *          "duration" : 0,
-   *          "height" : 80,
-   *          "url" : "http://www.gravatar.com/avatar/",
-   *          "width" : 80
-   *      },
-   *    },
-   *    "verb" : "post",
-   *    "content" : "My cool message",
-   *    "lat" : 48.856614,
-   *    "lon" : 2.352222
-   *  }
-   *
-   *  @method createEntity
-   *  @public
-   *  @params {string} user // "me", a uuid, or a username
-   *  @params {object} options
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createUserActivity = function(user, options, callback) {
-        options.type = "users/" + user + "/activities";
-        options = {
-            client: this,
-            data: options
-        };
-        var entity = new Usergrid.Entity(options);
-        entity.save(function(err, data) {
-            doCallback(callback, [ err, data, entity ]);
-        });
-    };
-    /*
-   *  Function for creating user activities with an associated user entity.
-   *
-   *  user object:
-   *  The user object passed into this function is an instance of Usergrid.Entity.
-   *
-   *  @method createUserActivityWithEntity
-   *  @public
-   *  @params {object} user
-   *  @params {string} content
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.createUserActivityWithEntity = function(user, content, callback) {
-        var username = user.get("username");
-        var options = {
-            actor: {
-                displayName: username,
-                uuid: user.get("uuid"),
-                username: username,
-                email: user.get("email"),
-                picture: user.get("picture"),
-                image: {
-                    duration: 0,
-                    height: 80,
-                    url: user.get("picture"),
-                    width: 80
+            return result;
+        }
+        function baseClamp(number, lower, upper) {
+            if (number === number) {
+                if (upper !== undefined) {
+                    number = number <= upper ? number : upper;
                 }
-            },
-            verb: "post",
-            content: content
+                if (lower !== undefined) {
+                    number = number >= lower ? number : lower;
+                }
+            }
+            return number;
+        }
+        function baseClone(value, isDeep, isFull, customizer, key, object, stack) {
+            var result;
+            if (customizer) {
+                result = object ? customizer(value, key, object, stack) : customizer(value);
+            }
+            if (result !== undefined) {
+                return result;
+            }
+            if (!isObject(value)) {
+                return value;
+            }
+            var isArr = isArray(value);
+            if (isArr) {
+                result = initCloneArray(value);
+                if (!isDeep) {
+                    return copyArray(value, result);
+                }
+            } else {
+                var tag = getTag(value), isFunc = tag == funcTag || tag == genTag;
+                if (isBuffer(value)) {
+                    return cloneBuffer(value, isDeep);
+                }
+                if (tag == objectTag || tag == argsTag || isFunc && !object) {
+                    result = initCloneObject(isFunc ? {} : value);
+                    if (!isDeep) {
+                        return copySymbols(value, baseAssign(result, value));
+                    }
+                } else {
+                    if (!cloneableTags[tag]) {
+                        return object ? value : {};
+                    }
+                    result = initCloneByTag(value, tag, baseClone, isDeep);
+                }
+            }
+            stack || (stack = new Stack());
+            var stacked = stack.get(value);
+            if (stacked) {
+                return stacked;
+            }
+            stack.set(value, result);
+            var props = isArr ? undefined : (isFull ? getAllKeys : keys)(value);
+            arrayEach(props || value, function(subValue, key) {
+                if (props) {
+                    key = subValue;
+                    subValue = value[key];
+                }
+                assignValue(result, key, baseClone(subValue, isDeep, isFull, customizer, key, value, stack));
+            });
+            return result;
+        }
+        function baseConforms(source) {
+            var props = keys(source);
+            return function(object) {
+                return baseConformsTo(object, source, props);
+            };
+        }
+        function baseConformsTo(object, source, props) {
+            var length = props.length;
+            if (object == null) {
+                return !length;
+            }
+            object = Object(object);
+            while (length--) {
+                var key = props[length], predicate = source[key], value = object[key];
+                if (value === undefined && !(key in object) || !predicate(value)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        function baseDelay(func, wait, args) {
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            return setTimeout(function() {
+                func.apply(undefined, args);
+            }, wait);
+        }
+        function baseDifference(array, values, iteratee, comparator) {
+            var index = -1, includes = arrayIncludes, isCommon = true, length = array.length, result = [], valuesLength = values.length;
+            if (!length) {
+                return result;
+            }
+            if (iteratee) {
+                values = arrayMap(values, baseUnary(iteratee));
+            }
+            if (comparator) {
+                includes = arrayIncludesWith;
+                isCommon = false;
+            } else if (values.length >= LARGE_ARRAY_SIZE) {
+                includes = cacheHas;
+                isCommon = false;
+                values = new SetCache(values);
+            }
+            outer: while (++index < length) {
+                var value = array[index], computed = iteratee ? iteratee(value) : value;
+                value = comparator || value !== 0 ? value : 0;
+                if (isCommon && computed === computed) {
+                    var valuesIndex = valuesLength;
+                    while (valuesIndex--) {
+                        if (values[valuesIndex] === computed) {
+                            continue outer;
+                        }
+                    }
+                    result.push(value);
+                } else if (!includes(values, computed, comparator)) {
+                    result.push(value);
+                }
+            }
+            return result;
+        }
+        var baseEach = createBaseEach(baseForOwn);
+        var baseEachRight = createBaseEach(baseForOwnRight, true);
+        function baseEvery(collection, predicate) {
+            var result = true;
+            baseEach(collection, function(value, index, collection) {
+                result = !!predicate(value, index, collection);
+                return result;
+            });
+            return result;
+        }
+        function baseExtremum(array, iteratee, comparator) {
+            var index = -1, length = array.length;
+            while (++index < length) {
+                var value = array[index], current = iteratee(value);
+                if (current != null && (computed === undefined ? current === current && !isSymbol(current) : comparator(current, computed))) {
+                    var computed = current, result = value;
+                }
+            }
+            return result;
+        }
+        function baseFill(array, value, start, end) {
+            var length = array.length;
+            start = toInteger(start);
+            if (start < 0) {
+                start = -start > length ? 0 : length + start;
+            }
+            end = end === undefined || end > length ? length : toInteger(end);
+            if (end < 0) {
+                end += length;
+            }
+            end = start > end ? 0 : toLength(end);
+            while (start < end) {
+                array[start++] = value;
+            }
+            return array;
+        }
+        function baseFilter(collection, predicate) {
+            var result = [];
+            baseEach(collection, function(value, index, collection) {
+                if (predicate(value, index, collection)) {
+                    result.push(value);
+                }
+            });
+            return result;
+        }
+        function baseFlatten(array, depth, predicate, isStrict, result) {
+            var index = -1, length = array.length;
+            predicate || (predicate = isFlattenable);
+            result || (result = []);
+            while (++index < length) {
+                var value = array[index];
+                if (depth > 0 && predicate(value)) {
+                    if (depth > 1) {
+                        baseFlatten(value, depth - 1, predicate, isStrict, result);
+                    } else {
+                        arrayPush(result, value);
+                    }
+                } else if (!isStrict) {
+                    result[result.length] = value;
+                }
+            }
+            return result;
+        }
+        var baseFor = createBaseFor();
+        var baseForRight = createBaseFor(true);
+        function baseForOwn(object, iteratee) {
+            return object && baseFor(object, iteratee, keys);
+        }
+        function baseForOwnRight(object, iteratee) {
+            return object && baseForRight(object, iteratee, keys);
+        }
+        function baseFunctions(object, props) {
+            return arrayFilter(props, function(key) {
+                return isFunction(object[key]);
+            });
+        }
+        function baseGet(object, path) {
+            path = isKey(path, object) ? [ path ] : castPath(path);
+            var index = 0, length = path.length;
+            while (object != null && index < length) {
+                object = object[toKey(path[index++])];
+            }
+            return index && index == length ? object : undefined;
+        }
+        function baseGetAllKeys(object, keysFunc, symbolsFunc) {
+            var result = keysFunc(object);
+            return isArray(object) ? result : arrayPush(result, symbolsFunc(object));
+        }
+        function baseGetTag(value) {
+            return objectToString.call(value);
+        }
+        function baseGt(value, other) {
+            return value > other;
+        }
+        function baseHas(object, key) {
+            return object != null && hasOwnProperty.call(object, key);
+        }
+        function baseHasIn(object, key) {
+            return object != null && key in Object(object);
+        }
+        function baseInRange(number, start, end) {
+            return number >= nativeMin(start, end) && number < nativeMax(start, end);
+        }
+        function baseIntersection(arrays, iteratee, comparator) {
+            var includes = comparator ? arrayIncludesWith : arrayIncludes, length = arrays[0].length, othLength = arrays.length, othIndex = othLength, caches = Array(othLength), maxLength = Infinity, result = [];
+            while (othIndex--) {
+                var array = arrays[othIndex];
+                if (othIndex && iteratee) {
+                    array = arrayMap(array, baseUnary(iteratee));
+                }
+                maxLength = nativeMin(array.length, maxLength);
+                caches[othIndex] = !comparator && (iteratee || length >= 120 && array.length >= 120) ? new SetCache(othIndex && array) : undefined;
+            }
+            array = arrays[0];
+            var index = -1, seen = caches[0];
+            outer: while (++index < length && result.length < maxLength) {
+                var value = array[index], computed = iteratee ? iteratee(value) : value;
+                value = comparator || value !== 0 ? value : 0;
+                if (!(seen ? cacheHas(seen, computed) : includes(result, computed, comparator))) {
+                    othIndex = othLength;
+                    while (--othIndex) {
+                        var cache = caches[othIndex];
+                        if (!(cache ? cacheHas(cache, computed) : includes(arrays[othIndex], computed, comparator))) {
+                            continue outer;
+                        }
+                    }
+                    if (seen) {
+                        seen.push(computed);
+                    }
+                    result.push(value);
+                }
+            }
+            return result;
+        }
+        function baseInverter(object, setter, iteratee, accumulator) {
+            baseForOwn(object, function(value, key, object) {
+                setter(accumulator, iteratee(value), key, object);
+            });
+            return accumulator;
+        }
+        function baseInvoke(object, path, args) {
+            if (!isKey(path, object)) {
+                path = castPath(path);
+                object = parent(object, path);
+                path = last(path);
+            }
+            var func = object == null ? object : object[toKey(path)];
+            return func == null ? undefined : apply(func, object, args);
+        }
+        function baseIsArguments(value) {
+            return isObjectLike(value) && objectToString.call(value) == argsTag;
+        }
+        function baseIsArrayBuffer(value) {
+            return isObjectLike(value) && objectToString.call(value) == arrayBufferTag;
+        }
+        function baseIsDate(value) {
+            return isObjectLike(value) && objectToString.call(value) == dateTag;
+        }
+        function baseIsEqual(value, other, customizer, bitmask, stack) {
+            if (value === other) {
+                return true;
+            }
+            if (value == null || other == null || !isObject(value) && !isObjectLike(other)) {
+                return value !== value && other !== other;
+            }
+            return baseIsEqualDeep(value, other, baseIsEqual, customizer, bitmask, stack);
+        }
+        function baseIsEqualDeep(object, other, equalFunc, customizer, bitmask, stack) {
+            var objIsArr = isArray(object), othIsArr = isArray(other), objTag = arrayTag, othTag = arrayTag;
+            if (!objIsArr) {
+                objTag = getTag(object);
+                objTag = objTag == argsTag ? objectTag : objTag;
+            }
+            if (!othIsArr) {
+                othTag = getTag(other);
+                othTag = othTag == argsTag ? objectTag : othTag;
+            }
+            var objIsObj = objTag == objectTag, othIsObj = othTag == objectTag, isSameTag = objTag == othTag;
+            if (isSameTag && isBuffer(object)) {
+                if (!isBuffer(other)) {
+                    return false;
+                }
+                objIsArr = true;
+                objIsObj = false;
+            }
+            if (isSameTag && !objIsObj) {
+                stack || (stack = new Stack());
+                return objIsArr || isTypedArray(object) ? equalArrays(object, other, equalFunc, customizer, bitmask, stack) : equalByTag(object, other, objTag, equalFunc, customizer, bitmask, stack);
+            }
+            if (!(bitmask & PARTIAL_COMPARE_FLAG)) {
+                var objIsWrapped = objIsObj && hasOwnProperty.call(object, "__wrapped__"), othIsWrapped = othIsObj && hasOwnProperty.call(other, "__wrapped__");
+                if (objIsWrapped || othIsWrapped) {
+                    var objUnwrapped = objIsWrapped ? object.value() : object, othUnwrapped = othIsWrapped ? other.value() : other;
+                    stack || (stack = new Stack());
+                    return equalFunc(objUnwrapped, othUnwrapped, customizer, bitmask, stack);
+                }
+            }
+            if (!isSameTag) {
+                return false;
+            }
+            stack || (stack = new Stack());
+            return equalObjects(object, other, equalFunc, customizer, bitmask, stack);
+        }
+        function baseIsMap(value) {
+            return isObjectLike(value) && getTag(value) == mapTag;
+        }
+        function baseIsMatch(object, source, matchData, customizer) {
+            var index = matchData.length, length = index, noCustomizer = !customizer;
+            if (object == null) {
+                return !length;
+            }
+            object = Object(object);
+            while (index--) {
+                var data = matchData[index];
+                if (noCustomizer && data[2] ? data[1] !== object[data[0]] : !(data[0] in object)) {
+                    return false;
+                }
+            }
+            while (++index < length) {
+                data = matchData[index];
+                var key = data[0], objValue = object[key], srcValue = data[1];
+                if (noCustomizer && data[2]) {
+                    if (objValue === undefined && !(key in object)) {
+                        return false;
+                    }
+                } else {
+                    var stack = new Stack();
+                    if (customizer) {
+                        var result = customizer(objValue, srcValue, key, object, source, stack);
+                    }
+                    if (!(result === undefined ? baseIsEqual(srcValue, objValue, customizer, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG, stack) : result)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        function baseIsNative(value) {
+            if (!isObject(value) || isMasked(value)) {
+                return false;
+            }
+            var pattern = isFunction(value) ? reIsNative : reIsHostCtor;
+            return pattern.test(toSource(value));
+        }
+        function baseIsRegExp(value) {
+            return isObject(value) && objectToString.call(value) == regexpTag;
+        }
+        function baseIsSet(value) {
+            return isObjectLike(value) && getTag(value) == setTag;
+        }
+        function baseIsTypedArray(value) {
+            return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[objectToString.call(value)];
+        }
+        function baseIteratee(value) {
+            if (typeof value == "function") {
+                return value;
+            }
+            if (value == null) {
+                return identity;
+            }
+            if (typeof value == "object") {
+                return isArray(value) ? baseMatchesProperty(value[0], value[1]) : baseMatches(value);
+            }
+            return property(value);
+        }
+        function baseKeys(object) {
+            if (!isPrototype(object)) {
+                return nativeKeys(object);
+            }
+            var result = [];
+            for (var key in Object(object)) {
+                if (hasOwnProperty.call(object, key) && key != "constructor") {
+                    result.push(key);
+                }
+            }
+            return result;
+        }
+        function baseKeysIn(object) {
+            if (!isObject(object)) {
+                return nativeKeysIn(object);
+            }
+            var isProto = isPrototype(object), result = [];
+            for (var key in object) {
+                if (!(key == "constructor" && (isProto || !hasOwnProperty.call(object, key)))) {
+                    result.push(key);
+                }
+            }
+            return result;
+        }
+        function baseLt(value, other) {
+            return value < other;
+        }
+        function baseMap(collection, iteratee) {
+            var index = -1, result = isArrayLike(collection) ? Array(collection.length) : [];
+            baseEach(collection, function(value, key, collection) {
+                result[++index] = iteratee(value, key, collection);
+            });
+            return result;
+        }
+        function baseMatches(source) {
+            var matchData = getMatchData(source);
+            if (matchData.length == 1 && matchData[0][2]) {
+                return matchesStrictComparable(matchData[0][0], matchData[0][1]);
+            }
+            return function(object) {
+                return object === source || baseIsMatch(object, source, matchData);
+            };
+        }
+        function baseMatchesProperty(path, srcValue) {
+            if (isKey(path) && isStrictComparable(srcValue)) {
+                return matchesStrictComparable(toKey(path), srcValue);
+            }
+            return function(object) {
+                var objValue = get(object, path);
+                return objValue === undefined && objValue === srcValue ? hasIn(object, path) : baseIsEqual(srcValue, objValue, undefined, UNORDERED_COMPARE_FLAG | PARTIAL_COMPARE_FLAG);
+            };
+        }
+        function baseMerge(object, source, srcIndex, customizer, stack) {
+            if (object === source) {
+                return;
+            }
+            baseFor(source, function(srcValue, key) {
+                if (isObject(srcValue)) {
+                    stack || (stack = new Stack());
+                    baseMergeDeep(object, source, key, srcIndex, baseMerge, customizer, stack);
+                } else {
+                    var newValue = customizer ? customizer(object[key], srcValue, key + "", object, source, stack) : undefined;
+                    if (newValue === undefined) {
+                        newValue = srcValue;
+                    }
+                    assignMergeValue(object, key, newValue);
+                }
+            }, keysIn);
+        }
+        function baseMergeDeep(object, source, key, srcIndex, mergeFunc, customizer, stack) {
+            var objValue = object[key], srcValue = source[key], stacked = stack.get(srcValue);
+            if (stacked) {
+                assignMergeValue(object, key, stacked);
+                return;
+            }
+            var newValue = customizer ? customizer(objValue, srcValue, key + "", object, source, stack) : undefined;
+            var isCommon = newValue === undefined;
+            if (isCommon) {
+                var isArr = isArray(srcValue), isBuff = !isArr && isBuffer(srcValue), isTyped = !isArr && !isBuff && isTypedArray(srcValue);
+                newValue = srcValue;
+                if (isArr || isBuff || isTyped) {
+                    if (isArray(objValue)) {
+                        newValue = objValue;
+                    } else if (isArrayLikeObject(objValue)) {
+                        newValue = copyArray(objValue);
+                    } else if (isBuff) {
+                        isCommon = false;
+                        newValue = cloneBuffer(srcValue, true);
+                    } else if (isTyped) {
+                        isCommon = false;
+                        newValue = cloneTypedArray(srcValue, true);
+                    } else {
+                        newValue = [];
+                    }
+                } else if (isPlainObject(srcValue) || isArguments(srcValue)) {
+                    newValue = objValue;
+                    if (isArguments(objValue)) {
+                        newValue = toPlainObject(objValue);
+                    } else if (!isObject(objValue) || srcIndex && isFunction(objValue)) {
+                        newValue = initCloneObject(srcValue);
+                    }
+                } else {
+                    isCommon = false;
+                }
+            }
+            if (isCommon) {
+                stack.set(srcValue, newValue);
+                mergeFunc(newValue, srcValue, srcIndex, customizer, stack);
+                stack["delete"](srcValue);
+            }
+            assignMergeValue(object, key, newValue);
+        }
+        function baseNth(array, n) {
+            var length = array.length;
+            if (!length) {
+                return;
+            }
+            n += n < 0 ? length : 0;
+            return isIndex(n, length) ? array[n] : undefined;
+        }
+        function baseOrderBy(collection, iteratees, orders) {
+            var index = -1;
+            iteratees = arrayMap(iteratees.length ? iteratees : [ identity ], baseUnary(getIteratee()));
+            var result = baseMap(collection, function(value, key, collection) {
+                var criteria = arrayMap(iteratees, function(iteratee) {
+                    return iteratee(value);
+                });
+                return {
+                    criteria: criteria,
+                    index: ++index,
+                    value: value
+                };
+            });
+            return baseSortBy(result, function(object, other) {
+                return compareMultiple(object, other, orders);
+            });
+        }
+        function basePick(object, props) {
+            object = Object(object);
+            return basePickBy(object, props, function(value, key) {
+                return key in object;
+            });
+        }
+        function basePickBy(object, props, predicate) {
+            var index = -1, length = props.length, result = {};
+            while (++index < length) {
+                var key = props[index], value = object[key];
+                if (predicate(value, key)) {
+                    baseAssignValue(result, key, value);
+                }
+            }
+            return result;
+        }
+        function basePropertyDeep(path) {
+            return function(object) {
+                return baseGet(object, path);
+            };
+        }
+        function basePullAll(array, values, iteratee, comparator) {
+            var indexOf = comparator ? baseIndexOfWith : baseIndexOf, index = -1, length = values.length, seen = array;
+            if (array === values) {
+                values = copyArray(values);
+            }
+            if (iteratee) {
+                seen = arrayMap(array, baseUnary(iteratee));
+            }
+            while (++index < length) {
+                var fromIndex = 0, value = values[index], computed = iteratee ? iteratee(value) : value;
+                while ((fromIndex = indexOf(seen, computed, fromIndex, comparator)) > -1) {
+                    if (seen !== array) {
+                        splice.call(seen, fromIndex, 1);
+                    }
+                    splice.call(array, fromIndex, 1);
+                }
+            }
+            return array;
+        }
+        function basePullAt(array, indexes) {
+            var length = array ? indexes.length : 0, lastIndex = length - 1;
+            while (length--) {
+                var index = indexes[length];
+                if (length == lastIndex || index !== previous) {
+                    var previous = index;
+                    if (isIndex(index)) {
+                        splice.call(array, index, 1);
+                    } else if (!isKey(index, array)) {
+                        var path = castPath(index), object = parent(array, path);
+                        if (object != null) {
+                            delete object[toKey(last(path))];
+                        }
+                    } else {
+                        delete array[toKey(index)];
+                    }
+                }
+            }
+            return array;
+        }
+        function baseRandom(lower, upper) {
+            return lower + nativeFloor(nativeRandom() * (upper - lower + 1));
+        }
+        function baseRange(start, end, step, fromRight) {
+            var index = -1, length = nativeMax(nativeCeil((end - start) / (step || 1)), 0), result = Array(length);
+            while (length--) {
+                result[fromRight ? length : ++index] = start;
+                start += step;
+            }
+            return result;
+        }
+        function baseRepeat(string, n) {
+            var result = "";
+            if (!string || n < 1 || n > MAX_SAFE_INTEGER) {
+                return result;
+            }
+            do {
+                if (n % 2) {
+                    result += string;
+                }
+                n = nativeFloor(n / 2);
+                if (n) {
+                    string += string;
+                }
+            } while (n);
+            return result;
+        }
+        function baseRest(func, start) {
+            return setToString(overRest(func, start, identity), func + "");
+        }
+        function baseSample(collection) {
+            return arraySample(values(collection));
+        }
+        function baseSampleSize(collection, n) {
+            var array = values(collection);
+            return shuffleSelf(array, baseClamp(n, 0, array.length));
+        }
+        function baseSet(object, path, value, customizer) {
+            if (!isObject(object)) {
+                return object;
+            }
+            path = isKey(path, object) ? [ path ] : castPath(path);
+            var index = -1, length = path.length, lastIndex = length - 1, nested = object;
+            while (nested != null && ++index < length) {
+                var key = toKey(path[index]), newValue = value;
+                if (index != lastIndex) {
+                    var objValue = nested[key];
+                    newValue = customizer ? customizer(objValue, key, nested) : undefined;
+                    if (newValue === undefined) {
+                        newValue = isObject(objValue) ? objValue : isIndex(path[index + 1]) ? [] : {};
+                    }
+                }
+                assignValue(nested, key, newValue);
+                nested = nested[key];
+            }
+            return object;
+        }
+        var baseSetData = !metaMap ? identity : function(func, data) {
+            metaMap.set(func, data);
+            return func;
         };
-        this.createUserActivity(username, options, callback);
-    };
-    /*
-   *  A private method to get call timing of last call
-   */
-    Usergrid.Client.prototype.calcTimeDiff = function() {
-        var seconds = 0;
-        var time = this._end - this._start;
-        try {
-            seconds = (time / 10 / 60).toFixed(2);
-        } catch (e) {
+        var baseSetToString = !defineProperty ? identity : function(func, string) {
+            return defineProperty(func, "toString", {
+                configurable: true,
+                enumerable: false,
+                value: constant(string),
+                writable: true
+            });
+        };
+        function baseShuffle(collection) {
+            return shuffleSelf(values(collection));
+        }
+        function baseSlice(array, start, end) {
+            var index = -1, length = array.length;
+            if (start < 0) {
+                start = -start > length ? 0 : length + start;
+            }
+            end = end > length ? length : end;
+            if (end < 0) {
+                end += length;
+            }
+            length = start > end ? 0 : end - start >>> 0;
+            start >>>= 0;
+            var result = Array(length);
+            while (++index < length) {
+                result[index] = array[index + start];
+            }
+            return result;
+        }
+        function baseSome(collection, predicate) {
+            var result;
+            baseEach(collection, function(value, index, collection) {
+                result = predicate(value, index, collection);
+                return !result;
+            });
+            return !!result;
+        }
+        function baseSortedIndex(array, value, retHighest) {
+            var low = 0, high = array ? array.length : low;
+            if (typeof value == "number" && value === value && high <= HALF_MAX_ARRAY_LENGTH) {
+                while (low < high) {
+                    var mid = low + high >>> 1, computed = array[mid];
+                    if (computed !== null && !isSymbol(computed) && (retHighest ? computed <= value : computed < value)) {
+                        low = mid + 1;
+                    } else {
+                        high = mid;
+                    }
+                }
+                return high;
+            }
+            return baseSortedIndexBy(array, value, identity, retHighest);
+        }
+        function baseSortedIndexBy(array, value, iteratee, retHighest) {
+            value = iteratee(value);
+            var low = 0, high = array ? array.length : 0, valIsNaN = value !== value, valIsNull = value === null, valIsSymbol = isSymbol(value), valIsUndefined = value === undefined;
+            while (low < high) {
+                var mid = nativeFloor((low + high) / 2), computed = iteratee(array[mid]), othIsDefined = computed !== undefined, othIsNull = computed === null, othIsReflexive = computed === computed, othIsSymbol = isSymbol(computed);
+                if (valIsNaN) {
+                    var setLow = retHighest || othIsReflexive;
+                } else if (valIsUndefined) {
+                    setLow = othIsReflexive && (retHighest || othIsDefined);
+                } else if (valIsNull) {
+                    setLow = othIsReflexive && othIsDefined && (retHighest || !othIsNull);
+                } else if (valIsSymbol) {
+                    setLow = othIsReflexive && othIsDefined && !othIsNull && (retHighest || !othIsSymbol);
+                } else if (othIsNull || othIsSymbol) {
+                    setLow = false;
+                } else {
+                    setLow = retHighest ? computed <= value : computed < value;
+                }
+                if (setLow) {
+                    low = mid + 1;
+                } else {
+                    high = mid;
+                }
+            }
+            return nativeMin(high, MAX_ARRAY_INDEX);
+        }
+        function baseSortedUniq(array, iteratee) {
+            var index = -1, length = array.length, resIndex = 0, result = [];
+            while (++index < length) {
+                var value = array[index], computed = iteratee ? iteratee(value) : value;
+                if (!index || !eq(computed, seen)) {
+                    var seen = computed;
+                    result[resIndex++] = value === 0 ? 0 : value;
+                }
+            }
+            return result;
+        }
+        function baseToNumber(value) {
+            if (typeof value == "number") {
+                return value;
+            }
+            if (isSymbol(value)) {
+                return NAN;
+            }
+            return +value;
+        }
+        function baseToString(value) {
+            if (typeof value == "string") {
+                return value;
+            }
+            if (isArray(value)) {
+                return arrayMap(value, baseToString) + "";
+            }
+            if (isSymbol(value)) {
+                return symbolToString ? symbolToString.call(value) : "";
+            }
+            var result = value + "";
+            return result == "0" && 1 / value == -INFINITY ? "-0" : result;
+        }
+        function baseUniq(array, iteratee, comparator) {
+            var index = -1, includes = arrayIncludes, length = array.length, isCommon = true, result = [], seen = result;
+            if (comparator) {
+                isCommon = false;
+                includes = arrayIncludesWith;
+            } else if (length >= LARGE_ARRAY_SIZE) {
+                var set = iteratee ? null : createSet(array);
+                if (set) {
+                    return setToArray(set);
+                }
+                isCommon = false;
+                includes = cacheHas;
+                seen = new SetCache();
+            } else {
+                seen = iteratee ? [] : result;
+            }
+            outer: while (++index < length) {
+                var value = array[index], computed = iteratee ? iteratee(value) : value;
+                value = comparator || value !== 0 ? value : 0;
+                if (isCommon && computed === computed) {
+                    var seenIndex = seen.length;
+                    while (seenIndex--) {
+                        if (seen[seenIndex] === computed) {
+                            continue outer;
+                        }
+                    }
+                    if (iteratee) {
+                        seen.push(computed);
+                    }
+                    result.push(value);
+                } else if (!includes(seen, computed, comparator)) {
+                    if (seen !== result) {
+                        seen.push(computed);
+                    }
+                    result.push(value);
+                }
+            }
+            return result;
+        }
+        function baseUnset(object, path) {
+            path = isKey(path, object) ? [ path ] : castPath(path);
+            object = parent(object, path);
+            var key = toKey(last(path));
+            return !(object != null && hasOwnProperty.call(object, key)) || delete object[key];
+        }
+        function baseUpdate(object, path, updater, customizer) {
+            return baseSet(object, path, updater(baseGet(object, path)), customizer);
+        }
+        function baseWhile(array, predicate, isDrop, fromRight) {
+            var length = array.length, index = fromRight ? length : -1;
+            while ((fromRight ? index-- : ++index < length) && predicate(array[index], index, array)) {}
+            return isDrop ? baseSlice(array, fromRight ? 0 : index, fromRight ? index + 1 : length) : baseSlice(array, fromRight ? index + 1 : 0, fromRight ? length : index);
+        }
+        function baseWrapperValue(value, actions) {
+            var result = value;
+            if (result instanceof LazyWrapper) {
+                result = result.value();
+            }
+            return arrayReduce(actions, function(result, action) {
+                return action.func.apply(action.thisArg, arrayPush([ result ], action.args));
+            }, result);
+        }
+        function baseXor(arrays, iteratee, comparator) {
+            var index = -1, length = arrays.length;
+            while (++index < length) {
+                var result = result ? arrayPush(baseDifference(result, arrays[index], iteratee, comparator), baseDifference(arrays[index], result, iteratee, comparator)) : arrays[index];
+            }
+            return result && result.length ? baseUniq(result, iteratee, comparator) : [];
+        }
+        function baseZipObject(props, values, assignFunc) {
+            var index = -1, length = props.length, valsLength = values.length, result = {};
+            while (++index < length) {
+                var value = index < valsLength ? values[index] : undefined;
+                assignFunc(result, props[index], value);
+            }
+            return result;
+        }
+        function castArrayLikeObject(value) {
+            return isArrayLikeObject(value) ? value : [];
+        }
+        function castFunction(value) {
+            return typeof value == "function" ? value : identity;
+        }
+        function castPath(value) {
+            return isArray(value) ? value : stringToPath(value);
+        }
+        var castRest = baseRest;
+        function castSlice(array, start, end) {
+            var length = array.length;
+            end = end === undefined ? length : end;
+            return !start && end >= length ? array : baseSlice(array, start, end);
+        }
+        var clearTimeout = ctxClearTimeout || function(id) {
+            return root.clearTimeout(id);
+        };
+        function cloneBuffer(buffer, isDeep) {
+            if (isDeep) {
+                return buffer.slice();
+            }
+            var length = buffer.length, result = allocUnsafe ? allocUnsafe(length) : new buffer.constructor(length);
+            buffer.copy(result);
+            return result;
+        }
+        function cloneArrayBuffer(arrayBuffer) {
+            var result = new arrayBuffer.constructor(arrayBuffer.byteLength);
+            new Uint8Array(result).set(new Uint8Array(arrayBuffer));
+            return result;
+        }
+        function cloneDataView(dataView, isDeep) {
+            var buffer = isDeep ? cloneArrayBuffer(dataView.buffer) : dataView.buffer;
+            return new dataView.constructor(buffer, dataView.byteOffset, dataView.byteLength);
+        }
+        function cloneMap(map, isDeep, cloneFunc) {
+            var array = isDeep ? cloneFunc(mapToArray(map), true) : mapToArray(map);
+            return arrayReduce(array, addMapEntry, new map.constructor());
+        }
+        function cloneRegExp(regexp) {
+            var result = new regexp.constructor(regexp.source, reFlags.exec(regexp));
+            result.lastIndex = regexp.lastIndex;
+            return result;
+        }
+        function cloneSet(set, isDeep, cloneFunc) {
+            var array = isDeep ? cloneFunc(setToArray(set), true) : setToArray(set);
+            return arrayReduce(array, addSetEntry, new set.constructor());
+        }
+        function cloneSymbol(symbol) {
+            return symbolValueOf ? Object(symbolValueOf.call(symbol)) : {};
+        }
+        function cloneTypedArray(typedArray, isDeep) {
+            var buffer = isDeep ? cloneArrayBuffer(typedArray.buffer) : typedArray.buffer;
+            return new typedArray.constructor(buffer, typedArray.byteOffset, typedArray.length);
+        }
+        function compareAscending(value, other) {
+            if (value !== other) {
+                var valIsDefined = value !== undefined, valIsNull = value === null, valIsReflexive = value === value, valIsSymbol = isSymbol(value);
+                var othIsDefined = other !== undefined, othIsNull = other === null, othIsReflexive = other === other, othIsSymbol = isSymbol(other);
+                if (!othIsNull && !othIsSymbol && !valIsSymbol && value > other || valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol || valIsNull && othIsDefined && othIsReflexive || !valIsDefined && othIsReflexive || !valIsReflexive) {
+                    return 1;
+                }
+                if (!valIsNull && !valIsSymbol && !othIsSymbol && value < other || othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol || othIsNull && valIsDefined && valIsReflexive || !othIsDefined && valIsReflexive || !othIsReflexive) {
+                    return -1;
+                }
+            }
             return 0;
         }
-        return seconds;
-    };
-    /*
-   *  A public method to store the OAuth token for later use - uses localstorage if available
-   *
-   *  @method setToken
-   *  @public
-   *  @params {string} token
-   *  @return none
-   */
-    Usergrid.Client.prototype.setToken = function(token) {
-        this.set("token", token);
-    };
-    /*
-   *  A public method to get the OAuth token
-   *
-   *  @method getToken
-   *  @public
-   *  @return {string} token
-   */
-    Usergrid.Client.prototype.getToken = function() {
-        return this.get("token");
-    };
-    Usergrid.Client.prototype.setObject = function(key, value) {
-        if (value) {
-            value = JSON.stringify(value);
+        function compareMultiple(object, other, orders) {
+            var index = -1, objCriteria = object.criteria, othCriteria = other.criteria, length = objCriteria.length, ordersLength = orders.length;
+            while (++index < length) {
+                var result = compareAscending(objCriteria[index], othCriteria[index]);
+                if (result) {
+                    if (index >= ordersLength) {
+                        return result;
+                    }
+                    var order = orders[index];
+                    return result * (order == "desc" ? -1 : 1);
+                }
+            }
+            return object.index - other.index;
         }
-        this.set(key, value);
-    };
-    Usergrid.Client.prototype.set = function(key, value) {
-        var keyStore = "apigee_" + key;
-        this[key] = value;
-        if (typeof Storage !== "undefined") {
-            if (value) {
-                localStorage.setItem(keyStore, value);
-            } else {
-                localStorage.removeItem(keyStore);
+        function composeArgs(args, partials, holders, isCurried) {
+            var argsIndex = -1, argsLength = args.length, holdersLength = holders.length, leftIndex = -1, leftLength = partials.length, rangeLength = nativeMax(argsLength - holdersLength, 0), result = Array(leftLength + rangeLength), isUncurried = !isCurried;
+            while (++leftIndex < leftLength) {
+                result[leftIndex] = partials[leftIndex];
             }
+            while (++argsIndex < holdersLength) {
+                if (isUncurried || argsIndex < argsLength) {
+                    result[holders[argsIndex]] = args[argsIndex];
+                }
+            }
+            while (rangeLength--) {
+                result[leftIndex++] = args[argsIndex++];
+            }
+            return result;
         }
-    };
-    Usergrid.Client.prototype.getObject = function(key) {
-        return JSON.parse(this.get(key));
-    };
-    Usergrid.Client.prototype.get = function(key) {
-        var keyStore = "apigee_" + key;
-        var value = null;
-        if (this[key]) {
-            value = this[key];
-        } else if (typeof Storage !== "undefined") {
-            value = localStorage.getItem(keyStore);
+        function composeArgsRight(args, partials, holders, isCurried) {
+            var argsIndex = -1, argsLength = args.length, holdersIndex = -1, holdersLength = holders.length, rightIndex = -1, rightLength = partials.length, rangeLength = nativeMax(argsLength - holdersLength, 0), result = Array(rangeLength + rightLength), isUncurried = !isCurried;
+            while (++argsIndex < rangeLength) {
+                result[argsIndex] = args[argsIndex];
+            }
+            var offset = argsIndex;
+            while (++rightIndex < rightLength) {
+                result[offset + rightIndex] = partials[rightIndex];
+            }
+            while (++holdersIndex < holdersLength) {
+                if (isUncurried || argsIndex < argsLength) {
+                    result[offset + holders[holdersIndex]] = args[argsIndex++];
+                }
+            }
+            return result;
         }
-        return value;
-    };
-    /*
-   * A public facing helper method for signing up users
-   *
-   * @method signup
-   * @public
-   * @params {string} username
-   * @params {string} password
-   * @params {string} email
-   * @params {string} name
-   * @param {function} callback
-   * @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.signup = function(username, password, email, name, callback) {
-        var self = this;
-        var options = {
-            type: "users",
-            username: username,
-            password: password,
-            email: email,
-            name: name
-        };
-        this.createEntity(options, callback);
-    };
-    /*
-   *
-   *  A public method to log in an app user - stores the token for later use
-   *
-   *  @method login
-   *  @public
-   *  @params {string} username
-   *  @params {string} password
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.login = function(username, password, callback) {
-        var self = this;
-        var options = {
-            method: "POST",
-            endpoint: "token",
-            body: {
-                username: username,
-                password: password,
-                grant_type: "password"
+        function copyArray(source, array) {
+            var index = -1, length = source.length;
+            array || (array = Array(length));
+            while (++index < length) {
+                array[index] = source[index];
             }
-        };
-        self.request(options, function(err, response) {
-            var user = {};
-            if (err) {
-                if (self.logging) console.log("error trying to log user in");
-            } else {
-                var options = {
-                    client: self,
-                    data: response.user
-                };
-                user = new Usergrid.Entity(options);
-                self.setToken(response.access_token);
+            return array;
+        }
+        function copyObject(source, props, object, customizer) {
+            var isNew = !object;
+            object || (object = {});
+            var index = -1, length = props.length;
+            while (++index < length) {
+                var key = props[index];
+                var newValue = customizer ? customizer(object[key], source[key], key, object, source) : undefined;
+                if (newValue === undefined) {
+                    newValue = source[key];
+                }
+                if (isNew) {
+                    baseAssignValue(object, key, newValue);
+                } else {
+                    assignValue(object, key, newValue);
+                }
             }
-            doCallback(callback, [ err, response, user ]);
-        });
-    };
-    Usergrid.Client.prototype.reAuthenticateLite = function(callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "management/me",
-            mQuery: true
-        };
-        this.request(options, function(err, response) {
-            if (err && self.logging) {
-                console.log("error trying to re-authenticate user");
-            } else {
-                self.setToken(response.data.access_token);
-            }
-            doCallback(callback, [ err ]);
-        });
-    };
-    Usergrid.Client.prototype.reAuthenticate = function(email, callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "management/users/" + email,
-            mQuery: true
-        };
-        this.request(options, function(err, response) {
-            var organizations = {};
-            var applications = {};
-            var user = {};
-            var data;
-            if (err && self.logging) {
-                console.log("error trying to full authenticate user");
-            } else {
-                data = response.data;
-                self.setToken(data.token);
-                self.set("email", data.email);
-                localStorage.setItem("accessToken", data.token);
-                localStorage.setItem("userUUID", data.uuid);
-                localStorage.setItem("userEmail", data.email);
-                var userData = {
-                    username: data.username,
-                    email: data.email,
-                    name: data.name,
-                    uuid: data.uuid
-                };
-                var options = {
-                    client: self,
-                    data: userData
-                };
-                user = new Usergrid.Entity(options);
-                organizations = data.organizations;
-                var org = "";
-                try {
-                    var existingOrg = self.get("orgName");
-                    org = organizations[existingOrg] ? organizations[existingOrg] : organizations[Object.keys(organizations)[0]];
-                    self.set("orgName", org.name);
-                } catch (e) {
-                    err = true;
-                    if (self.logging) {
-                        console.log("error selecting org");
+            return object;
+        }
+        function copySymbols(source, object) {
+            return copyObject(source, getSymbols(source), object);
+        }
+        function createAggregator(setter, initializer) {
+            return function(collection, iteratee) {
+                var func = isArray(collection) ? arrayAggregator : baseAggregator, accumulator = initializer ? initializer() : {};
+                return func(collection, setter, getIteratee(iteratee, 2), accumulator);
+            };
+        }
+        function createAssigner(assigner) {
+            return baseRest(function(object, sources) {
+                var index = -1, length = sources.length, customizer = length > 1 ? sources[length - 1] : undefined, guard = length > 2 ? sources[2] : undefined;
+                customizer = assigner.length > 3 && typeof customizer == "function" ? (length--, 
+                customizer) : undefined;
+                if (guard && isIterateeCall(sources[0], sources[1], guard)) {
+                    customizer = length < 3 ? undefined : customizer;
+                    length = 1;
+                }
+                object = Object(object);
+                while (++index < length) {
+                    var source = sources[index];
+                    if (source) {
+                        assigner(object, source, index, customizer);
                     }
                 }
-                applications = self.parseApplicationsArray(org);
-                self.selectFirstApp(applications);
-                self.setObject("organizations", organizations);
-                self.setObject("applications", applications);
-            }
-            doCallback(callback, [ err, data, user, organizations, applications ], self);
-        });
-    };
-    /*
-   *  A public method to log in an app user with facebook - stores the token for later use
-   *
-   *  @method loginFacebook
-   *  @public
-   *  @params {string} username
-   *  @params {string} password
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.loginFacebook = function(facebookToken, callback) {
-        var self = this;
-        var options = {
-            method: "GET",
-            endpoint: "auth/facebook",
-            qs: {
-                fb_access_token: facebookToken
-            }
-        };
-        this.request(options, function(err, data) {
-            var user = {};
-            if (err && self.logging) {
-                console.log("error trying to log user in");
-            } else {
-                var options = {
-                    client: self,
-                    data: data.user
-                };
-                user = new Usergrid.Entity(options);
-                self.setToken(data.access_token);
-            }
-            doCallback(callback, [ err, data, user ], self);
-        });
-    };
-    /*
-   *  A public method to get the currently logged in user entity
-   *
-   *  @method getLoggedInUser
-   *  @public
-   *  @param {function} callback
-   *  @return {callback} callback(err, data)
-   */
-    Usergrid.Client.prototype.getLoggedInUser = function(callback) {
-        var self = this;
-        if (!this.getToken()) {
-            doCallback(callback, [ new UsergridError("Access Token not set"), null, self ], self);
-        } else {
-            var options = {
-                method: "GET",
-                endpoint: "users/me"
-            };
-            this.request(options, function(err, response) {
-                if (err) {
-                    if (self.logging) {
-                        console.log("error trying to log user in");
+                return object;
+            });
+        }
+        function createBaseEach(eachFunc, fromRight) {
+            return function(collection, iteratee) {
+                if (collection == null) {
+                    return collection;
+                }
+                if (!isArrayLike(collection)) {
+                    return eachFunc(collection, iteratee);
+                }
+                var length = collection.length, index = fromRight ? length : -1, iterable = Object(collection);
+                while (fromRight ? index-- : ++index < length) {
+                    if (iteratee(iterable[index], index, iterable) === false) {
+                        break;
                     }
-                    console.error(err, response);
-                    doCallback(callback, [ err, response, self ], self);
-                } else {
-                    var options = {
-                        client: self,
-                        data: response.getEntity()
+                }
+                return collection;
+            };
+        }
+        function createBaseFor(fromRight) {
+            return function(object, iteratee, keysFunc) {
+                var index = -1, iterable = Object(object), props = keysFunc(object), length = props.length;
+                while (length--) {
+                    var key = props[fromRight ? length : ++index];
+                    if (iteratee(iterable[key], key, iterable) === false) {
+                        break;
+                    }
+                }
+                return object;
+            };
+        }
+        function createBind(func, bitmask, thisArg) {
+            var isBind = bitmask & BIND_FLAG, Ctor = createCtor(func);
+            function wrapper() {
+                var fn = this && this !== root && this instanceof wrapper ? Ctor : func;
+                return fn.apply(isBind ? thisArg : this, arguments);
+            }
+            return wrapper;
+        }
+        function createCaseFirst(methodName) {
+            return function(string) {
+                string = toString(string);
+                var strSymbols = hasUnicode(string) ? stringToArray(string) : undefined;
+                var chr = strSymbols ? strSymbols[0] : string.charAt(0);
+                var trailing = strSymbols ? castSlice(strSymbols, 1).join("") : string.slice(1);
+                return chr[methodName]() + trailing;
+            };
+        }
+        function createCompounder(callback) {
+            return function(string) {
+                return arrayReduce(words(deburr(string).replace(reApos, "")), callback, "");
+            };
+        }
+        function createCtor(Ctor) {
+            return function() {
+                var args = arguments;
+                switch (args.length) {
+                  case 0:
+                    return new Ctor();
+
+                  case 1:
+                    return new Ctor(args[0]);
+
+                  case 2:
+                    return new Ctor(args[0], args[1]);
+
+                  case 3:
+                    return new Ctor(args[0], args[1], args[2]);
+
+                  case 4:
+                    return new Ctor(args[0], args[1], args[2], args[3]);
+
+                  case 5:
+                    return new Ctor(args[0], args[1], args[2], args[3], args[4]);
+
+                  case 6:
+                    return new Ctor(args[0], args[1], args[2], args[3], args[4], args[5]);
+
+                  case 7:
+                    return new Ctor(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+                }
+                var thisBinding = baseCreate(Ctor.prototype), result = Ctor.apply(thisBinding, args);
+                return isObject(result) ? result : thisBinding;
+            };
+        }
+        function createCurry(func, bitmask, arity) {
+            var Ctor = createCtor(func);
+            function wrapper() {
+                var length = arguments.length, args = Array(length), index = length, placeholder = getHolder(wrapper);
+                while (index--) {
+                    args[index] = arguments[index];
+                }
+                var holders = length < 3 && args[0] !== placeholder && args[length - 1] !== placeholder ? [] : replaceHolders(args, placeholder);
+                length -= holders.length;
+                if (length < arity) {
+                    return createRecurry(func, bitmask, createHybrid, wrapper.placeholder, undefined, args, holders, undefined, undefined, arity - length);
+                }
+                var fn = this && this !== root && this instanceof wrapper ? Ctor : func;
+                return apply(fn, this, args);
+            }
+            return wrapper;
+        }
+        function createFind(findIndexFunc) {
+            return function(collection, predicate, fromIndex) {
+                var iterable = Object(collection);
+                if (!isArrayLike(collection)) {
+                    var iteratee = getIteratee(predicate, 3);
+                    collection = keys(collection);
+                    predicate = function(key) {
+                        return iteratee(iterable[key], key, iterable);
                     };
-                    var user = new Usergrid.Entity(options);
-                    doCallback(callback, [ null, response, user ], self);
+                }
+                var index = findIndexFunc(collection, predicate, fromIndex);
+                return index > -1 ? iterable[iteratee ? collection[index] : index] : undefined;
+            };
+        }
+        function createFlow(fromRight) {
+            return flatRest(function(funcs) {
+                var length = funcs.length, index = length, prereq = LodashWrapper.prototype.thru;
+                if (fromRight) {
+                    funcs.reverse();
+                }
+                while (index--) {
+                    var func = funcs[index];
+                    if (typeof func != "function") {
+                        throw new TypeError(FUNC_ERROR_TEXT);
+                    }
+                    if (prereq && !wrapper && getFuncName(func) == "wrapper") {
+                        var wrapper = new LodashWrapper([], true);
+                    }
+                }
+                index = wrapper ? index : length;
+                while (++index < length) {
+                    func = funcs[index];
+                    var funcName = getFuncName(func), data = funcName == "wrapper" ? getData(func) : undefined;
+                    if (data && isLaziable(data[0]) && data[1] == (ARY_FLAG | CURRY_FLAG | PARTIAL_FLAG | REARG_FLAG) && !data[4].length && data[9] == 1) {
+                        wrapper = wrapper[getFuncName(data[0])].apply(wrapper, data[3]);
+                    } else {
+                        wrapper = func.length == 1 && isLaziable(func) ? wrapper[funcName]() : wrapper.thru(func);
+                    }
+                }
+                return function() {
+                    var args = arguments, value = args[0];
+                    if (wrapper && args.length == 1 && isArray(value) && value.length >= LARGE_ARRAY_SIZE) {
+                        return wrapper.plant(value).value();
+                    }
+                    var index = 0, result = length ? funcs[index].apply(this, args) : value;
+                    while (++index < length) {
+                        result = funcs[index].call(this, result);
+                    }
+                    return result;
+                };
+            });
+        }
+        function createHybrid(func, bitmask, thisArg, partials, holders, partialsRight, holdersRight, argPos, ary, arity) {
+            var isAry = bitmask & ARY_FLAG, isBind = bitmask & BIND_FLAG, isBindKey = bitmask & BIND_KEY_FLAG, isCurried = bitmask & (CURRY_FLAG | CURRY_RIGHT_FLAG), isFlip = bitmask & FLIP_FLAG, Ctor = isBindKey ? undefined : createCtor(func);
+            function wrapper() {
+                var length = arguments.length, args = Array(length), index = length;
+                while (index--) {
+                    args[index] = arguments[index];
+                }
+                if (isCurried) {
+                    var placeholder = getHolder(wrapper), holdersCount = countHolders(args, placeholder);
+                }
+                if (partials) {
+                    args = composeArgs(args, partials, holders, isCurried);
+                }
+                if (partialsRight) {
+                    args = composeArgsRight(args, partialsRight, holdersRight, isCurried);
+                }
+                length -= holdersCount;
+                if (isCurried && length < arity) {
+                    var newHolders = replaceHolders(args, placeholder);
+                    return createRecurry(func, bitmask, createHybrid, wrapper.placeholder, thisArg, args, newHolders, argPos, ary, arity - length);
+                }
+                var thisBinding = isBind ? thisArg : this, fn = isBindKey ? thisBinding[func] : func;
+                length = args.length;
+                if (argPos) {
+                    args = reorder(args, argPos);
+                } else if (isFlip && length > 1) {
+                    args.reverse();
+                }
+                if (isAry && ary < length) {
+                    args.length = ary;
+                }
+                if (this && this !== root && this instanceof wrapper) {
+                    fn = Ctor || createCtor(fn);
+                }
+                return fn.apply(thisBinding, args);
+            }
+            return wrapper;
+        }
+        function createInverter(setter, toIteratee) {
+            return function(object, iteratee) {
+                return baseInverter(object, setter, toIteratee(iteratee), {});
+            };
+        }
+        function createMathOperation(operator, defaultValue) {
+            return function(value, other) {
+                var result;
+                if (value === undefined && other === undefined) {
+                    return defaultValue;
+                }
+                if (value !== undefined) {
+                    result = value;
+                }
+                if (other !== undefined) {
+                    if (result === undefined) {
+                        return other;
+                    }
+                    if (typeof value == "string" || typeof other == "string") {
+                        value = baseToString(value);
+                        other = baseToString(other);
+                    } else {
+                        value = baseToNumber(value);
+                        other = baseToNumber(other);
+                    }
+                    result = operator(value, other);
+                }
+                return result;
+            };
+        }
+        function createOver(arrayFunc) {
+            return flatRest(function(iteratees) {
+                iteratees = arrayMap(iteratees, baseUnary(getIteratee()));
+                return baseRest(function(args) {
+                    var thisArg = this;
+                    return arrayFunc(iteratees, function(iteratee) {
+                        return apply(iteratee, thisArg, args);
+                    });
+                });
+            });
+        }
+        function createPadding(length, chars) {
+            chars = chars === undefined ? " " : baseToString(chars);
+            var charsLength = chars.length;
+            if (charsLength < 2) {
+                return charsLength ? baseRepeat(chars, length) : chars;
+            }
+            var result = baseRepeat(chars, nativeCeil(length / stringSize(chars)));
+            return hasUnicode(chars) ? castSlice(stringToArray(result), 0, length).join("") : result.slice(0, length);
+        }
+        function createPartial(func, bitmask, thisArg, partials) {
+            var isBind = bitmask & BIND_FLAG, Ctor = createCtor(func);
+            function wrapper() {
+                var argsIndex = -1, argsLength = arguments.length, leftIndex = -1, leftLength = partials.length, args = Array(leftLength + argsLength), fn = this && this !== root && this instanceof wrapper ? Ctor : func;
+                while (++leftIndex < leftLength) {
+                    args[leftIndex] = partials[leftIndex];
+                }
+                while (argsLength--) {
+                    args[leftIndex++] = arguments[++argsIndex];
+                }
+                return apply(fn, isBind ? thisArg : this, args);
+            }
+            return wrapper;
+        }
+        function createRange(fromRight) {
+            return function(start, end, step) {
+                if (step && typeof step != "number" && isIterateeCall(start, end, step)) {
+                    end = step = undefined;
+                }
+                start = toFinite(start);
+                if (end === undefined) {
+                    end = start;
+                    start = 0;
+                } else {
+                    end = toFinite(end);
+                }
+                step = step === undefined ? start < end ? 1 : -1 : toFinite(step);
+                return baseRange(start, end, step, fromRight);
+            };
+        }
+        function createRelationalOperation(operator) {
+            return function(value, other) {
+                if (!(typeof value == "string" && typeof other == "string")) {
+                    value = toNumber(value);
+                    other = toNumber(other);
+                }
+                return operator(value, other);
+            };
+        }
+        function createRecurry(func, bitmask, wrapFunc, placeholder, thisArg, partials, holders, argPos, ary, arity) {
+            var isCurry = bitmask & CURRY_FLAG, newHolders = isCurry ? holders : undefined, newHoldersRight = isCurry ? undefined : holders, newPartials = isCurry ? partials : undefined, newPartialsRight = isCurry ? undefined : partials;
+            bitmask |= isCurry ? PARTIAL_FLAG : PARTIAL_RIGHT_FLAG;
+            bitmask &= ~(isCurry ? PARTIAL_RIGHT_FLAG : PARTIAL_FLAG);
+            if (!(bitmask & CURRY_BOUND_FLAG)) {
+                bitmask &= ~(BIND_FLAG | BIND_KEY_FLAG);
+            }
+            var newData = [ func, bitmask, thisArg, newPartials, newHolders, newPartialsRight, newHoldersRight, argPos, ary, arity ];
+            var result = wrapFunc.apply(undefined, newData);
+            if (isLaziable(func)) {
+                setData(result, newData);
+            }
+            result.placeholder = placeholder;
+            return setWrapToString(result, func, bitmask);
+        }
+        function createRound(methodName) {
+            var func = Math[methodName];
+            return function(number, precision) {
+                number = toNumber(number);
+                precision = nativeMin(toInteger(precision), 292);
+                if (precision) {
+                    var pair = (toString(number) + "e").split("e"), value = func(pair[0] + "e" + (+pair[1] + precision));
+                    pair = (toString(value) + "e").split("e");
+                    return +(pair[0] + "e" + (+pair[1] - precision));
+                }
+                return func(number);
+            };
+        }
+        var createSet = !(Set && 1 / setToArray(new Set([ , -0 ]))[1] == INFINITY) ? noop : function(values) {
+            return new Set(values);
+        };
+        function createToPairs(keysFunc) {
+            return function(object) {
+                var tag = getTag(object);
+                if (tag == mapTag) {
+                    return mapToArray(object);
+                }
+                if (tag == setTag) {
+                    return setToPairs(object);
+                }
+                return baseToPairs(object, keysFunc(object));
+            };
+        }
+        function createWrap(func, bitmask, thisArg, partials, holders, argPos, ary, arity) {
+            var isBindKey = bitmask & BIND_KEY_FLAG;
+            if (!isBindKey && typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            var length = partials ? partials.length : 0;
+            if (!length) {
+                bitmask &= ~(PARTIAL_FLAG | PARTIAL_RIGHT_FLAG);
+                partials = holders = undefined;
+            }
+            ary = ary === undefined ? ary : nativeMax(toInteger(ary), 0);
+            arity = arity === undefined ? arity : toInteger(arity);
+            length -= holders ? holders.length : 0;
+            if (bitmask & PARTIAL_RIGHT_FLAG) {
+                var partialsRight = partials, holdersRight = holders;
+                partials = holders = undefined;
+            }
+            var data = isBindKey ? undefined : getData(func);
+            var newData = [ func, bitmask, thisArg, partials, holders, partialsRight, holdersRight, argPos, ary, arity ];
+            if (data) {
+                mergeData(newData, data);
+            }
+            func = newData[0];
+            bitmask = newData[1];
+            thisArg = newData[2];
+            partials = newData[3];
+            holders = newData[4];
+            arity = newData[9] = newData[9] == null ? isBindKey ? 0 : func.length : nativeMax(newData[9] - length, 0);
+            if (!arity && bitmask & (CURRY_FLAG | CURRY_RIGHT_FLAG)) {
+                bitmask &= ~(CURRY_FLAG | CURRY_RIGHT_FLAG);
+            }
+            if (!bitmask || bitmask == BIND_FLAG) {
+                var result = createBind(func, bitmask, thisArg);
+            } else if (bitmask == CURRY_FLAG || bitmask == CURRY_RIGHT_FLAG) {
+                result = createCurry(func, bitmask, arity);
+            } else if ((bitmask == PARTIAL_FLAG || bitmask == (BIND_FLAG | PARTIAL_FLAG)) && !holders.length) {
+                result = createPartial(func, bitmask, thisArg, partials);
+            } else {
+                result = createHybrid.apply(undefined, newData);
+            }
+            var setter = data ? baseSetData : setData;
+            return setWrapToString(setter(result, newData), func, bitmask);
+        }
+        function equalArrays(array, other, equalFunc, customizer, bitmask, stack) {
+            var isPartial = bitmask & PARTIAL_COMPARE_FLAG, arrLength = array.length, othLength = other.length;
+            if (arrLength != othLength && !(isPartial && othLength > arrLength)) {
+                return false;
+            }
+            var stacked = stack.get(array);
+            if (stacked && stack.get(other)) {
+                return stacked == other;
+            }
+            var index = -1, result = true, seen = bitmask & UNORDERED_COMPARE_FLAG ? new SetCache() : undefined;
+            stack.set(array, other);
+            stack.set(other, array);
+            while (++index < arrLength) {
+                var arrValue = array[index], othValue = other[index];
+                if (customizer) {
+                    var compared = isPartial ? customizer(othValue, arrValue, index, other, array, stack) : customizer(arrValue, othValue, index, array, other, stack);
+                }
+                if (compared !== undefined) {
+                    if (compared) {
+                        continue;
+                    }
+                    result = false;
+                    break;
+                }
+                if (seen) {
+                    if (!arraySome(other, function(othValue, othIndex) {
+                        if (!cacheHas(seen, othIndex) && (arrValue === othValue || equalFunc(arrValue, othValue, customizer, bitmask, stack))) {
+                            return seen.push(othIndex);
+                        }
+                    })) {
+                        result = false;
+                        break;
+                    }
+                } else if (!(arrValue === othValue || equalFunc(arrValue, othValue, customizer, bitmask, stack))) {
+                    result = false;
+                    break;
+                }
+            }
+            stack["delete"](array);
+            stack["delete"](other);
+            return result;
+        }
+        function equalByTag(object, other, tag, equalFunc, customizer, bitmask, stack) {
+            switch (tag) {
+              case dataViewTag:
+                if (object.byteLength != other.byteLength || object.byteOffset != other.byteOffset) {
+                    return false;
+                }
+                object = object.buffer;
+                other = other.buffer;
+
+              case arrayBufferTag:
+                if (object.byteLength != other.byteLength || !equalFunc(new Uint8Array(object), new Uint8Array(other))) {
+                    return false;
+                }
+                return true;
+
+              case boolTag:
+              case dateTag:
+              case numberTag:
+                return eq(+object, +other);
+
+              case errorTag:
+                return object.name == other.name && object.message == other.message;
+
+              case regexpTag:
+              case stringTag:
+                return object == other + "";
+
+              case mapTag:
+                var convert = mapToArray;
+
+              case setTag:
+                var isPartial = bitmask & PARTIAL_COMPARE_FLAG;
+                convert || (convert = setToArray);
+                if (object.size != other.size && !isPartial) {
+                    return false;
+                }
+                var stacked = stack.get(object);
+                if (stacked) {
+                    return stacked == other;
+                }
+                bitmask |= UNORDERED_COMPARE_FLAG;
+                stack.set(object, other);
+                var result = equalArrays(convert(object), convert(other), equalFunc, customizer, bitmask, stack);
+                stack["delete"](object);
+                return result;
+
+              case symbolTag:
+                if (symbolValueOf) {
+                    return symbolValueOf.call(object) == symbolValueOf.call(other);
+                }
+            }
+            return false;
+        }
+        function equalObjects(object, other, equalFunc, customizer, bitmask, stack) {
+            var isPartial = bitmask & PARTIAL_COMPARE_FLAG, objProps = keys(object), objLength = objProps.length, othProps = keys(other), othLength = othProps.length;
+            if (objLength != othLength && !isPartial) {
+                return false;
+            }
+            var index = objLength;
+            while (index--) {
+                var key = objProps[index];
+                if (!(isPartial ? key in other : hasOwnProperty.call(other, key))) {
+                    return false;
+                }
+            }
+            var stacked = stack.get(object);
+            if (stacked && stack.get(other)) {
+                return stacked == other;
+            }
+            var result = true;
+            stack.set(object, other);
+            stack.set(other, object);
+            var skipCtor = isPartial;
+            while (++index < objLength) {
+                key = objProps[index];
+                var objValue = object[key], othValue = other[key];
+                if (customizer) {
+                    var compared = isPartial ? customizer(othValue, objValue, key, other, object, stack) : customizer(objValue, othValue, key, object, other, stack);
+                }
+                if (!(compared === undefined ? objValue === othValue || equalFunc(objValue, othValue, customizer, bitmask, stack) : compared)) {
+                    result = false;
+                    break;
+                }
+                skipCtor || (skipCtor = key == "constructor");
+            }
+            if (result && !skipCtor) {
+                var objCtor = object.constructor, othCtor = other.constructor;
+                if (objCtor != othCtor && ("constructor" in object && "constructor" in other) && !(typeof objCtor == "function" && objCtor instanceof objCtor && typeof othCtor == "function" && othCtor instanceof othCtor)) {
+                    result = false;
+                }
+            }
+            stack["delete"](object);
+            stack["delete"](other);
+            return result;
+        }
+        function flatRest(func) {
+            return setToString(overRest(func, undefined, flatten), func + "");
+        }
+        function getAllKeys(object) {
+            return baseGetAllKeys(object, keys, getSymbols);
+        }
+        function getAllKeysIn(object) {
+            return baseGetAllKeys(object, keysIn, getSymbolsIn);
+        }
+        var getData = !metaMap ? noop : function(func) {
+            return metaMap.get(func);
+        };
+        function getFuncName(func) {
+            var result = func.name + "", array = realNames[result], length = hasOwnProperty.call(realNames, result) ? array.length : 0;
+            while (length--) {
+                var data = array[length], otherFunc = data.func;
+                if (otherFunc == null || otherFunc == func) {
+                    return data.name;
+                }
+            }
+            return result;
+        }
+        function getHolder(func) {
+            var object = hasOwnProperty.call(lodash, "placeholder") ? lodash : func;
+            return object.placeholder;
+        }
+        function getIteratee() {
+            var result = lodash.iteratee || iteratee;
+            result = result === iteratee ? baseIteratee : result;
+            return arguments.length ? result(arguments[0], arguments[1]) : result;
+        }
+        function getMapData(map, key) {
+            var data = map.__data__;
+            return isKeyable(key) ? data[typeof key == "string" ? "string" : "hash"] : data.map;
+        }
+        function getMatchData(object) {
+            var result = keys(object), length = result.length;
+            while (length--) {
+                var key = result[length], value = object[key];
+                result[length] = [ key, value, isStrictComparable(value) ];
+            }
+            return result;
+        }
+        function getNative(object, key) {
+            var value = getValue(object, key);
+            return baseIsNative(value) ? value : undefined;
+        }
+        var getSymbols = nativeGetSymbols ? overArg(nativeGetSymbols, Object) : stubArray;
+        var getSymbolsIn = !nativeGetSymbols ? stubArray : function(object) {
+            var result = [];
+            while (object) {
+                arrayPush(result, getSymbols(object));
+                object = getPrototype(object);
+            }
+            return result;
+        };
+        var getTag = baseGetTag;
+        if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag || Map && getTag(new Map()) != mapTag || Promise && getTag(Promise.resolve()) != promiseTag || Set && getTag(new Set()) != setTag || WeakMap && getTag(new WeakMap()) != weakMapTag) {
+            getTag = function(value) {
+                var result = objectToString.call(value), Ctor = result == objectTag ? value.constructor : undefined, ctorString = Ctor ? toSource(Ctor) : undefined;
+                if (ctorString) {
+                    switch (ctorString) {
+                      case dataViewCtorString:
+                        return dataViewTag;
+
+                      case mapCtorString:
+                        return mapTag;
+
+                      case promiseCtorString:
+                        return promiseTag;
+
+                      case setCtorString:
+                        return setTag;
+
+                      case weakMapCtorString:
+                        return weakMapTag;
+                    }
+                }
+                return result;
+            };
+        }
+        function getView(start, end, transforms) {
+            var index = -1, length = transforms.length;
+            while (++index < length) {
+                var data = transforms[index], size = data.size;
+                switch (data.type) {
+                  case "drop":
+                    start += size;
+                    break;
+
+                  case "dropRight":
+                    end -= size;
+                    break;
+
+                  case "take":
+                    end = nativeMin(end, start + size);
+                    break;
+
+                  case "takeRight":
+                    start = nativeMax(start, end - size);
+                    break;
+                }
+            }
+            return {
+                start: start,
+                end: end
+            };
+        }
+        function getWrapDetails(source) {
+            var match = source.match(reWrapDetails);
+            return match ? match[1].split(reSplitDetails) : [];
+        }
+        function hasPath(object, path, hasFunc) {
+            path = isKey(path, object) ? [ path ] : castPath(path);
+            var index = -1, length = path.length, result = false;
+            while (++index < length) {
+                var key = toKey(path[index]);
+                if (!(result = object != null && hasFunc(object, key))) {
+                    break;
+                }
+                object = object[key];
+            }
+            if (result || ++index != length) {
+                return result;
+            }
+            length = object ? object.length : 0;
+            return !!length && isLength(length) && isIndex(key, length) && (isArray(object) || isArguments(object));
+        }
+        function initCloneArray(array) {
+            var length = array.length, result = array.constructor(length);
+            if (length && typeof array[0] == "string" && hasOwnProperty.call(array, "index")) {
+                result.index = array.index;
+                result.input = array.input;
+            }
+            return result;
+        }
+        function initCloneObject(object) {
+            return typeof object.constructor == "function" && !isPrototype(object) ? baseCreate(getPrototype(object)) : {};
+        }
+        function initCloneByTag(object, tag, cloneFunc, isDeep) {
+            var Ctor = object.constructor;
+            switch (tag) {
+              case arrayBufferTag:
+                return cloneArrayBuffer(object);
+
+              case boolTag:
+              case dateTag:
+                return new Ctor(+object);
+
+              case dataViewTag:
+                return cloneDataView(object, isDeep);
+
+              case float32Tag:
+              case float64Tag:
+              case int8Tag:
+              case int16Tag:
+              case int32Tag:
+              case uint8Tag:
+              case uint8ClampedTag:
+              case uint16Tag:
+              case uint32Tag:
+                return cloneTypedArray(object, isDeep);
+
+              case mapTag:
+                return cloneMap(object, isDeep, cloneFunc);
+
+              case numberTag:
+              case stringTag:
+                return new Ctor(object);
+
+              case regexpTag:
+                return cloneRegExp(object);
+
+              case setTag:
+                return cloneSet(object, isDeep, cloneFunc);
+
+              case symbolTag:
+                return cloneSymbol(object);
+            }
+        }
+        function insertWrapDetails(source, details) {
+            var length = details.length;
+            if (!length) {
+                return source;
+            }
+            var lastIndex = length - 1;
+            details[lastIndex] = (length > 1 ? "& " : "") + details[lastIndex];
+            details = details.join(length > 2 ? ", " : " ");
+            return source.replace(reWrapComment, "{\n/* [wrapped with " + details + "] */\n");
+        }
+        function isFlattenable(value) {
+            return isArray(value) || isArguments(value) || !!(spreadableSymbol && value && value[spreadableSymbol]);
+        }
+        function isIndex(value, length) {
+            length = length == null ? MAX_SAFE_INTEGER : length;
+            return !!length && (typeof value == "number" || reIsUint.test(value)) && (value > -1 && value % 1 == 0 && value < length);
+        }
+        function isIterateeCall(value, index, object) {
+            if (!isObject(object)) {
+                return false;
+            }
+            var type = typeof index;
+            if (type == "number" ? isArrayLike(object) && isIndex(index, object.length) : type == "string" && index in object) {
+                return eq(object[index], value);
+            }
+            return false;
+        }
+        function isKey(value, object) {
+            if (isArray(value)) {
+                return false;
+            }
+            var type = typeof value;
+            if (type == "number" || type == "symbol" || type == "boolean" || value == null || isSymbol(value)) {
+                return true;
+            }
+            return reIsPlainProp.test(value) || !reIsDeepProp.test(value) || object != null && value in Object(object);
+        }
+        function isKeyable(value) {
+            var type = typeof value;
+            return type == "string" || type == "number" || type == "symbol" || type == "boolean" ? value !== "__proto__" : value === null;
+        }
+        function isLaziable(func) {
+            var funcName = getFuncName(func), other = lodash[funcName];
+            if (typeof other != "function" || !(funcName in LazyWrapper.prototype)) {
+                return false;
+            }
+            if (func === other) {
+                return true;
+            }
+            var data = getData(other);
+            return !!data && func === data[0];
+        }
+        function isMasked(func) {
+            return !!maskSrcKey && maskSrcKey in func;
+        }
+        var isMaskable = coreJsData ? isFunction : stubFalse;
+        function isPrototype(value) {
+            var Ctor = value && value.constructor, proto = typeof Ctor == "function" && Ctor.prototype || objectProto;
+            return value === proto;
+        }
+        function isStrictComparable(value) {
+            return value === value && !isObject(value);
+        }
+        function matchesStrictComparable(key, srcValue) {
+            return function(object) {
+                if (object == null) {
+                    return false;
+                }
+                return object[key] === srcValue && (srcValue !== undefined || key in Object(object));
+            };
+        }
+        function memoizeCapped(func) {
+            var result = memoize(func, function(key) {
+                if (cache.size === MAX_MEMOIZE_SIZE) {
+                    cache.clear();
+                }
+                return key;
+            });
+            var cache = result.cache;
+            return result;
+        }
+        function mergeData(data, source) {
+            var bitmask = data[1], srcBitmask = source[1], newBitmask = bitmask | srcBitmask, isCommon = newBitmask < (BIND_FLAG | BIND_KEY_FLAG | ARY_FLAG);
+            var isCombo = srcBitmask == ARY_FLAG && bitmask == CURRY_FLAG || srcBitmask == ARY_FLAG && bitmask == REARG_FLAG && data[7].length <= source[8] || srcBitmask == (ARY_FLAG | REARG_FLAG) && source[7].length <= source[8] && bitmask == CURRY_FLAG;
+            if (!(isCommon || isCombo)) {
+                return data;
+            }
+            if (srcBitmask & BIND_FLAG) {
+                data[2] = source[2];
+                newBitmask |= bitmask & BIND_FLAG ? 0 : CURRY_BOUND_FLAG;
+            }
+            var value = source[3];
+            if (value) {
+                var partials = data[3];
+                data[3] = partials ? composeArgs(partials, value, source[4]) : value;
+                data[4] = partials ? replaceHolders(data[3], PLACEHOLDER) : source[4];
+            }
+            value = source[5];
+            if (value) {
+                partials = data[5];
+                data[5] = partials ? composeArgsRight(partials, value, source[6]) : value;
+                data[6] = partials ? replaceHolders(data[5], PLACEHOLDER) : source[6];
+            }
+            value = source[7];
+            if (value) {
+                data[7] = value;
+            }
+            if (srcBitmask & ARY_FLAG) {
+                data[8] = data[8] == null ? source[8] : nativeMin(data[8], source[8]);
+            }
+            if (data[9] == null) {
+                data[9] = source[9];
+            }
+            data[0] = source[0];
+            data[1] = newBitmask;
+            return data;
+        }
+        function mergeDefaults(objValue, srcValue, key, object, source, stack) {
+            if (isObject(objValue) && isObject(srcValue)) {
+                stack.set(srcValue, objValue);
+                baseMerge(objValue, srcValue, undefined, mergeDefaults, stack);
+                stack["delete"](srcValue);
+            }
+            return objValue;
+        }
+        function nativeKeysIn(object) {
+            var result = [];
+            if (object != null) {
+                for (var key in Object(object)) {
+                    result.push(key);
+                }
+            }
+            return result;
+        }
+        function overRest(func, start, transform) {
+            start = nativeMax(start === undefined ? func.length - 1 : start, 0);
+            return function() {
+                var args = arguments, index = -1, length = nativeMax(args.length - start, 0), array = Array(length);
+                while (++index < length) {
+                    array[index] = args[start + index];
+                }
+                index = -1;
+                var otherArgs = Array(start + 1);
+                while (++index < start) {
+                    otherArgs[index] = args[index];
+                }
+                otherArgs[start] = transform(array);
+                return apply(func, this, otherArgs);
+            };
+        }
+        function parent(object, path) {
+            return path.length == 1 ? object : baseGet(object, baseSlice(path, 0, -1));
+        }
+        function reorder(array, indexes) {
+            var arrLength = array.length, length = nativeMin(indexes.length, arrLength), oldArray = copyArray(array);
+            while (length--) {
+                var index = indexes[length];
+                array[length] = isIndex(index, arrLength) ? oldArray[index] : undefined;
+            }
+            return array;
+        }
+        var setData = shortOut(baseSetData);
+        var setTimeout = ctxSetTimeout || function(func, wait) {
+            return root.setTimeout(func, wait);
+        };
+        var setToString = shortOut(baseSetToString);
+        function setWrapToString(wrapper, reference, bitmask) {
+            var source = reference + "";
+            return setToString(wrapper, insertWrapDetails(source, updateWrapDetails(getWrapDetails(source), bitmask)));
+        }
+        function shortOut(func) {
+            var count = 0, lastCalled = 0;
+            return function() {
+                var stamp = nativeNow(), remaining = HOT_SPAN - (stamp - lastCalled);
+                lastCalled = stamp;
+                if (remaining > 0) {
+                    if (++count >= HOT_COUNT) {
+                        return arguments[0];
+                    }
+                } else {
+                    count = 0;
+                }
+                return func.apply(undefined, arguments);
+            };
+        }
+        function shuffleSelf(array, size) {
+            var index = -1, length = array.length, lastIndex = length - 1;
+            size = size === undefined ? length : size;
+            while (++index < size) {
+                var rand = baseRandom(index, lastIndex), value = array[rand];
+                array[rand] = array[index];
+                array[index] = value;
+            }
+            array.length = size;
+            return array;
+        }
+        var stringToPath = memoizeCapped(function(string) {
+            string = toString(string);
+            var result = [];
+            if (reLeadingDot.test(string)) {
+                result.push("");
+            }
+            string.replace(rePropName, function(match, number, quote, string) {
+                result.push(quote ? string.replace(reEscapeChar, "$1") : number || match);
+            });
+            return result;
+        });
+        function toKey(value) {
+            if (typeof value == "string" || isSymbol(value)) {
+                return value;
+            }
+            var result = value + "";
+            return result == "0" && 1 / value == -INFINITY ? "-0" : result;
+        }
+        function toSource(func) {
+            if (func != null) {
+                try {
+                    return funcToString.call(func);
+                } catch (e) {}
+                try {
+                    return func + "";
+                } catch (e) {}
+            }
+            return "";
+        }
+        function updateWrapDetails(details, bitmask) {
+            arrayEach(wrapFlags, function(pair) {
+                var value = "_." + pair[0];
+                if (bitmask & pair[1] && !arrayIncludes(details, value)) {
+                    details.push(value);
+                }
+            });
+            return details.sort();
+        }
+        function wrapperClone(wrapper) {
+            if (wrapper instanceof LazyWrapper) {
+                return wrapper.clone();
+            }
+            var result = new LodashWrapper(wrapper.__wrapped__, wrapper.__chain__);
+            result.__actions__ = copyArray(wrapper.__actions__);
+            result.__index__ = wrapper.__index__;
+            result.__values__ = wrapper.__values__;
+            return result;
+        }
+        function chunk(array, size, guard) {
+            if (guard ? isIterateeCall(array, size, guard) : size === undefined) {
+                size = 1;
+            } else {
+                size = nativeMax(toInteger(size), 0);
+            }
+            var length = array ? array.length : 0;
+            if (!length || size < 1) {
+                return [];
+            }
+            var index = 0, resIndex = 0, result = Array(nativeCeil(length / size));
+            while (index < length) {
+                result[resIndex++] = baseSlice(array, index, index += size);
+            }
+            return result;
+        }
+        function compact(array) {
+            var index = -1, length = array ? array.length : 0, resIndex = 0, result = [];
+            while (++index < length) {
+                var value = array[index];
+                if (value) {
+                    result[resIndex++] = value;
+                }
+            }
+            return result;
+        }
+        function concat() {
+            var length = arguments.length;
+            if (!length) {
+                return [];
+            }
+            var args = Array(length - 1), array = arguments[0], index = length;
+            while (index--) {
+                args[index - 1] = arguments[index];
+            }
+            return arrayPush(isArray(array) ? copyArray(array) : [ array ], baseFlatten(args, 1));
+        }
+        var difference = baseRest(function(array, values) {
+            return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true)) : [];
+        });
+        var differenceBy = baseRest(function(array, values) {
+            var iteratee = last(values);
+            if (isArrayLikeObject(iteratee)) {
+                iteratee = undefined;
+            }
+            return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true), getIteratee(iteratee, 2)) : [];
+        });
+        var differenceWith = baseRest(function(array, values) {
+            var comparator = last(values);
+            if (isArrayLikeObject(comparator)) {
+                comparator = undefined;
+            }
+            return isArrayLikeObject(array) ? baseDifference(array, baseFlatten(values, 1, isArrayLikeObject, true), undefined, comparator) : [];
+        });
+        function drop(array, n, guard) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            n = guard || n === undefined ? 1 : toInteger(n);
+            return baseSlice(array, n < 0 ? 0 : n, length);
+        }
+        function dropRight(array, n, guard) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            n = guard || n === undefined ? 1 : toInteger(n);
+            n = length - n;
+            return baseSlice(array, 0, n < 0 ? 0 : n);
+        }
+        function dropRightWhile(array, predicate) {
+            return array && array.length ? baseWhile(array, getIteratee(predicate, 3), true, true) : [];
+        }
+        function dropWhile(array, predicate) {
+            return array && array.length ? baseWhile(array, getIteratee(predicate, 3), true) : [];
+        }
+        function fill(array, value, start, end) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            if (start && typeof start != "number" && isIterateeCall(array, value, start)) {
+                start = 0;
+                end = length;
+            }
+            return baseFill(array, value, start, end);
+        }
+        function findIndex(array, predicate, fromIndex) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return -1;
+            }
+            var index = fromIndex == null ? 0 : toInteger(fromIndex);
+            if (index < 0) {
+                index = nativeMax(length + index, 0);
+            }
+            return baseFindIndex(array, getIteratee(predicate, 3), index);
+        }
+        function findLastIndex(array, predicate, fromIndex) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return -1;
+            }
+            var index = length - 1;
+            if (fromIndex !== undefined) {
+                index = toInteger(fromIndex);
+                index = fromIndex < 0 ? nativeMax(length + index, 0) : nativeMin(index, length - 1);
+            }
+            return baseFindIndex(array, getIteratee(predicate, 3), index, true);
+        }
+        function flatten(array) {
+            var length = array ? array.length : 0;
+            return length ? baseFlatten(array, 1) : [];
+        }
+        function flattenDeep(array) {
+            var length = array ? array.length : 0;
+            return length ? baseFlatten(array, INFINITY) : [];
+        }
+        function flattenDepth(array, depth) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            depth = depth === undefined ? 1 : toInteger(depth);
+            return baseFlatten(array, depth);
+        }
+        function fromPairs(pairs) {
+            var index = -1, length = pairs ? pairs.length : 0, result = {};
+            while (++index < length) {
+                var pair = pairs[index];
+                result[pair[0]] = pair[1];
+            }
+            return result;
+        }
+        function head(array) {
+            return array && array.length ? array[0] : undefined;
+        }
+        function indexOf(array, value, fromIndex) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return -1;
+            }
+            var index = fromIndex == null ? 0 : toInteger(fromIndex);
+            if (index < 0) {
+                index = nativeMax(length + index, 0);
+            }
+            return baseIndexOf(array, value, index);
+        }
+        function initial(array) {
+            var length = array ? array.length : 0;
+            return length ? baseSlice(array, 0, -1) : [];
+        }
+        var intersection = baseRest(function(arrays) {
+            var mapped = arrayMap(arrays, castArrayLikeObject);
+            return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped) : [];
+        });
+        var intersectionBy = baseRest(function(arrays) {
+            var iteratee = last(arrays), mapped = arrayMap(arrays, castArrayLikeObject);
+            if (iteratee === last(mapped)) {
+                iteratee = undefined;
+            } else {
+                mapped.pop();
+            }
+            return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped, getIteratee(iteratee, 2)) : [];
+        });
+        var intersectionWith = baseRest(function(arrays) {
+            var comparator = last(arrays), mapped = arrayMap(arrays, castArrayLikeObject);
+            if (comparator === last(mapped)) {
+                comparator = undefined;
+            } else {
+                mapped.pop();
+            }
+            return mapped.length && mapped[0] === arrays[0] ? baseIntersection(mapped, undefined, comparator) : [];
+        });
+        function join(array, separator) {
+            return array ? nativeJoin.call(array, separator) : "";
+        }
+        function last(array) {
+            var length = array ? array.length : 0;
+            return length ? array[length - 1] : undefined;
+        }
+        function lastIndexOf(array, value, fromIndex) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return -1;
+            }
+            var index = length;
+            if (fromIndex !== undefined) {
+                index = toInteger(fromIndex);
+                index = index < 0 ? nativeMax(length + index, 0) : nativeMin(index, length - 1);
+            }
+            return value === value ? strictLastIndexOf(array, value, index) : baseFindIndex(array, baseIsNaN, index, true);
+        }
+        function nth(array, n) {
+            return array && array.length ? baseNth(array, toInteger(n)) : undefined;
+        }
+        var pull = baseRest(pullAll);
+        function pullAll(array, values) {
+            return array && array.length && values && values.length ? basePullAll(array, values) : array;
+        }
+        function pullAllBy(array, values, iteratee) {
+            return array && array.length && values && values.length ? basePullAll(array, values, getIteratee(iteratee, 2)) : array;
+        }
+        function pullAllWith(array, values, comparator) {
+            return array && array.length && values && values.length ? basePullAll(array, values, undefined, comparator) : array;
+        }
+        var pullAt = flatRest(function(array, indexes) {
+            var length = array ? array.length : 0, result = baseAt(array, indexes);
+            basePullAt(array, arrayMap(indexes, function(index) {
+                return isIndex(index, length) ? +index : index;
+            }).sort(compareAscending));
+            return result;
+        });
+        function remove(array, predicate) {
+            var result = [];
+            if (!(array && array.length)) {
+                return result;
+            }
+            var index = -1, indexes = [], length = array.length;
+            predicate = getIteratee(predicate, 3);
+            while (++index < length) {
+                var value = array[index];
+                if (predicate(value, index, array)) {
+                    result.push(value);
+                    indexes.push(index);
+                }
+            }
+            basePullAt(array, indexes);
+            return result;
+        }
+        function reverse(array) {
+            return array ? nativeReverse.call(array) : array;
+        }
+        function slice(array, start, end) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            if (end && typeof end != "number" && isIterateeCall(array, start, end)) {
+                start = 0;
+                end = length;
+            } else {
+                start = start == null ? 0 : toInteger(start);
+                end = end === undefined ? length : toInteger(end);
+            }
+            return baseSlice(array, start, end);
+        }
+        function sortedIndex(array, value) {
+            return baseSortedIndex(array, value);
+        }
+        function sortedIndexBy(array, value, iteratee) {
+            return baseSortedIndexBy(array, value, getIteratee(iteratee, 2));
+        }
+        function sortedIndexOf(array, value) {
+            var length = array ? array.length : 0;
+            if (length) {
+                var index = baseSortedIndex(array, value);
+                if (index < length && eq(array[index], value)) {
+                    return index;
+                }
+            }
+            return -1;
+        }
+        function sortedLastIndex(array, value) {
+            return baseSortedIndex(array, value, true);
+        }
+        function sortedLastIndexBy(array, value, iteratee) {
+            return baseSortedIndexBy(array, value, getIteratee(iteratee, 2), true);
+        }
+        function sortedLastIndexOf(array, value) {
+            var length = array ? array.length : 0;
+            if (length) {
+                var index = baseSortedIndex(array, value, true) - 1;
+                if (eq(array[index], value)) {
+                    return index;
+                }
+            }
+            return -1;
+        }
+        function sortedUniq(array) {
+            return array && array.length ? baseSortedUniq(array) : [];
+        }
+        function sortedUniqBy(array, iteratee) {
+            return array && array.length ? baseSortedUniq(array, getIteratee(iteratee, 2)) : [];
+        }
+        function tail(array) {
+            var length = array ? array.length : 0;
+            return length ? baseSlice(array, 1, length) : [];
+        }
+        function take(array, n, guard) {
+            if (!(array && array.length)) {
+                return [];
+            }
+            n = guard || n === undefined ? 1 : toInteger(n);
+            return baseSlice(array, 0, n < 0 ? 0 : n);
+        }
+        function takeRight(array, n, guard) {
+            var length = array ? array.length : 0;
+            if (!length) {
+                return [];
+            }
+            n = guard || n === undefined ? 1 : toInteger(n);
+            n = length - n;
+            return baseSlice(array, n < 0 ? 0 : n, length);
+        }
+        function takeRightWhile(array, predicate) {
+            return array && array.length ? baseWhile(array, getIteratee(predicate, 3), false, true) : [];
+        }
+        function takeWhile(array, predicate) {
+            return array && array.length ? baseWhile(array, getIteratee(predicate, 3)) : [];
+        }
+        var union = baseRest(function(arrays) {
+            return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true));
+        });
+        var unionBy = baseRest(function(arrays) {
+            var iteratee = last(arrays);
+            if (isArrayLikeObject(iteratee)) {
+                iteratee = undefined;
+            }
+            return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true), getIteratee(iteratee, 2));
+        });
+        var unionWith = baseRest(function(arrays) {
+            var comparator = last(arrays);
+            if (isArrayLikeObject(comparator)) {
+                comparator = undefined;
+            }
+            return baseUniq(baseFlatten(arrays, 1, isArrayLikeObject, true), undefined, comparator);
+        });
+        function uniq(array) {
+            return array && array.length ? baseUniq(array) : [];
+        }
+        function uniqBy(array, iteratee) {
+            return array && array.length ? baseUniq(array, getIteratee(iteratee, 2)) : [];
+        }
+        function uniqWith(array, comparator) {
+            return array && array.length ? baseUniq(array, undefined, comparator) : [];
+        }
+        function unzip(array) {
+            if (!(array && array.length)) {
+                return [];
+            }
+            var length = 0;
+            array = arrayFilter(array, function(group) {
+                if (isArrayLikeObject(group)) {
+                    length = nativeMax(group.length, length);
+                    return true;
+                }
+            });
+            return baseTimes(length, function(index) {
+                return arrayMap(array, baseProperty(index));
+            });
+        }
+        function unzipWith(array, iteratee) {
+            if (!(array && array.length)) {
+                return [];
+            }
+            var result = unzip(array);
+            if (iteratee == null) {
+                return result;
+            }
+            return arrayMap(result, function(group) {
+                return apply(iteratee, undefined, group);
+            });
+        }
+        var without = baseRest(function(array, values) {
+            return isArrayLikeObject(array) ? baseDifference(array, values) : [];
+        });
+        var xor = baseRest(function(arrays) {
+            return baseXor(arrayFilter(arrays, isArrayLikeObject));
+        });
+        var xorBy = baseRest(function(arrays) {
+            var iteratee = last(arrays);
+            if (isArrayLikeObject(iteratee)) {
+                iteratee = undefined;
+            }
+            return baseXor(arrayFilter(arrays, isArrayLikeObject), getIteratee(iteratee, 2));
+        });
+        var xorWith = baseRest(function(arrays) {
+            var comparator = last(arrays);
+            if (isArrayLikeObject(comparator)) {
+                comparator = undefined;
+            }
+            return baseXor(arrayFilter(arrays, isArrayLikeObject), undefined, comparator);
+        });
+        var zip = baseRest(unzip);
+        function zipObject(props, values) {
+            return baseZipObject(props || [], values || [], assignValue);
+        }
+        function zipObjectDeep(props, values) {
+            return baseZipObject(props || [], values || [], baseSet);
+        }
+        var zipWith = baseRest(function(arrays) {
+            var length = arrays.length, iteratee = length > 1 ? arrays[length - 1] : undefined;
+            iteratee = typeof iteratee == "function" ? (arrays.pop(), iteratee) : undefined;
+            return unzipWith(arrays, iteratee);
+        });
+        function chain(value) {
+            var result = lodash(value);
+            result.__chain__ = true;
+            return result;
+        }
+        function tap(value, interceptor) {
+            interceptor(value);
+            return value;
+        }
+        function thru(value, interceptor) {
+            return interceptor(value);
+        }
+        var wrapperAt = flatRest(function(paths) {
+            var length = paths.length, start = length ? paths[0] : 0, value = this.__wrapped__, interceptor = function(object) {
+                return baseAt(object, paths);
+            };
+            if (length > 1 || this.__actions__.length || !(value instanceof LazyWrapper) || !isIndex(start)) {
+                return this.thru(interceptor);
+            }
+            value = value.slice(start, +start + (length ? 1 : 0));
+            value.__actions__.push({
+                func: thru,
+                args: [ interceptor ],
+                thisArg: undefined
+            });
+            return new LodashWrapper(value, this.__chain__).thru(function(array) {
+                if (length && !array.length) {
+                    array.push(undefined);
+                }
+                return array;
+            });
+        });
+        function wrapperChain() {
+            return chain(this);
+        }
+        function wrapperCommit() {
+            return new LodashWrapper(this.value(), this.__chain__);
+        }
+        function wrapperNext() {
+            if (this.__values__ === undefined) {
+                this.__values__ = toArray(this.value());
+            }
+            var done = this.__index__ >= this.__values__.length, value = done ? undefined : this.__values__[this.__index__++];
+            return {
+                done: done,
+                value: value
+            };
+        }
+        function wrapperToIterator() {
+            return this;
+        }
+        function wrapperPlant(value) {
+            var result, parent = this;
+            while (parent instanceof baseLodash) {
+                var clone = wrapperClone(parent);
+                clone.__index__ = 0;
+                clone.__values__ = undefined;
+                if (result) {
+                    previous.__wrapped__ = clone;
+                } else {
+                    result = clone;
+                }
+                var previous = clone;
+                parent = parent.__wrapped__;
+            }
+            previous.__wrapped__ = value;
+            return result;
+        }
+        function wrapperReverse() {
+            var value = this.__wrapped__;
+            if (value instanceof LazyWrapper) {
+                var wrapped = value;
+                if (this.__actions__.length) {
+                    wrapped = new LazyWrapper(this);
+                }
+                wrapped = wrapped.reverse();
+                wrapped.__actions__.push({
+                    func: thru,
+                    args: [ reverse ],
+                    thisArg: undefined
+                });
+                return new LodashWrapper(wrapped, this.__chain__);
+            }
+            return this.thru(reverse);
+        }
+        function wrapperValue() {
+            return baseWrapperValue(this.__wrapped__, this.__actions__);
+        }
+        var countBy = createAggregator(function(result, value, key) {
+            if (hasOwnProperty.call(result, key)) {
+                ++result[key];
+            } else {
+                baseAssignValue(result, key, 1);
+            }
+        });
+        function every(collection, predicate, guard) {
+            var func = isArray(collection) ? arrayEvery : baseEvery;
+            if (guard && isIterateeCall(collection, predicate, guard)) {
+                predicate = undefined;
+            }
+            return func(collection, getIteratee(predicate, 3));
+        }
+        function filter(collection, predicate) {
+            var func = isArray(collection) ? arrayFilter : baseFilter;
+            return func(collection, getIteratee(predicate, 3));
+        }
+        var find = createFind(findIndex);
+        var findLast = createFind(findLastIndex);
+        function flatMap(collection, iteratee) {
+            return baseFlatten(map(collection, iteratee), 1);
+        }
+        function flatMapDeep(collection, iteratee) {
+            return baseFlatten(map(collection, iteratee), INFINITY);
+        }
+        function flatMapDepth(collection, iteratee, depth) {
+            depth = depth === undefined ? 1 : toInteger(depth);
+            return baseFlatten(map(collection, iteratee), depth);
+        }
+        function forEach(collection, iteratee) {
+            var func = isArray(collection) ? arrayEach : baseEach;
+            return func(collection, getIteratee(iteratee, 3));
+        }
+        function forEachRight(collection, iteratee) {
+            var func = isArray(collection) ? arrayEachRight : baseEachRight;
+            return func(collection, getIteratee(iteratee, 3));
+        }
+        var groupBy = createAggregator(function(result, value, key) {
+            if (hasOwnProperty.call(result, key)) {
+                result[key].push(value);
+            } else {
+                baseAssignValue(result, key, [ value ]);
+            }
+        });
+        function includes(collection, value, fromIndex, guard) {
+            collection = isArrayLike(collection) ? collection : values(collection);
+            fromIndex = fromIndex && !guard ? toInteger(fromIndex) : 0;
+            var length = collection.length;
+            if (fromIndex < 0) {
+                fromIndex = nativeMax(length + fromIndex, 0);
+            }
+            return isString(collection) ? fromIndex <= length && collection.indexOf(value, fromIndex) > -1 : !!length && baseIndexOf(collection, value, fromIndex) > -1;
+        }
+        var invokeMap = baseRest(function(collection, path, args) {
+            var index = -1, isFunc = typeof path == "function", isProp = isKey(path), result = isArrayLike(collection) ? Array(collection.length) : [];
+            baseEach(collection, function(value) {
+                var func = isFunc ? path : isProp && value != null ? value[path] : undefined;
+                result[++index] = func ? apply(func, value, args) : baseInvoke(value, path, args);
+            });
+            return result;
+        });
+        var keyBy = createAggregator(function(result, value, key) {
+            baseAssignValue(result, key, value);
+        });
+        function map(collection, iteratee) {
+            var func = isArray(collection) ? arrayMap : baseMap;
+            return func(collection, getIteratee(iteratee, 3));
+        }
+        function orderBy(collection, iteratees, orders, guard) {
+            if (collection == null) {
+                return [];
+            }
+            if (!isArray(iteratees)) {
+                iteratees = iteratees == null ? [] : [ iteratees ];
+            }
+            orders = guard ? undefined : orders;
+            if (!isArray(orders)) {
+                orders = orders == null ? [] : [ orders ];
+            }
+            return baseOrderBy(collection, iteratees, orders);
+        }
+        var partition = createAggregator(function(result, value, key) {
+            result[key ? 0 : 1].push(value);
+        }, function() {
+            return [ [], [] ];
+        });
+        function reduce(collection, iteratee, accumulator) {
+            var func = isArray(collection) ? arrayReduce : baseReduce, initAccum = arguments.length < 3;
+            return func(collection, getIteratee(iteratee, 4), accumulator, initAccum, baseEach);
+        }
+        function reduceRight(collection, iteratee, accumulator) {
+            var func = isArray(collection) ? arrayReduceRight : baseReduce, initAccum = arguments.length < 3;
+            return func(collection, getIteratee(iteratee, 4), accumulator, initAccum, baseEachRight);
+        }
+        function reject(collection, predicate) {
+            var func = isArray(collection) ? arrayFilter : baseFilter;
+            return func(collection, negate(getIteratee(predicate, 3)));
+        }
+        function sample(collection) {
+            var func = isArray(collection) ? arraySample : baseSample;
+            return func(collection);
+        }
+        function sampleSize(collection, n, guard) {
+            if (guard ? isIterateeCall(collection, n, guard) : n === undefined) {
+                n = 1;
+            } else {
+                n = toInteger(n);
+            }
+            var func = isArray(collection) ? arraySampleSize : baseSampleSize;
+            return func(collection, n);
+        }
+        function shuffle(collection) {
+            var func = isArray(collection) ? arrayShuffle : baseShuffle;
+            return func(collection);
+        }
+        function size(collection) {
+            if (collection == null) {
+                return 0;
+            }
+            if (isArrayLike(collection)) {
+                return isString(collection) ? stringSize(collection) : collection.length;
+            }
+            var tag = getTag(collection);
+            if (tag == mapTag || tag == setTag) {
+                return collection.size;
+            }
+            return baseKeys(collection).length;
+        }
+        function some(collection, predicate, guard) {
+            var func = isArray(collection) ? arraySome : baseSome;
+            if (guard && isIterateeCall(collection, predicate, guard)) {
+                predicate = undefined;
+            }
+            return func(collection, getIteratee(predicate, 3));
+        }
+        var sortBy = baseRest(function(collection, iteratees) {
+            if (collection == null) {
+                return [];
+            }
+            var length = iteratees.length;
+            if (length > 1 && isIterateeCall(collection, iteratees[0], iteratees[1])) {
+                iteratees = [];
+            } else if (length > 2 && isIterateeCall(iteratees[0], iteratees[1], iteratees[2])) {
+                iteratees = [ iteratees[0] ];
+            }
+            return baseOrderBy(collection, baseFlatten(iteratees, 1), []);
+        });
+        var now = ctxNow || function() {
+            return root.Date.now();
+        };
+        function after(n, func) {
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            n = toInteger(n);
+            return function() {
+                if (--n < 1) {
+                    return func.apply(this, arguments);
+                }
+            };
+        }
+        function ary(func, n, guard) {
+            n = guard ? undefined : n;
+            n = func && n == null ? func.length : n;
+            return createWrap(func, ARY_FLAG, undefined, undefined, undefined, undefined, n);
+        }
+        function before(n, func) {
+            var result;
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            n = toInteger(n);
+            return function() {
+                if (--n > 0) {
+                    result = func.apply(this, arguments);
+                }
+                if (n <= 1) {
+                    func = undefined;
+                }
+                return result;
+            };
+        }
+        var bind = baseRest(function(func, thisArg, partials) {
+            var bitmask = BIND_FLAG;
+            if (partials.length) {
+                var holders = replaceHolders(partials, getHolder(bind));
+                bitmask |= PARTIAL_FLAG;
+            }
+            return createWrap(func, bitmask, thisArg, partials, holders);
+        });
+        var bindKey = baseRest(function(object, key, partials) {
+            var bitmask = BIND_FLAG | BIND_KEY_FLAG;
+            if (partials.length) {
+                var holders = replaceHolders(partials, getHolder(bindKey));
+                bitmask |= PARTIAL_FLAG;
+            }
+            return createWrap(key, bitmask, object, partials, holders);
+        });
+        function curry(func, arity, guard) {
+            arity = guard ? undefined : arity;
+            var result = createWrap(func, CURRY_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
+            result.placeholder = curry.placeholder;
+            return result;
+        }
+        function curryRight(func, arity, guard) {
+            arity = guard ? undefined : arity;
+            var result = createWrap(func, CURRY_RIGHT_FLAG, undefined, undefined, undefined, undefined, undefined, arity);
+            result.placeholder = curryRight.placeholder;
+            return result;
+        }
+        function debounce(func, wait, options) {
+            var lastArgs, lastThis, maxWait, result, timerId, lastCallTime, lastInvokeTime = 0, leading = false, maxing = false, trailing = true;
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            wait = toNumber(wait) || 0;
+            if (isObject(options)) {
+                leading = !!options.leading;
+                maxing = "maxWait" in options;
+                maxWait = maxing ? nativeMax(toNumber(options.maxWait) || 0, wait) : maxWait;
+                trailing = "trailing" in options ? !!options.trailing : trailing;
+            }
+            function invokeFunc(time) {
+                var args = lastArgs, thisArg = lastThis;
+                lastArgs = lastThis = undefined;
+                lastInvokeTime = time;
+                result = func.apply(thisArg, args);
+                return result;
+            }
+            function leadingEdge(time) {
+                lastInvokeTime = time;
+                timerId = setTimeout(timerExpired, wait);
+                return leading ? invokeFunc(time) : result;
+            }
+            function remainingWait(time) {
+                var timeSinceLastCall = time - lastCallTime, timeSinceLastInvoke = time - lastInvokeTime, result = wait - timeSinceLastCall;
+                return maxing ? nativeMin(result, maxWait - timeSinceLastInvoke) : result;
+            }
+            function shouldInvoke(time) {
+                var timeSinceLastCall = time - lastCallTime, timeSinceLastInvoke = time - lastInvokeTime;
+                return lastCallTime === undefined || timeSinceLastCall >= wait || timeSinceLastCall < 0 || maxing && timeSinceLastInvoke >= maxWait;
+            }
+            function timerExpired() {
+                var time = now();
+                if (shouldInvoke(time)) {
+                    return trailingEdge(time);
+                }
+                timerId = setTimeout(timerExpired, remainingWait(time));
+            }
+            function trailingEdge(time) {
+                timerId = undefined;
+                if (trailing && lastArgs) {
+                    return invokeFunc(time);
+                }
+                lastArgs = lastThis = undefined;
+                return result;
+            }
+            function cancel() {
+                if (timerId !== undefined) {
+                    clearTimeout(timerId);
+                }
+                lastInvokeTime = 0;
+                lastArgs = lastCallTime = lastThis = timerId = undefined;
+            }
+            function flush() {
+                return timerId === undefined ? result : trailingEdge(now());
+            }
+            function debounced() {
+                var time = now(), isInvoking = shouldInvoke(time);
+                lastArgs = arguments;
+                lastThis = this;
+                lastCallTime = time;
+                if (isInvoking) {
+                    if (timerId === undefined) {
+                        return leadingEdge(lastCallTime);
+                    }
+                    if (maxing) {
+                        timerId = setTimeout(timerExpired, wait);
+                        return invokeFunc(lastCallTime);
+                    }
+                }
+                if (timerId === undefined) {
+                    timerId = setTimeout(timerExpired, wait);
+                }
+                return result;
+            }
+            debounced.cancel = cancel;
+            debounced.flush = flush;
+            return debounced;
+        }
+        var defer = baseRest(function(func, args) {
+            return baseDelay(func, 1, args);
+        });
+        var delay = baseRest(function(func, wait, args) {
+            return baseDelay(func, toNumber(wait) || 0, args);
+        });
+        function flip(func) {
+            return createWrap(func, FLIP_FLAG);
+        }
+        function memoize(func, resolver) {
+            if (typeof func != "function" || resolver && typeof resolver != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            var memoized = function() {
+                var args = arguments, key = resolver ? resolver.apply(this, args) : args[0], cache = memoized.cache;
+                if (cache.has(key)) {
+                    return cache.get(key);
+                }
+                var result = func.apply(this, args);
+                memoized.cache = cache.set(key, result) || cache;
+                return result;
+            };
+            memoized.cache = new (memoize.Cache || MapCache)();
+            return memoized;
+        }
+        memoize.Cache = MapCache;
+        function negate(predicate) {
+            if (typeof predicate != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            return function() {
+                var args = arguments;
+                switch (args.length) {
+                  case 0:
+                    return !predicate.call(this);
+
+                  case 1:
+                    return !predicate.call(this, args[0]);
+
+                  case 2:
+                    return !predicate.call(this, args[0], args[1]);
+
+                  case 3:
+                    return !predicate.call(this, args[0], args[1], args[2]);
+                }
+                return !predicate.apply(this, args);
+            };
+        }
+        function once(func) {
+            return before(2, func);
+        }
+        var overArgs = castRest(function(func, transforms) {
+            transforms = transforms.length == 1 && isArray(transforms[0]) ? arrayMap(transforms[0], baseUnary(getIteratee())) : arrayMap(baseFlatten(transforms, 1), baseUnary(getIteratee()));
+            var funcsLength = transforms.length;
+            return baseRest(function(args) {
+                var index = -1, length = nativeMin(args.length, funcsLength);
+                while (++index < length) {
+                    args[index] = transforms[index].call(this, args[index]);
+                }
+                return apply(func, this, args);
+            });
+        });
+        var partial = baseRest(function(func, partials) {
+            var holders = replaceHolders(partials, getHolder(partial));
+            return createWrap(func, PARTIAL_FLAG, undefined, partials, holders);
+        });
+        var partialRight = baseRest(function(func, partials) {
+            var holders = replaceHolders(partials, getHolder(partialRight));
+            return createWrap(func, PARTIAL_RIGHT_FLAG, undefined, partials, holders);
+        });
+        var rearg = flatRest(function(func, indexes) {
+            return createWrap(func, REARG_FLAG, undefined, undefined, undefined, indexes);
+        });
+        function rest(func, start) {
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            start = start === undefined ? start : toInteger(start);
+            return baseRest(func, start);
+        }
+        function spread(func, start) {
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            start = start === undefined ? 0 : nativeMax(toInteger(start), 0);
+            return baseRest(function(args) {
+                var array = args[start], otherArgs = castSlice(args, 0, start);
+                if (array) {
+                    arrayPush(otherArgs, array);
+                }
+                return apply(func, this, otherArgs);
+            });
+        }
+        function throttle(func, wait, options) {
+            var leading = true, trailing = true;
+            if (typeof func != "function") {
+                throw new TypeError(FUNC_ERROR_TEXT);
+            }
+            if (isObject(options)) {
+                leading = "leading" in options ? !!options.leading : leading;
+                trailing = "trailing" in options ? !!options.trailing : trailing;
+            }
+            return debounce(func, wait, {
+                leading: leading,
+                maxWait: wait,
+                trailing: trailing
+            });
+        }
+        function unary(func) {
+            return ary(func, 1);
+        }
+        function wrap(value, wrapper) {
+            wrapper = wrapper == null ? identity : wrapper;
+            return partial(wrapper, value);
+        }
+        function castArray() {
+            if (!arguments.length) {
+                return [];
+            }
+            var value = arguments[0];
+            return isArray(value) ? value : [ value ];
+        }
+        function clone(value) {
+            return baseClone(value, false, true);
+        }
+        function cloneWith(value, customizer) {
+            return baseClone(value, false, true, customizer);
+        }
+        function cloneDeep(value) {
+            return baseClone(value, true, true);
+        }
+        function cloneDeepWith(value, customizer) {
+            return baseClone(value, true, true, customizer);
+        }
+        function conformsTo(object, source) {
+            return source == null || baseConformsTo(object, source, keys(source));
+        }
+        function eq(value, other) {
+            return value === other || value !== value && other !== other;
+        }
+        var gt = createRelationalOperation(baseGt);
+        var gte = createRelationalOperation(function(value, other) {
+            return value >= other;
+        });
+        var isArguments = baseIsArguments(function() {
+            return arguments;
+        }()) ? baseIsArguments : function(value) {
+            return isObjectLike(value) && hasOwnProperty.call(value, "callee") && !propertyIsEnumerable.call(value, "callee");
+        };
+        var isArray = Array.isArray;
+        var isArrayBuffer = nodeIsArrayBuffer ? baseUnary(nodeIsArrayBuffer) : baseIsArrayBuffer;
+        function isArrayLike(value) {
+            return value != null && isLength(value.length) && !isFunction(value);
+        }
+        function isArrayLikeObject(value) {
+            return isObjectLike(value) && isArrayLike(value);
+        }
+        function isBoolean(value) {
+            return value === true || value === false || isObjectLike(value) && objectToString.call(value) == boolTag;
+        }
+        var isBuffer = nativeIsBuffer || stubFalse;
+        var isDate = nodeIsDate ? baseUnary(nodeIsDate) : baseIsDate;
+        function isElement(value) {
+            return value != null && value.nodeType === 1 && isObjectLike(value) && !isPlainObject(value);
+        }
+        function isEmpty(value) {
+            if (isArrayLike(value) && (isArray(value) || typeof value == "string" || typeof value.splice == "function" || isBuffer(value) || isTypedArray(value) || isArguments(value))) {
+                return !value.length;
+            }
+            var tag = getTag(value);
+            if (tag == mapTag || tag == setTag) {
+                return !value.size;
+            }
+            if (isPrototype(value)) {
+                return !baseKeys(value).length;
+            }
+            for (var key in value) {
+                if (hasOwnProperty.call(value, key)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        function isEqual(value, other) {
+            return baseIsEqual(value, other);
+        }
+        function isEqualWith(value, other, customizer) {
+            customizer = typeof customizer == "function" ? customizer : undefined;
+            var result = customizer ? customizer(value, other) : undefined;
+            return result === undefined ? baseIsEqual(value, other, customizer) : !!result;
+        }
+        function isError(value) {
+            if (!isObjectLike(value)) {
+                return false;
+            }
+            return objectToString.call(value) == errorTag || typeof value.message == "string" && typeof value.name == "string";
+        }
+        function isFinite(value) {
+            return typeof value == "number" && nativeIsFinite(value);
+        }
+        function isFunction(value) {
+            var tag = isObject(value) ? objectToString.call(value) : "";
+            return tag == funcTag || tag == genTag || tag == proxyTag;
+        }
+        function isInteger(value) {
+            return typeof value == "number" && value == toInteger(value);
+        }
+        function isLength(value) {
+            return typeof value == "number" && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+        }
+        function isObject(value) {
+            var type = typeof value;
+            return value != null && (type == "object" || type == "function");
+        }
+        function isObjectLike(value) {
+            return value != null && typeof value == "object";
+        }
+        var isMap = nodeIsMap ? baseUnary(nodeIsMap) : baseIsMap;
+        function isMatch(object, source) {
+            return object === source || baseIsMatch(object, source, getMatchData(source));
+        }
+        function isMatchWith(object, source, customizer) {
+            customizer = typeof customizer == "function" ? customizer : undefined;
+            return baseIsMatch(object, source, getMatchData(source), customizer);
+        }
+        function isNaN(value) {
+            return isNumber(value) && value != +value;
+        }
+        function isNative(value) {
+            if (isMaskable(value)) {
+                throw new Error(CORE_ERROR_TEXT);
+            }
+            return baseIsNative(value);
+        }
+        function isNull(value) {
+            return value === null;
+        }
+        function isNil(value) {
+            return value == null;
+        }
+        function isNumber(value) {
+            return typeof value == "number" || isObjectLike(value) && objectToString.call(value) == numberTag;
+        }
+        function isPlainObject(value) {
+            if (!isObjectLike(value) || objectToString.call(value) != objectTag) {
+                return false;
+            }
+            var proto = getPrototype(value);
+            if (proto === null) {
+                return true;
+            }
+            var Ctor = hasOwnProperty.call(proto, "constructor") && proto.constructor;
+            return typeof Ctor == "function" && Ctor instanceof Ctor && funcToString.call(Ctor) == objectCtorString;
+        }
+        var isRegExp = nodeIsRegExp ? baseUnary(nodeIsRegExp) : baseIsRegExp;
+        function isSafeInteger(value) {
+            return isInteger(value) && value >= -MAX_SAFE_INTEGER && value <= MAX_SAFE_INTEGER;
+        }
+        var isSet = nodeIsSet ? baseUnary(nodeIsSet) : baseIsSet;
+        function isString(value) {
+            return typeof value == "string" || !isArray(value) && isObjectLike(value) && objectToString.call(value) == stringTag;
+        }
+        function isSymbol(value) {
+            return typeof value == "symbol" || isObjectLike(value) && objectToString.call(value) == symbolTag;
+        }
+        var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
+        function isUndefined(value) {
+            return value === undefined;
+        }
+        function isWeakMap(value) {
+            return isObjectLike(value) && getTag(value) == weakMapTag;
+        }
+        function isWeakSet(value) {
+            return isObjectLike(value) && objectToString.call(value) == weakSetTag;
+        }
+        var lt = createRelationalOperation(baseLt);
+        var lte = createRelationalOperation(function(value, other) {
+            return value <= other;
+        });
+        function toArray(value) {
+            if (!value) {
+                return [];
+            }
+            if (isArrayLike(value)) {
+                return isString(value) ? stringToArray(value) : copyArray(value);
+            }
+            if (iteratorSymbol && value[iteratorSymbol]) {
+                return iteratorToArray(value[iteratorSymbol]());
+            }
+            var tag = getTag(value), func = tag == mapTag ? mapToArray : tag == setTag ? setToArray : values;
+            return func(value);
+        }
+        function toFinite(value) {
+            if (!value) {
+                return value === 0 ? value : 0;
+            }
+            value = toNumber(value);
+            if (value === INFINITY || value === -INFINITY) {
+                var sign = value < 0 ? -1 : 1;
+                return sign * MAX_INTEGER;
+            }
+            return value === value ? value : 0;
+        }
+        function toInteger(value) {
+            var result = toFinite(value), remainder = result % 1;
+            return result === result ? remainder ? result - remainder : result : 0;
+        }
+        function toLength(value) {
+            return value ? baseClamp(toInteger(value), 0, MAX_ARRAY_LENGTH) : 0;
+        }
+        function toNumber(value) {
+            if (typeof value == "number") {
+                return value;
+            }
+            if (isSymbol(value)) {
+                return NAN;
+            }
+            if (isObject(value)) {
+                var other = typeof value.valueOf == "function" ? value.valueOf() : value;
+                value = isObject(other) ? other + "" : other;
+            }
+            if (typeof value != "string") {
+                return value === 0 ? value : +value;
+            }
+            value = value.replace(reTrim, "");
+            var isBinary = reIsBinary.test(value);
+            return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
+        }
+        function toPlainObject(value) {
+            return copyObject(value, keysIn(value));
+        }
+        function toSafeInteger(value) {
+            return baseClamp(toInteger(value), -MAX_SAFE_INTEGER, MAX_SAFE_INTEGER);
+        }
+        function toString(value) {
+            return value == null ? "" : baseToString(value);
+        }
+        var assign = createAssigner(function(object, source) {
+            if (isPrototype(source) || isArrayLike(source)) {
+                copyObject(source, keys(source), object);
+                return;
+            }
+            for (var key in source) {
+                if (hasOwnProperty.call(source, key)) {
+                    assignValue(object, key, source[key]);
+                }
+            }
+        });
+        var assignIn = createAssigner(function(object, source) {
+            copyObject(source, keysIn(source), object);
+        });
+        var assignInWith = createAssigner(function(object, source, srcIndex, customizer) {
+            copyObject(source, keysIn(source), object, customizer);
+        });
+        var assignWith = createAssigner(function(object, source, srcIndex, customizer) {
+            copyObject(source, keys(source), object, customizer);
+        });
+        var at = flatRest(baseAt);
+        function create(prototype, properties) {
+            var result = baseCreate(prototype);
+            return properties ? baseAssign(result, properties) : result;
+        }
+        var defaults = baseRest(function(args) {
+            args.push(undefined, assignInDefaults);
+            return apply(assignInWith, undefined, args);
+        });
+        var defaultsDeep = baseRest(function(args) {
+            args.push(undefined, mergeDefaults);
+            return apply(mergeWith, undefined, args);
+        });
+        function findKey(object, predicate) {
+            return baseFindKey(object, getIteratee(predicate, 3), baseForOwn);
+        }
+        function findLastKey(object, predicate) {
+            return baseFindKey(object, getIteratee(predicate, 3), baseForOwnRight);
+        }
+        function forIn(object, iteratee) {
+            return object == null ? object : baseFor(object, getIteratee(iteratee, 3), keysIn);
+        }
+        function forInRight(object, iteratee) {
+            return object == null ? object : baseForRight(object, getIteratee(iteratee, 3), keysIn);
+        }
+        function forOwn(object, iteratee) {
+            return object && baseForOwn(object, getIteratee(iteratee, 3));
+        }
+        function forOwnRight(object, iteratee) {
+            return object && baseForOwnRight(object, getIteratee(iteratee, 3));
+        }
+        function functions(object) {
+            return object == null ? [] : baseFunctions(object, keys(object));
+        }
+        function functionsIn(object) {
+            return object == null ? [] : baseFunctions(object, keysIn(object));
+        }
+        function get(object, path, defaultValue) {
+            var result = object == null ? undefined : baseGet(object, path);
+            return result === undefined ? defaultValue : result;
+        }
+        function has(object, path) {
+            return object != null && hasPath(object, path, baseHas);
+        }
+        function hasIn(object, path) {
+            return object != null && hasPath(object, path, baseHasIn);
+        }
+        var invert = createInverter(function(result, value, key) {
+            result[value] = key;
+        }, constant(identity));
+        var invertBy = createInverter(function(result, value, key) {
+            if (hasOwnProperty.call(result, value)) {
+                result[value].push(key);
+            } else {
+                result[value] = [ key ];
+            }
+        }, getIteratee);
+        var invoke = baseRest(baseInvoke);
+        function keys(object) {
+            return isArrayLike(object) ? arrayLikeKeys(object) : baseKeys(object);
+        }
+        function keysIn(object) {
+            return isArrayLike(object) ? arrayLikeKeys(object, true) : baseKeysIn(object);
+        }
+        function mapKeys(object, iteratee) {
+            var result = {};
+            iteratee = getIteratee(iteratee, 3);
+            baseForOwn(object, function(value, key, object) {
+                baseAssignValue(result, iteratee(value, key, object), value);
+            });
+            return result;
+        }
+        function mapValues(object, iteratee) {
+            var result = {};
+            iteratee = getIteratee(iteratee, 3);
+            baseForOwn(object, function(value, key, object) {
+                baseAssignValue(result, key, iteratee(value, key, object));
+            });
+            return result;
+        }
+        var merge = createAssigner(function(object, source, srcIndex) {
+            baseMerge(object, source, srcIndex);
+        });
+        var mergeWith = createAssigner(function(object, source, srcIndex, customizer) {
+            baseMerge(object, source, srcIndex, customizer);
+        });
+        var omit = flatRest(function(object, props) {
+            if (object == null) {
+                return {};
+            }
+            props = arrayMap(props, toKey);
+            return basePick(object, baseDifference(getAllKeysIn(object), props));
+        });
+        function omitBy(object, predicate) {
+            return pickBy(object, negate(getIteratee(predicate)));
+        }
+        var pick = flatRest(function(object, props) {
+            return object == null ? {} : basePick(object, arrayMap(props, toKey));
+        });
+        function pickBy(object, predicate) {
+            return object == null ? {} : basePickBy(object, getAllKeysIn(object), getIteratee(predicate));
+        }
+        function result(object, path, defaultValue) {
+            path = isKey(path, object) ? [ path ] : castPath(path);
+            var index = -1, length = path.length;
+            if (!length) {
+                object = undefined;
+                length = 1;
+            }
+            while (++index < length) {
+                var value = object == null ? undefined : object[toKey(path[index])];
+                if (value === undefined) {
+                    index = length;
+                    value = defaultValue;
+                }
+                object = isFunction(value) ? value.call(object) : value;
+            }
+            return object;
+        }
+        function set(object, path, value) {
+            return object == null ? object : baseSet(object, path, value);
+        }
+        function setWith(object, path, value, customizer) {
+            customizer = typeof customizer == "function" ? customizer : undefined;
+            return object == null ? object : baseSet(object, path, value, customizer);
+        }
+        var toPairs = createToPairs(keys);
+        var toPairsIn = createToPairs(keysIn);
+        function transform(object, iteratee, accumulator) {
+            var isArr = isArray(object), isArrLike = isArr || isBuffer(object) || isTypedArray(object);
+            iteratee = getIteratee(iteratee, 4);
+            if (accumulator == null) {
+                var Ctor = object && object.constructor;
+                if (isArrLike) {
+                    accumulator = isArr ? new Ctor() : [];
+                } else if (isObject(object)) {
+                    accumulator = isFunction(Ctor) ? baseCreate(getPrototype(object)) : {};
+                } else {
+                    accumulator = {};
+                }
+            }
+            (isArrLike ? arrayEach : baseForOwn)(object, function(value, index, object) {
+                return iteratee(accumulator, value, index, object);
+            });
+            return accumulator;
+        }
+        function unset(object, path) {
+            return object == null ? true : baseUnset(object, path);
+        }
+        function update(object, path, updater) {
+            return object == null ? object : baseUpdate(object, path, castFunction(updater));
+        }
+        function updateWith(object, path, updater, customizer) {
+            customizer = typeof customizer == "function" ? customizer : undefined;
+            return object == null ? object : baseUpdate(object, path, castFunction(updater), customizer);
+        }
+        function values(object) {
+            return object ? baseValues(object, keys(object)) : [];
+        }
+        function valuesIn(object) {
+            return object == null ? [] : baseValues(object, keysIn(object));
+        }
+        function clamp(number, lower, upper) {
+            if (upper === undefined) {
+                upper = lower;
+                lower = undefined;
+            }
+            if (upper !== undefined) {
+                upper = toNumber(upper);
+                upper = upper === upper ? upper : 0;
+            }
+            if (lower !== undefined) {
+                lower = toNumber(lower);
+                lower = lower === lower ? lower : 0;
+            }
+            return baseClamp(toNumber(number), lower, upper);
+        }
+        function inRange(number, start, end) {
+            start = toFinite(start);
+            if (end === undefined) {
+                end = start;
+                start = 0;
+            } else {
+                end = toFinite(end);
+            }
+            number = toNumber(number);
+            return baseInRange(number, start, end);
+        }
+        function random(lower, upper, floating) {
+            if (floating && typeof floating != "boolean" && isIterateeCall(lower, upper, floating)) {
+                upper = floating = undefined;
+            }
+            if (floating === undefined) {
+                if (typeof upper == "boolean") {
+                    floating = upper;
+                    upper = undefined;
+                } else if (typeof lower == "boolean") {
+                    floating = lower;
+                    lower = undefined;
+                }
+            }
+            if (lower === undefined && upper === undefined) {
+                lower = 0;
+                upper = 1;
+            } else {
+                lower = toFinite(lower);
+                if (upper === undefined) {
+                    upper = lower;
+                    lower = 0;
+                } else {
+                    upper = toFinite(upper);
+                }
+            }
+            if (lower > upper) {
+                var temp = lower;
+                lower = upper;
+                upper = temp;
+            }
+            if (floating || lower % 1 || upper % 1) {
+                var rand = nativeRandom();
+                return nativeMin(lower + rand * (upper - lower + freeParseFloat("1e-" + ((rand + "").length - 1))), upper);
+            }
+            return baseRandom(lower, upper);
+        }
+        var camelCase = createCompounder(function(result, word, index) {
+            word = word.toLowerCase();
+            return result + (index ? capitalize(word) : word);
+        });
+        function capitalize(string) {
+            return upperFirst(toString(string).toLowerCase());
+        }
+        function deburr(string) {
+            string = toString(string);
+            return string && string.replace(reLatin, deburrLetter).replace(reComboMark, "");
+        }
+        function endsWith(string, target, position) {
+            string = toString(string);
+            target = baseToString(target);
+            var length = string.length;
+            position = position === undefined ? length : baseClamp(toInteger(position), 0, length);
+            var end = position;
+            position -= target.length;
+            return position >= 0 && string.slice(position, end) == target;
+        }
+        function escape(string) {
+            string = toString(string);
+            return string && reHasUnescapedHtml.test(string) ? string.replace(reUnescapedHtml, escapeHtmlChar) : string;
+        }
+        function escapeRegExp(string) {
+            string = toString(string);
+            return string && reHasRegExpChar.test(string) ? string.replace(reRegExpChar, "\\$&") : string;
+        }
+        var kebabCase = createCompounder(function(result, word, index) {
+            return result + (index ? "-" : "") + word.toLowerCase();
+        });
+        var lowerCase = createCompounder(function(result, word, index) {
+            return result + (index ? " " : "") + word.toLowerCase();
+        });
+        var lowerFirst = createCaseFirst("toLowerCase");
+        function pad(string, length, chars) {
+            string = toString(string);
+            length = toInteger(length);
+            var strLength = length ? stringSize(string) : 0;
+            if (!length || strLength >= length) {
+                return string;
+            }
+            var mid = (length - strLength) / 2;
+            return createPadding(nativeFloor(mid), chars) + string + createPadding(nativeCeil(mid), chars);
+        }
+        function padEnd(string, length, chars) {
+            string = toString(string);
+            length = toInteger(length);
+            var strLength = length ? stringSize(string) : 0;
+            return length && strLength < length ? string + createPadding(length - strLength, chars) : string;
+        }
+        function padStart(string, length, chars) {
+            string = toString(string);
+            length = toInteger(length);
+            var strLength = length ? stringSize(string) : 0;
+            return length && strLength < length ? createPadding(length - strLength, chars) + string : string;
+        }
+        function parseInt(string, radix, guard) {
+            if (guard || radix == null) {
+                radix = 0;
+            } else if (radix) {
+                radix = +radix;
+            }
+            return nativeParseInt(toString(string).replace(reTrimStart, ""), radix || 0);
+        }
+        function repeat(string, n, guard) {
+            if (guard ? isIterateeCall(string, n, guard) : n === undefined) {
+                n = 1;
+            } else {
+                n = toInteger(n);
+            }
+            return baseRepeat(toString(string), n);
+        }
+        function replace() {
+            var args = arguments, string = toString(args[0]);
+            return args.length < 3 ? string : string.replace(args[1], args[2]);
+        }
+        var snakeCase = createCompounder(function(result, word, index) {
+            return result + (index ? "_" : "") + word.toLowerCase();
+        });
+        function split(string, separator, limit) {
+            if (limit && typeof limit != "number" && isIterateeCall(string, separator, limit)) {
+                separator = limit = undefined;
+            }
+            limit = limit === undefined ? MAX_ARRAY_LENGTH : limit >>> 0;
+            if (!limit) {
+                return [];
+            }
+            string = toString(string);
+            if (string && (typeof separator == "string" || separator != null && !isRegExp(separator))) {
+                separator = baseToString(separator);
+                if (!separator && hasUnicode(string)) {
+                    return castSlice(stringToArray(string), 0, limit);
+                }
+            }
+            return string.split(separator, limit);
+        }
+        var startCase = createCompounder(function(result, word, index) {
+            return result + (index ? " " : "") + upperFirst(word);
+        });
+        function startsWith(string, target, position) {
+            string = toString(string);
+            position = baseClamp(toInteger(position), 0, string.length);
+            target = baseToString(target);
+            return string.slice(position, position + target.length) == target;
+        }
+        function template(string, options, guard) {
+            var settings = lodash.templateSettings;
+            if (guard && isIterateeCall(string, options, guard)) {
+                options = undefined;
+            }
+            string = toString(string);
+            options = assignInWith({}, options, settings, assignInDefaults);
+            var imports = assignInWith({}, options.imports, settings.imports, assignInDefaults), importsKeys = keys(imports), importsValues = baseValues(imports, importsKeys);
+            var isEscaping, isEvaluating, index = 0, interpolate = options.interpolate || reNoMatch, source = "__p += '";
+            var reDelimiters = RegExp((options.escape || reNoMatch).source + "|" + interpolate.source + "|" + (interpolate === reInterpolate ? reEsTemplate : reNoMatch).source + "|" + (options.evaluate || reNoMatch).source + "|$", "g");
+            var sourceURL = "//# sourceURL=" + ("sourceURL" in options ? options.sourceURL : "lodash.templateSources[" + ++templateCounter + "]") + "\n";
+            string.replace(reDelimiters, function(match, escapeValue, interpolateValue, esTemplateValue, evaluateValue, offset) {
+                interpolateValue || (interpolateValue = esTemplateValue);
+                source += string.slice(index, offset).replace(reUnescapedString, escapeStringChar);
+                if (escapeValue) {
+                    isEscaping = true;
+                    source += "' +\n__e(" + escapeValue + ") +\n'";
+                }
+                if (evaluateValue) {
+                    isEvaluating = true;
+                    source += "';\n" + evaluateValue + ";\n__p += '";
+                }
+                if (interpolateValue) {
+                    source += "' +\n((__t = (" + interpolateValue + ")) == null ? '' : __t) +\n'";
+                }
+                index = offset + match.length;
+                return match;
+            });
+            source += "';\n";
+            var variable = options.variable;
+            if (!variable) {
+                source = "with (obj) {\n" + source + "\n}\n";
+            }
+            source = (isEvaluating ? source.replace(reEmptyStringLeading, "") : source).replace(reEmptyStringMiddle, "$1").replace(reEmptyStringTrailing, "$1;");
+            source = "function(" + (variable || "obj") + ") {\n" + (variable ? "" : "obj || (obj = {});\n") + "var __t, __p = ''" + (isEscaping ? ", __e = _.escape" : "") + (isEvaluating ? ", __j = Array.prototype.join;\n" + "function print() { __p += __j.call(arguments, '') }\n" : ";\n") + source + "return __p\n}";
+            var result = attempt(function() {
+                return Function(importsKeys, sourceURL + "return " + source).apply(undefined, importsValues);
+            });
+            result.source = source;
+            if (isError(result)) {
+                throw result;
+            }
+            return result;
+        }
+        function toLower(value) {
+            return toString(value).toLowerCase();
+        }
+        function toUpper(value) {
+            return toString(value).toUpperCase();
+        }
+        function trim(string, chars, guard) {
+            string = toString(string);
+            if (string && (guard || chars === undefined)) {
+                return string.replace(reTrim, "");
+            }
+            if (!string || !(chars = baseToString(chars))) {
+                return string;
+            }
+            var strSymbols = stringToArray(string), chrSymbols = stringToArray(chars), start = charsStartIndex(strSymbols, chrSymbols), end = charsEndIndex(strSymbols, chrSymbols) + 1;
+            return castSlice(strSymbols, start, end).join("");
+        }
+        function trimEnd(string, chars, guard) {
+            string = toString(string);
+            if (string && (guard || chars === undefined)) {
+                return string.replace(reTrimEnd, "");
+            }
+            if (!string || !(chars = baseToString(chars))) {
+                return string;
+            }
+            var strSymbols = stringToArray(string), end = charsEndIndex(strSymbols, stringToArray(chars)) + 1;
+            return castSlice(strSymbols, 0, end).join("");
+        }
+        function trimStart(string, chars, guard) {
+            string = toString(string);
+            if (string && (guard || chars === undefined)) {
+                return string.replace(reTrimStart, "");
+            }
+            if (!string || !(chars = baseToString(chars))) {
+                return string;
+            }
+            var strSymbols = stringToArray(string), start = charsStartIndex(strSymbols, stringToArray(chars));
+            return castSlice(strSymbols, start).join("");
+        }
+        function truncate(string, options) {
+            var length = DEFAULT_TRUNC_LENGTH, omission = DEFAULT_TRUNC_OMISSION;
+            if (isObject(options)) {
+                var separator = "separator" in options ? options.separator : separator;
+                length = "length" in options ? toInteger(options.length) : length;
+                omission = "omission" in options ? baseToString(options.omission) : omission;
+            }
+            string = toString(string);
+            var strLength = string.length;
+            if (hasUnicode(string)) {
+                var strSymbols = stringToArray(string);
+                strLength = strSymbols.length;
+            }
+            if (length >= strLength) {
+                return string;
+            }
+            var end = length - stringSize(omission);
+            if (end < 1) {
+                return omission;
+            }
+            var result = strSymbols ? castSlice(strSymbols, 0, end).join("") : string.slice(0, end);
+            if (separator === undefined) {
+                return result + omission;
+            }
+            if (strSymbols) {
+                end += result.length - end;
+            }
+            if (isRegExp(separator)) {
+                if (string.slice(end).search(separator)) {
+                    var match, substring = result;
+                    if (!separator.global) {
+                        separator = RegExp(separator.source, toString(reFlags.exec(separator)) + "g");
+                    }
+                    separator.lastIndex = 0;
+                    while (match = separator.exec(substring)) {
+                        var newEnd = match.index;
+                    }
+                    result = result.slice(0, newEnd === undefined ? end : newEnd);
+                }
+            } else if (string.indexOf(baseToString(separator), end) != end) {
+                var index = result.lastIndexOf(separator);
+                if (index > -1) {
+                    result = result.slice(0, index);
+                }
+            }
+            return result + omission;
+        }
+        function unescape(string) {
+            string = toString(string);
+            return string && reHasEscapedHtml.test(string) ? string.replace(reEscapedHtml, unescapeHtmlChar) : string;
+        }
+        var upperCase = createCompounder(function(result, word, index) {
+            return result + (index ? " " : "") + word.toUpperCase();
+        });
+        var upperFirst = createCaseFirst("toUpperCase");
+        function words(string, pattern, guard) {
+            string = toString(string);
+            pattern = guard ? undefined : pattern;
+            if (pattern === undefined) {
+                return hasUnicodeWord(string) ? unicodeWords(string) : asciiWords(string);
+            }
+            return string.match(pattern) || [];
+        }
+        var attempt = baseRest(function(func, args) {
+            try {
+                return apply(func, undefined, args);
+            } catch (e) {
+                return isError(e) ? e : new Error(e);
+            }
+        });
+        var bindAll = flatRest(function(object, methodNames) {
+            arrayEach(methodNames, function(key) {
+                key = toKey(key);
+                baseAssignValue(object, key, bind(object[key], object));
+            });
+            return object;
+        });
+        function cond(pairs) {
+            var length = pairs ? pairs.length : 0, toIteratee = getIteratee();
+            pairs = !length ? [] : arrayMap(pairs, function(pair) {
+                if (typeof pair[1] != "function") {
+                    throw new TypeError(FUNC_ERROR_TEXT);
+                }
+                return [ toIteratee(pair[0]), pair[1] ];
+            });
+            return baseRest(function(args) {
+                var index = -1;
+                while (++index < length) {
+                    var pair = pairs[index];
+                    if (apply(pair[0], this, args)) {
+                        return apply(pair[1], this, args);
+                    }
                 }
             });
         }
-    };
-    /*
-   *  A public method to test if a user is logged in - does not guarantee that the token is still valid,
-   *  but rather that one exists
-   *
-   *  @method isLoggedIn
-   *  @public
-   *  @return {boolean} Returns true the user is logged in (has token and uuid), false if not
-   */
-    Usergrid.Client.prototype.isLoggedIn = function() {
-        var token = this.getToken();
-        return "undefined" !== typeof token && token !== null;
-    };
-    /*
-   *  A public method to log out an app user - clears all user fields from client
-   *
-   *  @method logout
-   *  @public
-   *  @return none
-   */
-    Usergrid.Client.prototype.logout = function() {
-        this.setToken();
-    };
-    /*
-   *  A public method to destroy access tokens on the server
-   *
-   *  @method logout
-   *  @public
-   *  @param {string} username	the user associated with the token to revoke
-   *  @param {string} token set to 'null' to revoke the token of the currently logged in user
-   *    or set to token value to revoke a specific token
-   *  @param {string} revokeAll set to 'true' to revoke all tokens for the user
-   *  @return none
-   */
-    Usergrid.Client.prototype.destroyToken = function(username, token, revokeAll, callback) {
-        var options = {
-            client: self,
-            method: "PUT"
-        };
-        if (revokeAll === true) {
-            options.endpoint = "users/" + username + "/revoketokens";
-        } else if (token === null) {
-            options.endpoint = "users/" + username + "/revoketoken?token=" + this.getToken();
-        } else {
-            options.endpoint = "users/" + username + "/revoketoken?token=" + token;
+        function conforms(source) {
+            return baseConforms(baseClone(source, true));
         }
-        this.request(options, function(err, data) {
-            if (err) {
-                if (self.logging) {
-                    console.log("error destroying access token");
+        function constant(value) {
+            return function() {
+                return value;
+            };
+        }
+        function defaultTo(value, defaultValue) {
+            return value == null || value !== value ? defaultValue : value;
+        }
+        var flow = createFlow();
+        var flowRight = createFlow(true);
+        function identity(value) {
+            return value;
+        }
+        function iteratee(func) {
+            return baseIteratee(typeof func == "function" ? func : baseClone(func, true));
+        }
+        function matches(source) {
+            return baseMatches(baseClone(source, true));
+        }
+        function matchesProperty(path, srcValue) {
+            return baseMatchesProperty(path, baseClone(srcValue, true));
+        }
+        var method = baseRest(function(path, args) {
+            return function(object) {
+                return baseInvoke(object, path, args);
+            };
+        });
+        var methodOf = baseRest(function(object, args) {
+            return function(path) {
+                return baseInvoke(object, path, args);
+            };
+        });
+        function mixin(object, source, options) {
+            var props = keys(source), methodNames = baseFunctions(source, props);
+            if (options == null && !(isObject(source) && (methodNames.length || !props.length))) {
+                options = source;
+                source = object;
+                object = this;
+                methodNames = baseFunctions(source, keys(source));
+            }
+            var chain = !(isObject(options) && "chain" in options) || !!options.chain, isFunc = isFunction(object);
+            arrayEach(methodNames, function(methodName) {
+                var func = source[methodName];
+                object[methodName] = func;
+                if (isFunc) {
+                    object.prototype[methodName] = function() {
+                        var chainAll = this.__chain__;
+                        if (chain || chainAll) {
+                            var result = object(this.__wrapped__), actions = result.__actions__ = copyArray(this.__actions__);
+                            actions.push({
+                                func: func,
+                                args: arguments,
+                                thisArg: object
+                            });
+                            result.__chain__ = chainAll;
+                            return result;
+                        }
+                        return func.apply(object, arrayPush([ this.value() ], arguments));
+                    };
                 }
-                doCallback(callback, [ err, data, null ], self);
-            } else {
-                if (revokeAll === true) {
-                    console.log("all user tokens invalidated");
+            });
+            return object;
+        }
+        function noConflict() {
+            if (root._ === this) {
+                root._ = oldDash;
+            }
+            return this;
+        }
+        function noop() {}
+        function nthArg(n) {
+            n = toInteger(n);
+            return baseRest(function(args) {
+                return baseNth(args, n);
+            });
+        }
+        var over = createOver(arrayMap);
+        var overEvery = createOver(arrayEvery);
+        var overSome = createOver(arraySome);
+        function property(path) {
+            return isKey(path) ? baseProperty(toKey(path)) : basePropertyDeep(path);
+        }
+        function propertyOf(object) {
+            return function(path) {
+                return object == null ? undefined : baseGet(object, path);
+            };
+        }
+        var range = createRange();
+        var rangeRight = createRange(true);
+        function stubArray() {
+            return [];
+        }
+        function stubFalse() {
+            return false;
+        }
+        function stubObject() {
+            return {};
+        }
+        function stubString() {
+            return "";
+        }
+        function stubTrue() {
+            return true;
+        }
+        function times(n, iteratee) {
+            n = toInteger(n);
+            if (n < 1 || n > MAX_SAFE_INTEGER) {
+                return [];
+            }
+            var index = MAX_ARRAY_LENGTH, length = nativeMin(n, MAX_ARRAY_LENGTH);
+            iteratee = getIteratee(iteratee);
+            n -= MAX_ARRAY_LENGTH;
+            var result = baseTimes(length, iteratee);
+            while (++index < n) {
+                iteratee(index);
+            }
+            return result;
+        }
+        function toPath(value) {
+            if (isArray(value)) {
+                return arrayMap(value, toKey);
+            }
+            return isSymbol(value) ? [ value ] : copyArray(stringToPath(value));
+        }
+        function uniqueId(prefix) {
+            var id = ++idCounter;
+            return toString(prefix) + id;
+        }
+        var add = createMathOperation(function(augend, addend) {
+            return augend + addend;
+        }, 0);
+        var ceil = createRound("ceil");
+        var divide = createMathOperation(function(dividend, divisor) {
+            return dividend / divisor;
+        }, 1);
+        var floor = createRound("floor");
+        function max(array) {
+            return array && array.length ? baseExtremum(array, identity, baseGt) : undefined;
+        }
+        function maxBy(array, iteratee) {
+            return array && array.length ? baseExtremum(array, getIteratee(iteratee, 2), baseGt) : undefined;
+        }
+        function mean(array) {
+            return baseMean(array, identity);
+        }
+        function meanBy(array, iteratee) {
+            return baseMean(array, getIteratee(iteratee, 2));
+        }
+        function min(array) {
+            return array && array.length ? baseExtremum(array, identity, baseLt) : undefined;
+        }
+        function minBy(array, iteratee) {
+            return array && array.length ? baseExtremum(array, getIteratee(iteratee, 2), baseLt) : undefined;
+        }
+        var multiply = createMathOperation(function(multiplier, multiplicand) {
+            return multiplier * multiplicand;
+        }, 1);
+        var round = createRound("round");
+        var subtract = createMathOperation(function(minuend, subtrahend) {
+            return minuend - subtrahend;
+        }, 0);
+        function sum(array) {
+            return array && array.length ? baseSum(array, identity) : 0;
+        }
+        function sumBy(array, iteratee) {
+            return array && array.length ? baseSum(array, getIteratee(iteratee, 2)) : 0;
+        }
+        lodash.after = after;
+        lodash.ary = ary;
+        lodash.assign = assign;
+        lodash.assignIn = assignIn;
+        lodash.assignInWith = assignInWith;
+        lodash.assignWith = assignWith;
+        lodash.at = at;
+        lodash.before = before;
+        lodash.bind = bind;
+        lodash.bindAll = bindAll;
+        lodash.bindKey = bindKey;
+        lodash.castArray = castArray;
+        lodash.chain = chain;
+        lodash.chunk = chunk;
+        lodash.compact = compact;
+        lodash.concat = concat;
+        lodash.cond = cond;
+        lodash.conforms = conforms;
+        lodash.constant = constant;
+        lodash.countBy = countBy;
+        lodash.create = create;
+        lodash.curry = curry;
+        lodash.curryRight = curryRight;
+        lodash.debounce = debounce;
+        lodash.defaults = defaults;
+        lodash.defaultsDeep = defaultsDeep;
+        lodash.defer = defer;
+        lodash.delay = delay;
+        lodash.difference = difference;
+        lodash.differenceBy = differenceBy;
+        lodash.differenceWith = differenceWith;
+        lodash.drop = drop;
+        lodash.dropRight = dropRight;
+        lodash.dropRightWhile = dropRightWhile;
+        lodash.dropWhile = dropWhile;
+        lodash.fill = fill;
+        lodash.filter = filter;
+        lodash.flatMap = flatMap;
+        lodash.flatMapDeep = flatMapDeep;
+        lodash.flatMapDepth = flatMapDepth;
+        lodash.flatten = flatten;
+        lodash.flattenDeep = flattenDeep;
+        lodash.flattenDepth = flattenDepth;
+        lodash.flip = flip;
+        lodash.flow = flow;
+        lodash.flowRight = flowRight;
+        lodash.fromPairs = fromPairs;
+        lodash.functions = functions;
+        lodash.functionsIn = functionsIn;
+        lodash.groupBy = groupBy;
+        lodash.initial = initial;
+        lodash.intersection = intersection;
+        lodash.intersectionBy = intersectionBy;
+        lodash.intersectionWith = intersectionWith;
+        lodash.invert = invert;
+        lodash.invertBy = invertBy;
+        lodash.invokeMap = invokeMap;
+        lodash.iteratee = iteratee;
+        lodash.keyBy = keyBy;
+        lodash.keys = keys;
+        lodash.keysIn = keysIn;
+        lodash.map = map;
+        lodash.mapKeys = mapKeys;
+        lodash.mapValues = mapValues;
+        lodash.matches = matches;
+        lodash.matchesProperty = matchesProperty;
+        lodash.memoize = memoize;
+        lodash.merge = merge;
+        lodash.mergeWith = mergeWith;
+        lodash.method = method;
+        lodash.methodOf = methodOf;
+        lodash.mixin = mixin;
+        lodash.negate = negate;
+        lodash.nthArg = nthArg;
+        lodash.omit = omit;
+        lodash.omitBy = omitBy;
+        lodash.once = once;
+        lodash.orderBy = orderBy;
+        lodash.over = over;
+        lodash.overArgs = overArgs;
+        lodash.overEvery = overEvery;
+        lodash.overSome = overSome;
+        lodash.partial = partial;
+        lodash.partialRight = partialRight;
+        lodash.partition = partition;
+        lodash.pick = pick;
+        lodash.pickBy = pickBy;
+        lodash.property = property;
+        lodash.propertyOf = propertyOf;
+        lodash.pull = pull;
+        lodash.pullAll = pullAll;
+        lodash.pullAllBy = pullAllBy;
+        lodash.pullAllWith = pullAllWith;
+        lodash.pullAt = pullAt;
+        lodash.range = range;
+        lodash.rangeRight = rangeRight;
+        lodash.rearg = rearg;
+        lodash.reject = reject;
+        lodash.remove = remove;
+        lodash.rest = rest;
+        lodash.reverse = reverse;
+        lodash.sampleSize = sampleSize;
+        lodash.set = set;
+        lodash.setWith = setWith;
+        lodash.shuffle = shuffle;
+        lodash.slice = slice;
+        lodash.sortBy = sortBy;
+        lodash.sortedUniq = sortedUniq;
+        lodash.sortedUniqBy = sortedUniqBy;
+        lodash.split = split;
+        lodash.spread = spread;
+        lodash.tail = tail;
+        lodash.take = take;
+        lodash.takeRight = takeRight;
+        lodash.takeRightWhile = takeRightWhile;
+        lodash.takeWhile = takeWhile;
+        lodash.tap = tap;
+        lodash.throttle = throttle;
+        lodash.thru = thru;
+        lodash.toArray = toArray;
+        lodash.toPairs = toPairs;
+        lodash.toPairsIn = toPairsIn;
+        lodash.toPath = toPath;
+        lodash.toPlainObject = toPlainObject;
+        lodash.transform = transform;
+        lodash.unary = unary;
+        lodash.union = union;
+        lodash.unionBy = unionBy;
+        lodash.unionWith = unionWith;
+        lodash.uniq = uniq;
+        lodash.uniqBy = uniqBy;
+        lodash.uniqWith = uniqWith;
+        lodash.unset = unset;
+        lodash.unzip = unzip;
+        lodash.unzipWith = unzipWith;
+        lodash.update = update;
+        lodash.updateWith = updateWith;
+        lodash.values = values;
+        lodash.valuesIn = valuesIn;
+        lodash.without = without;
+        lodash.words = words;
+        lodash.wrap = wrap;
+        lodash.xor = xor;
+        lodash.xorBy = xorBy;
+        lodash.xorWith = xorWith;
+        lodash.zip = zip;
+        lodash.zipObject = zipObject;
+        lodash.zipObjectDeep = zipObjectDeep;
+        lodash.zipWith = zipWith;
+        lodash.entries = toPairs;
+        lodash.entriesIn = toPairsIn;
+        lodash.extend = assignIn;
+        lodash.extendWith = assignInWith;
+        mixin(lodash, lodash);
+        lodash.add = add;
+        lodash.attempt = attempt;
+        lodash.camelCase = camelCase;
+        lodash.capitalize = capitalize;
+        lodash.ceil = ceil;
+        lodash.clamp = clamp;
+        lodash.clone = clone;
+        lodash.cloneDeep = cloneDeep;
+        lodash.cloneDeepWith = cloneDeepWith;
+        lodash.cloneWith = cloneWith;
+        lodash.conformsTo = conformsTo;
+        lodash.deburr = deburr;
+        lodash.defaultTo = defaultTo;
+        lodash.divide = divide;
+        lodash.endsWith = endsWith;
+        lodash.eq = eq;
+        lodash.escape = escape;
+        lodash.escapeRegExp = escapeRegExp;
+        lodash.every = every;
+        lodash.find = find;
+        lodash.findIndex = findIndex;
+        lodash.findKey = findKey;
+        lodash.findLast = findLast;
+        lodash.findLastIndex = findLastIndex;
+        lodash.findLastKey = findLastKey;
+        lodash.floor = floor;
+        lodash.forEach = forEach;
+        lodash.forEachRight = forEachRight;
+        lodash.forIn = forIn;
+        lodash.forInRight = forInRight;
+        lodash.forOwn = forOwn;
+        lodash.forOwnRight = forOwnRight;
+        lodash.get = get;
+        lodash.gt = gt;
+        lodash.gte = gte;
+        lodash.has = has;
+        lodash.hasIn = hasIn;
+        lodash.head = head;
+        lodash.identity = identity;
+        lodash.includes = includes;
+        lodash.indexOf = indexOf;
+        lodash.inRange = inRange;
+        lodash.invoke = invoke;
+        lodash.isArguments = isArguments;
+        lodash.isArray = isArray;
+        lodash.isArrayBuffer = isArrayBuffer;
+        lodash.isArrayLike = isArrayLike;
+        lodash.isArrayLikeObject = isArrayLikeObject;
+        lodash.isBoolean = isBoolean;
+        lodash.isBuffer = isBuffer;
+        lodash.isDate = isDate;
+        lodash.isElement = isElement;
+        lodash.isEmpty = isEmpty;
+        lodash.isEqual = isEqual;
+        lodash.isEqualWith = isEqualWith;
+        lodash.isError = isError;
+        lodash.isFinite = isFinite;
+        lodash.isFunction = isFunction;
+        lodash.isInteger = isInteger;
+        lodash.isLength = isLength;
+        lodash.isMap = isMap;
+        lodash.isMatch = isMatch;
+        lodash.isMatchWith = isMatchWith;
+        lodash.isNaN = isNaN;
+        lodash.isNative = isNative;
+        lodash.isNil = isNil;
+        lodash.isNull = isNull;
+        lodash.isNumber = isNumber;
+        lodash.isObject = isObject;
+        lodash.isObjectLike = isObjectLike;
+        lodash.isPlainObject = isPlainObject;
+        lodash.isRegExp = isRegExp;
+        lodash.isSafeInteger = isSafeInteger;
+        lodash.isSet = isSet;
+        lodash.isString = isString;
+        lodash.isSymbol = isSymbol;
+        lodash.isTypedArray = isTypedArray;
+        lodash.isUndefined = isUndefined;
+        lodash.isWeakMap = isWeakMap;
+        lodash.isWeakSet = isWeakSet;
+        lodash.join = join;
+        lodash.kebabCase = kebabCase;
+        lodash.last = last;
+        lodash.lastIndexOf = lastIndexOf;
+        lodash.lowerCase = lowerCase;
+        lodash.lowerFirst = lowerFirst;
+        lodash.lt = lt;
+        lodash.lte = lte;
+        lodash.max = max;
+        lodash.maxBy = maxBy;
+        lodash.mean = mean;
+        lodash.meanBy = meanBy;
+        lodash.min = min;
+        lodash.minBy = minBy;
+        lodash.stubArray = stubArray;
+        lodash.stubFalse = stubFalse;
+        lodash.stubObject = stubObject;
+        lodash.stubString = stubString;
+        lodash.stubTrue = stubTrue;
+        lodash.multiply = multiply;
+        lodash.nth = nth;
+        lodash.noConflict = noConflict;
+        lodash.noop = noop;
+        lodash.now = now;
+        lodash.pad = pad;
+        lodash.padEnd = padEnd;
+        lodash.padStart = padStart;
+        lodash.parseInt = parseInt;
+        lodash.random = random;
+        lodash.reduce = reduce;
+        lodash.reduceRight = reduceRight;
+        lodash.repeat = repeat;
+        lodash.replace = replace;
+        lodash.result = result;
+        lodash.round = round;
+        lodash.runInContext = runInContext;
+        lodash.sample = sample;
+        lodash.size = size;
+        lodash.snakeCase = snakeCase;
+        lodash.some = some;
+        lodash.sortedIndex = sortedIndex;
+        lodash.sortedIndexBy = sortedIndexBy;
+        lodash.sortedIndexOf = sortedIndexOf;
+        lodash.sortedLastIndex = sortedLastIndex;
+        lodash.sortedLastIndexBy = sortedLastIndexBy;
+        lodash.sortedLastIndexOf = sortedLastIndexOf;
+        lodash.startCase = startCase;
+        lodash.startsWith = startsWith;
+        lodash.subtract = subtract;
+        lodash.sum = sum;
+        lodash.sumBy = sumBy;
+        lodash.template = template;
+        lodash.times = times;
+        lodash.toFinite = toFinite;
+        lodash.toInteger = toInteger;
+        lodash.toLength = toLength;
+        lodash.toLower = toLower;
+        lodash.toNumber = toNumber;
+        lodash.toSafeInteger = toSafeInteger;
+        lodash.toString = toString;
+        lodash.toUpper = toUpper;
+        lodash.trim = trim;
+        lodash.trimEnd = trimEnd;
+        lodash.trimStart = trimStart;
+        lodash.truncate = truncate;
+        lodash.unescape = unescape;
+        lodash.uniqueId = uniqueId;
+        lodash.upperCase = upperCase;
+        lodash.upperFirst = upperFirst;
+        lodash.each = forEach;
+        lodash.eachRight = forEachRight;
+        lodash.first = head;
+        mixin(lodash, function() {
+            var source = {};
+            baseForOwn(lodash, function(func, methodName) {
+                if (!hasOwnProperty.call(lodash.prototype, methodName)) {
+                    source[methodName] = func;
+                }
+            });
+            return source;
+        }(), {
+            chain: false
+        });
+        lodash.VERSION = VERSION;
+        arrayEach([ "bind", "bindKey", "curry", "curryRight", "partial", "partialRight" ], function(methodName) {
+            lodash[methodName].placeholder = lodash;
+        });
+        arrayEach([ "drop", "take" ], function(methodName, index) {
+            LazyWrapper.prototype[methodName] = function(n) {
+                var filtered = this.__filtered__;
+                if (filtered && !index) {
+                    return new LazyWrapper(this);
+                }
+                n = n === undefined ? 1 : nativeMax(toInteger(n), 0);
+                var result = this.clone();
+                if (filtered) {
+                    result.__takeCount__ = nativeMin(n, result.__takeCount__);
                 } else {
-                    console.log("token invalidated");
+                    result.__views__.push({
+                        size: nativeMin(n, MAX_ARRAY_LENGTH),
+                        type: methodName + (result.__dir__ < 0 ? "Right" : "")
+                    });
                 }
-                doCallback(callback, [ err, data, null ], self);
+                return result;
+            };
+            LazyWrapper.prototype[methodName + "Right"] = function(n) {
+                return this.reverse()[methodName](n).reverse();
+            };
+        });
+        arrayEach([ "filter", "map", "takeWhile" ], function(methodName, index) {
+            var type = index + 1, isFilter = type == LAZY_FILTER_FLAG || type == LAZY_WHILE_FLAG;
+            LazyWrapper.prototype[methodName] = function(iteratee) {
+                var result = this.clone();
+                result.__iteratees__.push({
+                    iteratee: getIteratee(iteratee, 3),
+                    type: type
+                });
+                result.__filtered__ = result.__filtered__ || isFilter;
+                return result;
+            };
+        });
+        arrayEach([ "head", "last" ], function(methodName, index) {
+            var takeName = "take" + (index ? "Right" : "");
+            LazyWrapper.prototype[methodName] = function() {
+                return this[takeName](1).value()[0];
+            };
+        });
+        arrayEach([ "initial", "tail" ], function(methodName, index) {
+            var dropName = "drop" + (index ? "" : "Right");
+            LazyWrapper.prototype[methodName] = function() {
+                return this.__filtered__ ? new LazyWrapper(this) : this[dropName](1);
+            };
+        });
+        LazyWrapper.prototype.compact = function() {
+            return this.filter(identity);
+        };
+        LazyWrapper.prototype.find = function(predicate) {
+            return this.filter(predicate).head();
+        };
+        LazyWrapper.prototype.findLast = function(predicate) {
+            return this.reverse().find(predicate);
+        };
+        LazyWrapper.prototype.invokeMap = baseRest(function(path, args) {
+            if (typeof path == "function") {
+                return new LazyWrapper(this);
+            }
+            return this.map(function(value) {
+                return baseInvoke(value, path, args);
+            });
+        });
+        LazyWrapper.prototype.reject = function(predicate) {
+            return this.filter(negate(getIteratee(predicate)));
+        };
+        LazyWrapper.prototype.slice = function(start, end) {
+            start = toInteger(start);
+            var result = this;
+            if (result.__filtered__ && (start > 0 || end < 0)) {
+                return new LazyWrapper(result);
+            }
+            if (start < 0) {
+                result = result.takeRight(-start);
+            } else if (start) {
+                result = result.drop(start);
+            }
+            if (end !== undefined) {
+                end = toInteger(end);
+                result = end < 0 ? result.dropRight(-end) : result.take(end - start);
+            }
+            return result;
+        };
+        LazyWrapper.prototype.takeRightWhile = function(predicate) {
+            return this.reverse().takeWhile(predicate).reverse();
+        };
+        LazyWrapper.prototype.toArray = function() {
+            return this.take(MAX_ARRAY_LENGTH);
+        };
+        baseForOwn(LazyWrapper.prototype, function(func, methodName) {
+            var checkIteratee = /^(?:filter|find|map|reject)|While$/.test(methodName), isTaker = /^(?:head|last)$/.test(methodName), lodashFunc = lodash[isTaker ? "take" + (methodName == "last" ? "Right" : "") : methodName], retUnwrapped = isTaker || /^find/.test(methodName);
+            if (!lodashFunc) {
+                return;
+            }
+            lodash.prototype[methodName] = function() {
+                var value = this.__wrapped__, args = isTaker ? [ 1 ] : arguments, isLazy = value instanceof LazyWrapper, iteratee = args[0], useLazy = isLazy || isArray(value);
+                var interceptor = function(value) {
+                    var result = lodashFunc.apply(lodash, arrayPush([ value ], args));
+                    return isTaker && chainAll ? result[0] : result;
+                };
+                if (useLazy && checkIteratee && typeof iteratee == "function" && iteratee.length != 1) {
+                    isLazy = useLazy = false;
+                }
+                var chainAll = this.__chain__, isHybrid = !!this.__actions__.length, isUnwrapped = retUnwrapped && !chainAll, onlyLazy = isLazy && !isHybrid;
+                if (!retUnwrapped && useLazy) {
+                    value = onlyLazy ? value : new LazyWrapper(this);
+                    var result = func.apply(value, args);
+                    result.__actions__.push({
+                        func: thru,
+                        args: [ interceptor ],
+                        thisArg: undefined
+                    });
+                    return new LodashWrapper(result, chainAll);
+                }
+                if (isUnwrapped && onlyLazy) {
+                    return func.apply(this, args);
+                }
+                result = this.thru(interceptor);
+                return isUnwrapped ? isTaker ? result.value()[0] : result.value() : result;
+            };
+        });
+        arrayEach([ "pop", "push", "shift", "sort", "splice", "unshift" ], function(methodName) {
+            var func = arrayProto[methodName], chainName = /^(?:push|sort|unshift)$/.test(methodName) ? "tap" : "thru", retUnwrapped = /^(?:pop|shift)$/.test(methodName);
+            lodash.prototype[methodName] = function() {
+                var args = arguments;
+                if (retUnwrapped && !this.__chain__) {
+                    var value = this.value();
+                    return func.apply(isArray(value) ? value : [], args);
+                }
+                return this[chainName](function(value) {
+                    return func.apply(isArray(value) ? value : [], args);
+                });
+            };
+        });
+        baseForOwn(LazyWrapper.prototype, function(func, methodName) {
+            var lodashFunc = lodash[methodName];
+            if (lodashFunc) {
+                var key = lodashFunc.name + "", names = realNames[key] || (realNames[key] = []);
+                names.push({
+                    name: methodName,
+                    func: lodashFunc
+                });
+            }
+        });
+        realNames[createHybrid(undefined, BIND_KEY_FLAG).name] = [ {
+            name: "wrapper",
+            func: undefined
+        } ];
+        LazyWrapper.prototype.clone = lazyClone;
+        LazyWrapper.prototype.reverse = lazyReverse;
+        LazyWrapper.prototype.value = lazyValue;
+        lodash.prototype.at = wrapperAt;
+        lodash.prototype.chain = wrapperChain;
+        lodash.prototype.commit = wrapperCommit;
+        lodash.prototype.next = wrapperNext;
+        lodash.prototype.plant = wrapperPlant;
+        lodash.prototype.reverse = wrapperReverse;
+        lodash.prototype.toJSON = lodash.prototype.valueOf = lodash.prototype.value = wrapperValue;
+        lodash.prototype.first = lodash.prototype.head;
+        if (iteratorSymbol) {
+            lodash.prototype[iteratorSymbol] = wrapperToIterator;
+        }
+        return lodash;
+    };
+    var _ = runInContext();
+    if (typeof define == "function" && typeof define.amd == "object" && define.amd) {
+        root._ = _;
+        define(function() {
+            return _;
+        });
+    } else if (freeModule) {
+        (freeModule.exports = _)._ = _;
+        freeExports._ = _;
+    } else {
+        root._ = _;
+    }
+}).call(this);
+
+"use strict";
+
+var UsergridAuthMode = Object.freeze({
+    NONE: "none",
+    USER: "user",
+    APP: "app"
+});
+
+var UsergridDirection = Object.freeze({
+    IN: "connecting",
+    OUT: "connections"
+});
+
+var UsergridHttpMethod = Object.freeze({
+    GET: "GET",
+    PUT: "PUT",
+    POST: "POST",
+    DELETE: "DELETE"
+});
+
+var UsergridQueryOperator = Object.freeze({
+    EQUAL: "=",
+    GREATER_THAN: ">",
+    GREATER_THAN_EQUAL_TO: ">=",
+    LESS_THAN: "<",
+    LESS_THAN_EQUAL_TO: "<="
+});
+
+var UsergridQuerySortOrder = Object.freeze({
+    ASC: "asc",
+    DESC: "desc"
+});
+
+"use strict";
+
+var UsergridApplicationJSONHeaderValue = "application/json";
+
+(function(global) {
+    var name = "UsergridHelpers", overwrittenName = global[name];
+    function UsergridHelpers() {}
+    UsergridHelpers.DefaultHeaders = Object.freeze({
+        "Content-Type": UsergridApplicationJSONHeaderValue,
+        Accept: UsergridApplicationJSONHeaderValue
+    });
+    UsergridHelpers.validateAndRetrieveClient = function(args) {
+        var client = _.first([ args, args[0], _.get(args, "client"), Usergrid.isInitialized ? Usergrid : undefined ].filter(function(client) {
+            return client instanceof UsergridClient;
+        }));
+        if (!client) {
+            throw new Error("this method requires either the Usergrid shared instance to be initialized or a UsergridClient instance as the first argument");
+        }
+        return client;
+    };
+    UsergridHelpers.inherits = function(ctor, superCtor) {
+        ctor.super_ = superCtor;
+        ctor.prototype = Object.create(superCtor.prototype, {
+            constructor: {
+                value: ctor,
+                enumerable: false,
+                writable: true,
+                configurable: true
             }
         });
     };
-    /*
-   *  A public method to log out an app user - clears all user fields from client
-   *  and destroys the access token on the server.
-   *
-   *  @method logout
-   *  @public
-   *  @param {string} username the user associated with the token to revoke
-   *  @param {string} token set to 'null' to revoke the token of the currently logged in user
-   *   or set to token value to revoke a specific token
-   *  @param {string} revokeAll set to 'true' to revoke all tokens for the user
-   *  @return none
-   */
-    Usergrid.Client.prototype.logoutAndDestroyToken = function(username, token, revokeAll, callback) {
-        if (username === null) {
-            console.log("username required to revoke tokens");
+    UsergridHelpers.flattenArgs = function(args) {
+        return _.flattenDeep(Array.prototype.slice.call(args));
+    };
+    UsergridHelpers.callback = function() {
+        var args = UsergridHelpers.flattenArgs(arguments).reverse();
+        var emptyFunc = function() {};
+        return _.first(_.flattenDeep([ args, _.get(args, "0.callback"), emptyFunc ]).filter(_.isFunction));
+    };
+    UsergridHelpers.authForRequests = function(client) {
+        var authForRequests = undefined;
+        if (_.get(client, "tempAuth.isValid")) {
+            authForRequests = client.tempAuth;
+            client.tempAuth = undefined;
+        } else if (_.get(client, "currentUser.auth.isValid") && client.authMode === UsergridAuthMode.USER) {
+            authForRequests = client.currentUser.auth;
+        } else if (_.get(client, "appAuth.isValid") && client.authMode === UsergridAuthMode.APP) {
+            authForRequests = client.appAuth;
+        }
+        return authForRequests;
+    };
+    UsergridHelpers.userLoginBody = function(options) {
+        var body = {
+            grant_type: "password",
+            password: options.password
+        };
+        if (options.tokenTtl) {
+            body.ttl = options.tokenTtl;
+        }
+        body[options.username ? "username" : "email"] = options.username ? options.username : options.email;
+        return body;
+    };
+    UsergridHelpers.appLoginBody = function(options) {
+        var body = {
+            grant_type: "client_credentials",
+            client_id: options.clientId,
+            client_secret: options.clientSecret
+        };
+        if (options.tokenTtl) {
+            body.ttl = options.tokenTtl;
+        }
+        return body;
+    };
+    UsergridHelpers.userResetPasswordBody = function(args) {
+        return {
+            oldpassword: _.isPlainObject(args[0]) ? args[0].oldPassword : _.isString(args[0]) ? args[0] : undefined,
+            newpassword: _.isPlainObject(args[0]) ? args[0].newPassword : _.isString(args[1]) ? args[1] : undefined
+        };
+    };
+    UsergridHelpers.calculateExpiry = function(expires_in) {
+        return Date.now() + (expires_in ? expires_in - 5 : 0) * 1e3;
+    };
+    var uuidValueRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    UsergridHelpers.isUUID = function(uuid) {
+        return !uuid ? false : uuidValueRegex.test(uuid);
+    };
+    UsergridHelpers.useQuotesIfRequired = function(value) {
+        return _.isFinite(value) || UsergridHelpers.isUUID(value) || _.isBoolean(value) || _.isObject(value) && !_.isFunction(value) || _.isArray(value) ? value : "'" + value + "'";
+    };
+    UsergridHelpers.setReadOnly = function(obj, key) {
+        if (_.isArray(key)) {
+            return key.forEach(function(k) {
+                UsergridHelpers.setReadOnly(obj, k);
+            });
+        } else if (_.isPlainObject(obj[key])) {
+            return Object.freeze(obj[key]);
+        } else if (_.isPlainObject(obj) && key === undefined) {
+            return Object.freeze(obj);
+        } else if (_.has(obj, key)) {
+            return Object.defineProperty(obj, key, {
+                writable: false
+            });
         } else {
-            this.destroyToken(username, token, revokeAll, callback);
-            if (revokeAll === true || token === this.getToken() || token === null) {
-                this.setToken(null);
+            return obj;
+        }
+    };
+    UsergridHelpers.setWritable = function(obj, key) {
+        if (_.isArray(key)) {
+            return key.forEach(function(k) {
+                UsergridHelpers.setWritable(obj, k);
+            });
+        } else if (_.isPlainObject(obj[key])) {
+            return _.clone(obj[key]);
+        } else if (_.isPlainObject(obj) && key === undefined) {
+            return _.clone(obj);
+        } else if (_.has(obj, key)) {
+            return Object.defineProperty(obj, key, {
+                writable: true
+            });
+        } else {
+            return obj;
+        }
+    };
+    UsergridHelpers.assignPrefabOptions = function(args) {
+        if (_.isObject(args[0]) && !_.isFunction(args[0]) && _.has(args, "method")) {
+            _.assign(this, args[0]);
+        }
+        return this;
+    };
+    UsergridHelpers.normalize = function(str) {
+        str = str.replace(/\/+/g, "/");
+        str = str.replace(/:\//g, "://");
+        str = str.replace(/\/(\?|&|#[^!])/g, "$1");
+        str = str.replace(/(\?.+)\?/g, "$1&");
+        return str;
+    };
+    UsergridHelpers.urljoin = function() {
+        var input = arguments;
+        var options = {};
+        if (typeof arguments[0] === "object") {
+            input = arguments[0];
+            options = arguments[1] || {};
+        }
+        var joined = [].slice.call(input, 0).join("/");
+        return UsergridHelpers.normalize(joined, options);
+    };
+    UsergridHelpers.parseResponseHeaders = function(headerStr) {
+        var headers = {};
+        if (headerStr) {
+            var headerPairs = headerStr.split("\r\n");
+            for (var i = 0; i < headerPairs.length; i++) {
+                var headerPair = headerPairs[i];
+                var index = headerPair.indexOf(": ");
+                if (index > 0) {
+                    var key = headerPair.substring(0, index).toLowerCase();
+                    headers[key] = headerPair.substring(index + 2);
+                }
             }
         }
+        return headers;
     };
-    /*
-   *  A private method to build the curl call to display on the command line
-   *
-   *  @method buildCurlCall
-   *  @private
-   *  @param {object} options
-   *  @return {string} curl
-   */
-    Usergrid.Client.prototype.buildCurlCall = function(options) {
-        var curl = [ "curl" ];
-        var method = (options.method || "GET").toUpperCase();
-        var body = options.body;
-        var uri = options.uri;
-        curl.push("-X");
-        curl.push([ "POST", "PUT", "DELETE" ].indexOf(method) >= 0 ? method : "GET");
-        curl.push(uri);
-        if ("object" === typeof body && Object.keys(body).length > 0 && [ "POST", "PUT" ].indexOf(method) !== -1) {
-            curl.push("-d");
-            curl.push("'" + JSON.stringify(body) + "'");
+    UsergridHelpers.uri = function(client, options) {
+        var path = "";
+        if (options instanceof UsergridEntity) {
+            path = options.type;
+        } else if (options instanceof UsergridQuery) {
+            path = options._type;
+        } else if (_.isString(options)) {
+            path = options;
+        } else if (_.isArray(options)) {
+            path = _.get(options, "0.type") || _.get(options, "0.path");
+        } else {
+            path = options.path || options.type || _.get(options, "entity.type") || _.get(options, "query._type") || _.get(options, "body.type") || _.get(options, "body.path");
         }
-        curl = curl.join(" ");
-        console.log(curl);
-        return curl;
+        var uuidOrName = "";
+        if (options.method !== UsergridHttpMethod.POST) {
+            uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "entity.name"), _.get(options, "body.uuid"), _.get(options, "body.name"), "" ].filter(_.isString));
+        }
+        return UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, path, uuidOrName);
     };
-    Usergrid.Client.prototype.getDisplayImage = function(email, picture, size) {
-        size = size || 50;
-        var image = "https://apigee.com/usergrid/images/user_profile.png";
-        try {
-            if (picture) {
-                image = picture;
-            } else if (email.length) {
-                image = "https://secure.gravatar.com/avatar/" + MD5(email) + "?s=" + size + encodeURI("&d=https://apigee.com/usergrid/images/user_profile.png");
+    UsergridHelpers.updateEntityFromRemote = function(entity, usergridResponse) {
+        UsergridHelpers.setWritable(entity, [ "uuid", "name", "type", "created" ]);
+        _.assign(entity, usergridResponse.entity);
+        UsergridHelpers.setReadOnly(entity, [ "uuid", "name", "type", "created" ]);
+    };
+    UsergridHelpers.headers = function(client, options, defaultHeaders) {
+        var returnHeaders = {};
+        _.defaults(returnHeaders, options.headers, defaultHeaders);
+        _.assign(returnHeaders, {
+            "User-Agent": "usergrid-js/v" + UsergridSDKVersion
+        });
+        var authForRequests = UsergridHelpers.authForRequests(client);
+        if (authForRequests) {
+            _.assign(returnHeaders, {
+                authorization: "Bearer " + authForRequests.token
+            });
+        }
+        return returnHeaders;
+    };
+    UsergridHelpers.setEntity = function(options, args) {
+        options.entity = _.first([ options.entity, args[0] ].filter(function(property) {
+            return property instanceof UsergridEntity;
+        }));
+        if (options.entity !== undefined) {
+            options.type = options.entity.type;
+        }
+        return options;
+    };
+    UsergridHelpers.setAsset = function(options, args) {
+        options.asset = _.first([ options.asset, _.get(options, "entity.asset"), args[1], args[0] ].filter(function(property) {
+            return property instanceof UsergridAsset;
+        }));
+        return options;
+    };
+    UsergridHelpers.setUuidOrName = function(options, args) {
+        options.uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, _.get(options, "entity.uuid"), _.get(options, "body.uuid"), _.get(options, "entity.name"), _.get(options, "body.name"), _.get(args, "0.uuid"), _.get(args, "0.name"), _.get(args, "2"), _.get(args, "1") ].filter(_.isString));
+        return options;
+    };
+    UsergridHelpers.setPathOrType = function(options, args) {
+        var pathOrType = _.first([ args.type, _.get(args, "0.type"), _.get(options, "entity.type"), _.get(args, "body.type"), _.get(options, "body.0.type"), _.isArray(args) ? args[0] : undefined ].filter(_.isString));
+        options[/\//.test(pathOrType) ? "path" : "type"] = pathOrType;
+        return options;
+    };
+    UsergridHelpers.setQs = function(options, args) {
+        if (options.path) {
+            options.qs = _.first([ options.qs, args[2], args[1], args[0] ].filter(_.isPlainObject));
+        }
+        return options;
+    };
+    UsergridHelpers.setQuery = function(options, args) {
+        options.query = _.first([ options, options.query, args[0] ].filter(function(property) {
+            return property instanceof UsergridQuery;
+        }));
+        return options;
+    };
+    UsergridHelpers.setAsset = function(options, args) {
+        options.asset = _.first([ options.asset, _.get(options, "entity.asset"), args[1], args[0] ].filter(function(property) {
+            return property instanceof UsergridAsset;
+        }));
+        return options;
+    };
+    UsergridHelpers.setBody = function(options, args) {
+        var body = _.first([ args.entity, args.body, args[0].entity, args[0].body, args[2], args[1], args[0] ].filter(function(property) {
+            return _.isObject(property) && !_.isFunction(property) && !(property instanceof UsergridQuery) && !(property instanceof UsergridAsset);
+        }));
+        if (body instanceof UsergridEntity) {
+            body = body.jsonValue();
+        } else if (_.isArray(body)) {
+            if (body[0] instanceof UsergridEntity) {
+                body = _.map(body, function(entity) {
+                    return entity.jsonValue();
+                });
             }
-        } catch (e) {} finally {
-            return image;
         }
+        options.body = body;
+        return options;
     };
-    global[name] = Usergrid.Client;
+    UsergridHelpers.buildRequest = function(client, method, args) {
+        var options = {
+            client: client,
+            method: method,
+            queryParams: args.queryParams || _.get(args, "0.queryParams"),
+            callback: UsergridHelpers.callback(args)
+        };
+        UsergridHelpers.assignPrefabOptions(options, args);
+        UsergridHelpers.setEntity(options, args);
+        if (method === UsergridHttpMethod.POST || method === UsergridHttpMethod.PUT) {
+            UsergridHelpers.setAsset(options, args);
+            if (!options.asset) {
+                UsergridHelpers.setBody(options, args);
+                if (!options.body) {
+                    throw new Error("'body' is required when making a " + options.method + " request");
+                }
+            }
+        }
+        UsergridHelpers.setUuidOrName(options, args);
+        UsergridHelpers.setPathOrType(options, args);
+        UsergridHelpers.setQs(options, args);
+        UsergridHelpers.setQuery(options, args);
+        options.uri = UsergridHelpers.uri(client, options);
+        return new UsergridRequest(options);
+    };
+    UsergridHelpers.buildAppAuthRequest = function(client, auth, callback) {
+        var requestOptions = {
+            client: client,
+            method: UsergridHttpMethod.POST,
+            uri: UsergridHelpers.uri(client, {
+                path: "token"
+            }),
+            body: UsergridHelpers.appLoginBody(auth),
+            callback: callback
+        };
+        return new UsergridRequest(requestOptions);
+    };
+    UsergridHelpers.buildConnectionRequest = function(client, method, args) {
+        var options = {
+            client: client,
+            method: method,
+            entity: {},
+            to: {},
+            callback: UsergridHelpers.callback(args)
+        };
+        UsergridHelpers.assignPrefabOptions.call(options, args);
+        if (_.isObject(options.from)) {
+            options.to = options.from;
+        }
+        if (_.isObject(args[0]) && _.has(args[0], "entity") && _.has(args[0], "to")) {
+            _.assign(options.entity, args[0].entity);
+            options.relationship = _.get(args, "0.relationship");
+            _.assign(options.to, args[0].to);
+        }
+        if (_.isObject(args[0]) && !_.isFunction(args[0]) && _.isString(args[1])) {
+            _.assign(options.entity, args[0]);
+            options.relationship = _.first([ options.relationship, args[1] ].filter(_.isString));
+        }
+        if (_.isObject(args[2]) && !_.isFunction(args[2])) {
+            _.assign(options.to, args[2]);
+        }
+        options.entity.uuidOrName = _.first([ options.entity.uuidOrName, options.entity.uuid, options.entity.name, args[1] ].filter(_.isString));
+        if (!options.entity.type) {
+            options.entity.type = _.first([ options.entity.type, args[0] ].filter(_.isString));
+        }
+        options.relationship = _.first([ options.relationship, args[2] ].filter(_.isString));
+        if (_.isString(args[3]) && !UsergridHelpers.isUUID(args[3]) && _.isString(args[4])) {
+            options.to.type = args[3];
+        } else if (_.isString(args[2]) && !UsergridHelpers.isUUID(args[2]) && _.isString(args[3]) && _.isObject(args[0]) && !_.isFunction(args[0])) {
+            options.to.type = args[2];
+        }
+        options.to.uuidOrName = _.first([ options.to.uuidOrName, options.to.uuid, options.to.name, args[4], args[3], args[2] ].filter(function(property) {
+            return _.isString(options.to.type) && _.isString(property) || UsergridHelpers.isUUID(property);
+        }));
+        if (!_.isString(options.entity.uuidOrName)) {
+            throw new Error("source entity 'uuidOrName' is required when connecting or disconnecting entities");
+        }
+        if (!_.isString(options.to.uuidOrName)) {
+            throw new Error("target entity 'uuidOrName' is required when connecting or disconnecting entities");
+        }
+        if (!_.isString(options.to.type) && !UsergridHelpers.isUUID(options.to.uuidOrName)) {
+            throw new Error("target 'type' (collection name) parameter is required connecting or disconnecting entities by name");
+        }
+        options.uri = UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, _.isString(options.entity.type) ? options.entity.type : "", _.isString(options.entity.uuidOrName) ? options.entity.uuidOrName : "", options.relationship, _.isString(options.to.type) ? options.to.type : "", _.isString(options.to.uuidOrName) ? options.to.uuidOrName : "");
+        return new UsergridRequest(options);
+    };
+    UsergridHelpers.buildGetConnectionRequest = function(client, args) {
+        var options = {
+            client: client,
+            method: "GET",
+            callback: UsergridHelpers.callback(args)
+        };
+        UsergridHelpers.assignPrefabOptions.call(options, args);
+        if (_.isObject(args[1]) && !_.isFunction(args[1])) {
+            _.assign(options, args[1]);
+        }
+        options.direction = _.first([ options.direction, args[0] ].filter(function(property) {
+            return property === UsergridDirection.IN || property === UsergridDirection.OUT;
+        }));
+        options.relationship = _.first([ options.relationship, args[3], args[2] ].filter(_.isString));
+        options.uuidOrName = _.first([ options.uuidOrName, options.uuid, options.name, args[2] ].filter(_.isString));
+        options.type = _.first([ options.type, args[1] ].filter(_.isString));
+        if (!_.isString(options.type)) {
+            throw new Error("'type' (collection name) parameter is required when retrieving connections");
+        }
+        if (!_.isString(options.uuidOrName)) {
+            throw new Error("target entity 'uuidOrName' is required when retrieving connections");
+        }
+        options.uri = UsergridHelpers.urljoin(client.baseUrl, client.orgId, client.appId, _.isString(options.type) ? options.type : "", _.isString(options.uuidOrName) ? options.uuidOrName : "", options.direction, options.relationship);
+        return new UsergridRequest(options);
+    };
+    global[name] = UsergridHelpers;
     global[name].noConflict = function() {
         if (overwrittenName) {
             global[name] = overwrittenName;
         }
-        return exports;
-    };
-    return global[name];
-})();
-
-var ENTITY_SYSTEM_PROPERTIES = [ "metadata", "created", "modified", "oldpassword", "newpassword", "type", "activated", "uuid" ];
-
-/*
- *  A class to Model a Usergrid Entity.
- *  Set the type and uuid of entity in the 'data' json object
- *
- *  @constructor
- *  @param {object} options {client:client, data:{'type':'collection_type', uuid:'uuid', 'key':'value'}}
- */
-Usergrid.Entity = function(options) {
-    this._data = {};
-    this._client = undefined;
-    if (options) {
-        this.set(options.data || {});
-        this._client = options.client || {};
-    }
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Entity
- *
- *  @method isEntity
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.Entity.isEntity = function(obj) {
-    return obj && obj instanceof Usergrid.Entity;
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Entity
- *  That has been saved.
- *
- *  @method isPersistedEntity
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.Entity.isPersistedEntity = function(obj) {
-    return isEntity(obj) && isUUID(obj.get("uuid"));
-};
-
-/*
- *  returns a serialized version of the entity object
- *
- *  Note: use the client.restoreEntity() function to restore
- *
- *  @method serialize
- *  @return {string} data
- */
-Usergrid.Entity.prototype.serialize = function() {
-    return JSON.stringify(this._data);
-};
-
-/*
- *  gets a specific field or the entire data object. If null or no argument
- *  passed, will return all data, else, will return a specific field
- *
- *  @method get
- *  @param {string} field
- *  @return {string} || {object} data
- */
-Usergrid.Entity.prototype.get = function(key) {
-    var value;
-    if (arguments.length === 0) {
-        value = this._data;
-    } else if (arguments.length > 1) {
-        key = [].slice.call(arguments).reduce(function(p, c, i, a) {
-            if (c instanceof Array) {
-                p = p.concat(c);
-            } else {
-                p.push(c);
-            }
-            return p;
-        }, []);
-    }
-    if (key instanceof Array) {
-        var self = this;
-        value = key.map(function(k) {
-            return self.get(k);
-        });
-    } else if ("undefined" !== typeof key) {
-        value = this._data[key];
-    }
-    return value;
-};
-
-/*
- *  adds a specific key value pair or object to the Entity's data
- *  is additive - will not overwrite existing values unless they
- *  are explicitly specified
- *
- *  @method set
- *  @param {string} key || {object}
- *  @param {string} value
- *  @return none
- */
-Usergrid.Entity.prototype.set = function(key, value) {
-    if (typeof key === "object") {
-        for (var field in key) {
-            this._data[field] = key[field];
-        }
-    } else if (typeof key === "string") {
-        if (value === null) {
-            delete this._data[key];
-        } else {
-            this._data[key] = value;
-        }
-    } else {
-        this._data = {};
-    }
-};
-
-Usergrid.Entity.prototype.getEndpoint = function() {
-    var type = this.get("type"), nameProperties = [ "uuid", "name" ], name;
-    if (type === undefined) {
-        throw new UsergridError("cannot fetch entity, no entity type specified", "no_type_specified");
-    } else if (/^users?$/.test(type)) {
-        nameProperties.unshift("username");
-    }
-    name = this.get(nameProperties).filter(function(x) {
-        return x !== null && "undefined" !== typeof x;
-    }).shift();
-    return name ? [ type, name ].join("/") : type;
-};
-
-/*
- *  Saves the entity back to the database
- *
- *  @method save
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, response, self)
- */
-Usergrid.Entity.prototype.save = function(callback) {
-    var self = this, type = this.get("type"), method = "POST", entityId = this.get("uuid"), changePassword, entityData = this.get(), options = {
-        method: method,
-        endpoint: type
-    };
-    if (entityId) {
-        options.method = "PUT";
-        options.endpoint += "/" + entityId;
-    }
-    options.body = Object.keys(entityData).filter(function(key) {
-        return ENTITY_SYSTEM_PROPERTIES.indexOf(key) === -1;
-    }).reduce(function(data, key) {
-        data[key] = entityData[key];
-        return data;
-    }, {});
-    self._client.request(options, function(err, response) {
-        var entity = response.getEntity();
-        if (entity) {
-            self.set(entity);
-            self.set("type", /^\//.test(response.path) ? response.path.substring(1) : response.path);
-        }
-        if (err && self._client.logging) {
-            console.log("could not save entity");
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *
- * Updates the user's password
- */
-Usergrid.Entity.prototype.changePassword = function(oldpassword, newpassword, callback) {
-    var self = this;
-    if ("function" === typeof oldpassword && callback === undefined) {
-        callback = oldpassword;
-        oldpassword = self.get("oldpassword");
-        newpassword = self.get("newpassword");
-    }
-    self.set({
-        password: null,
-        oldpassword: null,
-        newpassword: null
-    });
-    if (/^users?$/.test(self.get("type")) && oldpassword && newpassword) {
-        var options = {
-            method: "PUT",
-            endpoint: "users/" + self.get("uuid") + "/password",
-            body: {
-                uuid: self.get("uuid"),
-                username: self.get("username"),
-                oldpassword: oldpassword,
-                newpassword: newpassword
-            }
-        };
-        self._client.request(options, function(err, response) {
-            if (err && self._client.logging) {
-                console.log("could not update user");
-            }
-            doCallback(callback, [ err, response, self ], self);
-        });
-    } else {
-        throw new UsergridInvalidArgumentError("Invalid arguments passed to 'changePassword'");
-    }
-};
-
-/*
- *  refreshes the entity by making a GET call back to the database
- *
- *  @method fetch
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Entity.prototype.fetch = function(callback) {
-    var endpoint, self = this;
-    endpoint = this.getEndpoint();
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        var entity = response.getEntity();
-        if (entity) {
-            self.set(entity);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  deletes the entity from the database - will only delete
- *  if the object has a valid uuid
- *
- *  @method destroy
- *  @public
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.destroy = function(callback) {
-    var self = this;
-    var endpoint = this.getEndpoint();
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (!err) {
-            self.set(null);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  connects one entity to another
- *
- *  @method connect
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.connect = function(connection, entity, callback) {
-    this.addOrRemoveConnection("POST", connection, entity, callback);
-};
-
-/*
- *  disconnects one entity from another
- *
- *  @method disconnect
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.disconnect = function(connection, entity, callback) {
-    this.addOrRemoveConnection("DELETE", connection, entity, callback);
-};
-
-/*
- *  adds or removes a connection between two entities
- *
- *  @method addOrRemoveConnection
- *  @public
- *  @param {string} method
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.addOrRemoveConnection = function(method, connection, entity, callback) {
-    var self = this;
-    if ([ "POST", "DELETE" ].indexOf(method.toUpperCase()) == -1) {
-        throw new UsergridInvalidArgumentError("invalid method for connection call. must be 'POST' or 'DELETE'");
-    }
-    var connecteeType = entity.get("type");
-    var connectee = this.getEntityId(entity);
-    if (!connectee) {
-        throw new UsergridInvalidArgumentError("connectee could not be identified");
-    }
-    var connectorType = this.get("type");
-    var connector = this.getEntityId(this);
-    if (!connector) {
-        throw new UsergridInvalidArgumentError("connector could not be identified");
-    }
-    var endpoint = [ connectorType, connector, connection, connecteeType, connectee ].join("/");
-    var options = {
-        method: method,
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err && self._client.logging) {
-            console.log("There was an error with the connection call");
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  returns a unique identifier for an entity
- *
- *  @method connect
- *  @public
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- *
- */
-Usergrid.Entity.prototype.getEntityId = function(entity) {
-    var id;
-    if (isUUID(entity.get("uuid"))) {
-        id = entity.get("uuid");
-    } else if (this.get("type") === "users" || this.get("type") === "user") {
-        id = entity.get("username");
-    } else {
-        id = entity.get("name");
-    }
-    return id;
-};
-
-/*
- *  gets an entities connections
- *
- *  @method getConnections
- *  @public
- *  @param {string} connection
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data, connections)
- *
- */
-Usergrid.Entity.prototype.getConnections = function(connection, callback) {
-    var self = this;
-    var connectorType = this.get("type");
-    var connector = this.getEntityId(this);
-    if (!connector) {
-        if (typeof callback === "function") {
-            var error = "Error in getConnections - no uuid specified.";
-            if (self._client.logging) {
-                console.log(error);
-            }
-            doCallback(callback, [ true, error ], self);
-        }
-        return;
-    }
-    var endpoint = connectorType + "/" + connector + "/" + connection + "/";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        self[connection] = {};
-        var length = data && data.entities ? data.entities.length : 0;
-        for (var i = 0; i < length; i++) {
-            if (data.entities[i].type === "user") {
-                self[connection][data.entities[i].username] = data.entities[i];
-            } else {
-                self[connection][data.entities[i].name] = data.entities[i];
-            }
-        }
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getGroups = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/groups";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        self.groups = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getActivities = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/activities";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("entity could not be connected");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-        }
-        self.activities = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getFollowing = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/following";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user following");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-            var image = self._client.getDisplayImage(data.entities[entity].email, data.entities[entity].picture);
-            data.entities[entity]._portal_image_icon = image;
-        }
-        self.following = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getFollowers = function(callback) {
-    var self = this;
-    var endpoint = "users" + "/" + this.get("uuid") + "/followers";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user followers");
-        }
-        for (var entity in data.entities) {
-            data.entities[entity].createdDate = new Date(data.entities[entity].created).toUTCString();
-            var image = self._client.getDisplayImage(data.entities[entity].email, data.entities[entity].picture);
-            data.entities[entity]._portal_image_icon = image;
-        }
-        self.followers = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Client.prototype.createRole = function(roleName, permissions, callback) {
-    var options = {
-        type: "role",
-        name: roleName
-    };
-    this.createEntity(options, function(err, response, entity) {
-        if (err) {
-            doCallback(callback, [ err, response, self ]);
-        } else {
-            entity.assignPermissions(permissions, function(err, data) {
-                if (err) {
-                    doCallback(callback, [ err, response, self ]);
-                } else {
-                    doCallback(callback, [ err, data, data.data ], self);
-                }
-            });
-        }
-    });
-};
-
-Usergrid.Entity.prototype.getRoles = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/roles";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user roles");
-        }
-        self.roles = data.entities;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-Usergrid.Entity.prototype.assignRole = function(roleName, callback) {
-    var self = this;
-    var type = self.get("type");
-    var collection = type + "s";
-    var entityID;
-    if (type == "user" && this.get("username") != null) {
-        entityID = self.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = self.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = self.get("uuid");
-    }
-    if (type != "users" && type != "groups") {
-        doCallback(callback, [ new UsergridError("entity must be a group or user", "invalid_entity_type"), null, this ], this);
-    }
-    var endpoint = "roles/" + roleName + "/" + collection + "/" + entityID;
-    var options = {
-        method: "POST",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err) {
-            console.log("Could not assign role.");
-        }
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-Usergrid.Entity.prototype.removeRole = function(roleName, callback) {
-    var self = this;
-    var type = self.get("type");
-    var collection = type + "s";
-    var entityID;
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    if (type != "users" && type != "groups") {
-        doCallback(callback, [ new UsergridError("entity must be a group or user", "invalid_entity_type"), null, this ], this);
-    }
-    var endpoint = "roles/" + roleName + "/" + collection + "/" + entityID;
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, response) {
-        if (err) {
-            console.log("Could not assign role.");
-        }
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-Usergrid.Entity.prototype.assignPermissions = function(permissions, callback) {
-    var self = this;
-    var entityID;
-    var type = this.get("type");
-    if (type != "user" && type != "users" && type != "group" && type != "groups" && type != "role" && type != "roles") {
-        doCallback(callback, [ new UsergridError("entity must be a group, user, or role", "invalid_entity_type"), null, this ], this);
-    }
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    var endpoint = type + "/" + entityID + "/permissions";
-    var options = {
-        method: "POST",
-        endpoint: endpoint,
-        body: {
-            permission: permissions
-        }
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not assign permissions");
-        }
-        doCallback(callback, [ err, data, data.data ], self);
-    });
-};
-
-Usergrid.Entity.prototype.removePermissions = function(permissions, callback) {
-    var self = this;
-    var entityID;
-    var type = this.get("type");
-    if (type != "user" && type != "users" && type != "group" && type != "groups" && type != "role" && type != "roles") {
-        doCallback(callback, [ new UsergridError("entity must be a group, user, or role", "invalid_entity_type"), null, this ], this);
-    }
-    if (type == "user" && this.get("username") != null) {
-        entityID = this.get("username");
-    } else if (type == "group" && this.get("name") != null) {
-        entityID = this.get("name");
-    } else if (this.get("uuid") != null) {
-        entityID = this.get("uuid");
-    }
-    var endpoint = type + "/" + entityID + "/permissions";
-    var options = {
-        method: "DELETE",
-        endpoint: endpoint,
-        qs: {
-            permission: permissions
-        }
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not remove permissions");
-        }
-        doCallback(callback, [ err, data, data.params.permission ], self);
-    });
-};
-
-Usergrid.Entity.prototype.getPermissions = function(callback) {
-    var self = this;
-    var endpoint = this.get("type") + "/" + this.get("uuid") + "/permissions";
-    var options = {
-        method: "GET",
-        endpoint: endpoint
-    };
-    this._client.request(options, function(err, data) {
-        if (err && self._client.logging) {
-            console.log("could not get user permissions");
-        }
-        var permissions = [];
-        if (data.data) {
-            var perms = data.data;
-            var count = 0;
-            for (var i in perms) {
-                count++;
-                var perm = perms[i];
-                var parts = perm.split(":");
-                var ops_part = "";
-                var path_part = parts[0];
-                if (parts.length > 1) {
-                    ops_part = parts[0];
-                    path_part = parts[1];
-                }
-                ops_part = ops_part.replace("*", "get,post,put,delete");
-                var ops = ops_part.split(",");
-                var ops_object = {};
-                ops_object.get = "no";
-                ops_object.post = "no";
-                ops_object.put = "no";
-                ops_object.delete = "no";
-                for (var j in ops) {
-                    ops_object[ops[j]] = "yes";
-                }
-                permissions.push({
-                    operations: ops_object,
-                    path: path_part,
-                    perm: perm
-                });
-            }
-        }
-        self.permissions = permissions;
-        doCallback(callback, [ err, data, data.entities ], self);
-    });
-};
-
-/*
- *  The Collection class models Usergrid Collections.  It essentially
- *  acts as a container for holding Entity objects, while providing
- *  additional funcitonality such as paging, and saving
- *
- *  @constructor
- *  @param {string} options - configuration object
- *  @return {Collection} collection
- */
-Usergrid.Collection = function(options) {
-    if (options) {
-        this._client = options.client;
-        this._type = options.type;
-        this.qs = options.qs || {};
-        this._list = options.list || [];
-        this._iterator = options.iterator || -1;
-        this._previous = options.previous || [];
-        this._next = options.next || null;
-        this._cursor = options.cursor || null;
-        if (options.list) {
-            var count = options.list.length;
-            for (var i = 0; i < count; i++) {
-                var entity = this._client.restoreEntity(options.list[i]);
-                this._list[i] = entity;
-            }
-        }
-    }
-};
-
-/*
- *  method to determine whether or not the passed variable is a Usergrid Collection
- *
- *  @method isCollection
- *  @public
- *  @params {any} obj - any variable
- *  @return {boolean} Returns true or false
- */
-Usergrid.isCollection = function(obj) {
-    return obj && obj instanceof Usergrid.Collection;
-};
-
-/*
- *  gets the data from the collection object for serialization
- *
- *  @method serialize
- *  @return {object} data
- */
-Usergrid.Collection.prototype.serialize = function() {
-    var data = {};
-    data.type = this._type;
-    data.qs = this.qs;
-    data.iterator = this._iterator;
-    data.previous = this._previous;
-    data.next = this._next;
-    data.cursor = this._cursor;
-    this.resetEntityPointer();
-    var i = 0;
-    data.list = [];
-    while (this.hasNextEntity()) {
-        var entity = this.getNextEntity();
-        data.list[i] = entity.serialize();
-        i++;
-    }
-    data = JSON.stringify(data);
-    return data;
-};
-
-/*Usergrid.Collection.prototype.addCollection = function (collectionName, options, callback) {
-  self = this;
-  options.client = this._client;
-  var collection = new Usergrid.Collection(options, function(err, data) {
-    if (typeof(callback) === 'function') {
-
-      collection.resetEntityPointer();
-      while(collection.hasNextEntity()) {
-        var user = collection.getNextEntity();
-        var email = user.get('email');
-        var image = self._client.getDisplayImage(user.get('email'), user.get('picture'));
-        user._portal_image_icon = image;
-      }
-
-      self[collectionName] = collection;
-      doCallback(callback, [err, collection], self);
-    }
-  });
-};*/
-/*
- *  Populates the collection from the server
- *
- *  @method fetch
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.fetch = function(callback) {
-    var self = this;
-    var qs = this.qs;
-    if (this._cursor) {
-        qs.cursor = this._cursor;
-    } else {
-        delete qs.cursor;
-    }
-    var options = {
-        method: "GET",
-        endpoint: this._type,
-        qs: this.qs
-    };
-    this._client.request(options, function(err, response) {
-        if (err && self._client.logging) {
-            console.log("error getting collection");
-        } else {
-            self.saveCursor(response.cursor || null);
-            self.resetEntityPointer();
-            self._list = response.getEntities().filter(function(entity) {
-                return isUUID(entity.uuid);
-            }).map(function(entity) {
-                var ent = new Usergrid.Entity({
-                    client: self._client
-                });
-                ent.set(entity);
-                ent.type = self._type;
-                return ent;
-            });
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- *  Adds a new Entity to the collection (saves, then adds to the local object)
- *
- *  @method addNewEntity
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data, entity)
- */
-Usergrid.Collection.prototype.addEntity = function(entityObject, callback) {
-    var self = this;
-    entityObject.type = this._type;
-    this._client.createEntity(entityObject, function(err, response, entity) {
-        if (!err) {
-            self.addExistingEntity(entity);
-        }
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-Usergrid.Collection.prototype.addExistingEntity = function(entity) {
-    var count = this._list.length;
-    this._list[count] = entity;
-};
-
-/*
- *  Removes the Entity from the collection, then destroys the object on the server
- *
- *  @method destroyEntity
- *  @param {object} entity
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.destroyEntity = function(entity, callback) {
-    var self = this;
-    entity.destroy(function(err, response) {
-        if (err) {
-            if (self._client.logging) {
-                console.log("could not destroy entity");
-            }
-            doCallback(callback, [ err, response, self ], self);
-        } else {
-            self.fetch(callback);
-        }
-        self.removeEntity(entity);
-    });
-};
-
-/*
- * Filters the list of entities based on the supplied criteria function
- * works like Array.prototype.filter
- *
- *  @method getEntitiesByCriteria
- *  @param {function} criteria  A function that takes each entity as an argument and returns true or false
- *  @return {Entity[]} returns a list of entities that caused the criteria function to return true
- */
-Usergrid.Collection.prototype.getEntitiesByCriteria = function(criteria) {
-    return this._list.filter(criteria);
-};
-
-/*
- * Returns the first entity from the list of entities based on the supplied criteria function
- * works like Array.prototype.filter
- *
- *  @method getEntitiesByCriteria
- *  @param {function} criteria  A function that takes each entity as an argument and returns true or false
- *  @return {Entity[]} returns a list of entities that caused the criteria function to return true
- */
-Usergrid.Collection.prototype.getEntityByCriteria = function(criteria) {
-    return this.getEntitiesByCriteria(criteria).shift();
-};
-
-/*
- * Removed an entity from the collection without destroying it on the server
- *
- *  @method removeEntity
- *  @param {object} entity
- *  @return {Entity} returns the removed entity or undefined if it was not found
- */
-Usergrid.Collection.prototype.removeEntity = function(entity) {
-    var removedEntity = this.getEntityByCriteria(function(item) {
-        return entity.uuid === item.get("uuid");
-    });
-    delete this._list[this._list.indexOf(removedEntity)];
-    return removedEntity;
-};
-
-/*
- *  Looks up an Entity by UUID
- *
- *  @method getEntityByUUID
- *  @param {string} UUID
- *  @param {function} callback
- *  @return {callback} callback(err, data, entity)
- */
-Usergrid.Collection.prototype.getEntityByUUID = function(uuid, callback) {
-    var entity = this.getEntityByCriteria(function(item) {
-        return item.get("uuid") === uuid;
-    });
-    if (entity) {
-        doCallback(callback, [ null, entity, entity ], this);
-    } else {
-        var options = {
-            data: {
-                type: this._type,
-                uuid: uuid
-            },
-            client: this._client
-        };
-        entity = new Usergrid.Entity(options);
-        entity.fetch(callback);
-    }
-};
-
-/*
- *  Returns the first Entity of the Entity list - does not affect the iterator
- *
- *  @method getFirstEntity
- *  @return {object} returns an entity object
- */
-Usergrid.Collection.prototype.getFirstEntity = function() {
-    var count = this._list.length;
-    if (count > 0) {
-        return this._list[0];
-    }
-    return null;
-};
-
-/*
- *  Returns the last Entity of the Entity list - does not affect the iterator
- *
- *  @method getLastEntity
- *  @return {object} returns an entity object
- */
-Usergrid.Collection.prototype.getLastEntity = function() {
-    var count = this._list.length;
-    if (count > 0) {
-        return this._list[count - 1];
-    }
-    return null;
-};
-
-/*
- *  Entity iteration -Checks to see if there is a "next" entity
- *  in the list.  The first time this method is called on an entity
- *  list, or after the resetEntityPointer method is called, it will
- *  return true referencing the first entity in the list
- *
- *  @method hasNextEntity
- *  @return {boolean} true if there is a next entity, false if not
- */
-Usergrid.Collection.prototype.hasNextEntity = function() {
-    var next = this._iterator + 1;
-    var hasNextElement = next >= 0 && next < this._list.length;
-    if (hasNextElement) {
-        return true;
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Gets the "next" entity in the list.  The first
- *  time this method is called on an entity list, or after the method
- *  resetEntityPointer is called, it will return the,
- *  first entity in the list
- *
- *  @method hasNextEntity
- *  @return {object} entity
- */
-Usergrid.Collection.prototype.getNextEntity = function() {
-    this._iterator++;
-    var hasNextElement = this._iterator >= 0 && this._iterator <= this._list.length;
-    if (hasNextElement) {
-        return this._list[this._iterator];
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Checks to see if there is a "previous"
- *  entity in the list.
- *
- *  @method hasPrevEntity
- *  @return {boolean} true if there is a previous entity, false if not
- */
-Usergrid.Collection.prototype.hasPrevEntity = function() {
-    var previous = this._iterator - 1;
-    var hasPreviousElement = previous >= 0 && previous < this._list.length;
-    if (hasPreviousElement) {
-        return true;
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Gets the "previous" entity in the list.
- *
- *  @method getPrevEntity
- *  @return {object} entity
- */
-Usergrid.Collection.prototype.getPrevEntity = function() {
-    this._iterator--;
-    var hasPreviousElement = this._iterator >= 0 && this._iterator <= this._list.length;
-    if (hasPreviousElement) {
-        return this._list[this._iterator];
-    }
-    return false;
-};
-
-/*
- *  Entity iteration - Resets the iterator back to the beginning
- *  of the list
- *
- *  @method resetEntityPointer
- *  @return none
- */
-Usergrid.Collection.prototype.resetEntityPointer = function() {
-    this._iterator = -1;
-};
-
-/*
- * Method to save off the cursor just returned by the last API call
- *
- * @public
- * @method saveCursor
- * @return none
- */
-Usergrid.Collection.prototype.saveCursor = function(cursor) {
-    if (this._next !== cursor) {
-        this._next = cursor;
-    }
-};
-
-/*
- * Resets the paging pointer (back to original page)
- *
- * @public
- * @method resetPaging
- * @return none
- */
-Usergrid.Collection.prototype.resetPaging = function() {
-    this._previous = [];
-    this._next = null;
-    this._cursor = null;
-};
-
-/*
- *  Paging -  checks to see if there is a next page od data
- *
- *  @method hasNextPage
- *  @return {boolean} returns true if there is a next page of data, false otherwise
- */
-Usergrid.Collection.prototype.hasNextPage = function() {
-    return this._next;
-};
-
-/*
- *  Paging - advances the cursor and gets the next
- *  page of data from the API.  Stores returned entities
- *  in the Entity list.
- *
- *  @method getNextPage
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.getNextPage = function(callback) {
-    if (this.hasNextPage()) {
-        this._previous.push(this._cursor);
-        this._cursor = this._next;
-        this._list = [];
-        this.fetch(callback);
-    }
-};
-
-/*
- *  Paging -  checks to see if there is a previous page od data
- *
- *  @method hasPreviousPage
- *  @return {boolean} returns true if there is a previous page of data, false otherwise
- */
-Usergrid.Collection.prototype.hasPreviousPage = function() {
-    return this._previous.length > 0;
-};
-
-/*
- *  Paging - reverts the cursor and gets the previous
- *  page of data from the API.  Stores returned entities
- *  in the Entity list.
- *
- *  @method getPreviousPage
- *  @param {function} callback
- *  @return {callback} callback(err, data)
- */
-Usergrid.Collection.prototype.getPreviousPage = function(callback) {
-    if (this.hasPreviousPage()) {
-        this._next = null;
-        this._cursor = this._previous.pop();
-        this._list = [];
-        this.fetch(callback);
-    }
-};
-
-/*
- *  A class to model a Usergrid group.
- *  Set the path in the options object.
- *
- *  @constructor
- *  @param {object} options {client:client, data: {'key': 'value'}, path:'path'}
- */
-Usergrid.Group = function(options, callback) {
-    this._path = options.path;
-    this._list = [];
-    this._client = options.client;
-    this._data = options.data || {};
-    this._data.type = "groups";
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- *  Note: This only accounts for data on the group object itself.
- *  You need to use add and remove to manipulate group membership.
- */
-Usergrid.Group.prototype = new Usergrid.Entity();
-
-/*
- *  Fetches current group data, and members.
- *
- *  @method fetch
- *  @public
- *  @param {function} callback
- *  @returns {function} callback(err, data)
- */
-Usergrid.Group.prototype.fetch = function(callback) {
-    var self = this;
-    var groupEndpoint = "groups/" + this._path;
-    var memberEndpoint = "groups/" + this._path + "/users";
-    var groupOptions = {
-        method: "GET",
-        endpoint: groupEndpoint
-    };
-    var memberOptions = {
-        method: "GET",
-        endpoint: memberEndpoint
-    };
-    this._client.request(groupOptions, function(err, response) {
-        if (err) {
-            if (self._client.logging) {
-                console.log("error getting group");
-            }
-            doCallback(callback, [ err, response ], self);
-        } else {
-            var entities = response.getEntities();
-            if (entities && entities.length) {
-                var groupresponse = entities.shift();
-                self._client.request(memberOptions, function(err, response) {
-                    if (err && self._client.logging) {
-                        console.log("error getting group users");
-                    } else {
-                        self._list = response.getEntities().filter(function(entity) {
-                            return isUUID(entity.uuid);
-                        }).map(function(entity) {
-                            return new Usergrid.Entity({
-                                type: entity.type,
-                                client: self._client,
-                                uuid: entity.uuid,
-                                response: entity
-                            });
-                        });
-                    }
-                    doCallback(callback, [ err, response, self ], self);
-                });
-            }
-        }
-    });
-};
-
-/*
- *  Retrieves the members of a group.
- *
- *  @method members
- *  @public
- *  @param {function} callback
- *  @return {function} callback(err, data);
- */
-Usergrid.Group.prototype.members = function(callback) {
-    return this._list;
-};
-
-/*
- *  Adds an existing user to the group, and refreshes the group object.
- *
- *  Options object: {user: user_entity}
- *
- *  @method add
- *  @public
- *  @params {object} options
- *  @param {function} callback
- *  @return {function} callback(err, data)
- */
-Usergrid.Group.prototype.add = function(options, callback) {
-    var self = this;
-    if (options.user) {
-        options = {
-            method: "POST",
-            endpoint: "groups/" + this._path + "/users/" + options.user.get("username")
-        };
-        this._client.request(options, function(error, response) {
-            if (error) {
-                doCallback(callback, [ error, response, self ], self);
-            } else {
-                self.fetch(callback);
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("no user specified", "no_user_specified"), null, this ], this);
-    }
-};
-
-/*
- *  Removes a user from a group, and refreshes the group object.
- *
- *  Options object: {user: user_entity}
- *
- *  @method remove
- *  @public
- *  @params {object} options
- *  @param {function} callback
- *  @return {function} callback(err, data)
- */
-Usergrid.Group.prototype.remove = function(options, callback) {
-    var self = this;
-    if (options.user) {
-        options = {
-            method: "DELETE",
-            endpoint: "groups/" + this._path + "/users/" + options.user.username
-        };
-        this._client.request(options, function(error, response) {
-            if (error) {
-                doCallback(callback, [ error, response, self ], self);
-            } else {
-                self.fetch(callback);
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("no user specified", "no_user_specified"), null, this ], this);
-    }
-};
-
-/*
- * Gets feed for a group.
- *
- * @public
- * @method feed
- * @param {function} callback
- * @returns {callback} callback(err, data, activities)
- */
-Usergrid.Group.prototype.feed = function(callback) {
-    var self = this;
-    var options = {
-        method: "GET",
-        endpoint: "groups/" + this._path + "/feed"
-    };
-    this._client.request(options, function(err, response) {
-        doCallback(callback, [ err, response, self ], self);
-    });
-};
-
-/*
- * Creates activity and posts to group feed.
- *
- * options object: {user: user_entity, content: "activity content"}
- *
- * @public
- * @method createGroupActivity
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, entity)
- */
-Usergrid.Group.prototype.createGroupActivity = function(options, callback) {
-    var self = this;
-    var user = options.user;
-    var entity = new Usergrid.Entity({
-        client: this._client,
-        data: {
-            actor: {
-                displayName: user.get("username"),
-                uuid: user.get("uuid"),
-                username: user.get("username"),
-                email: user.get("email"),
-                picture: user.get("picture"),
-                image: {
-                    duration: 0,
-                    height: 80,
-                    url: user.get("picture"),
-                    width: 80
-                }
-            },
-            verb: "post",
-            content: options.content,
-            type: "groups/" + this._path + "/activities"
-        }
-    });
-    entity.save(function(err, response, entity) {
-        doCallback(callback, [ err, response, self ]);
-    });
-};
-
-/*
- *  A class to model a Usergrid event.
- *
- *  @constructor
- *  @param {object} options {timestamp:0, category:'value', counters:{name : value}}
- *  @returns {callback} callback(err, event)
- */
-Usergrid.Counter = function(options) {
-    this._client = options.client;
-    this._data = options.data || {};
-    this._data.category = options.category || "UNKNOWN";
-    this._data.timestamp = options.timestamp || 0;
-    this._data.type = "events";
-    this._data.counters = options.counters || {};
-};
-
-var COUNTER_RESOLUTIONS = [ "all", "minute", "five_minutes", "half_hour", "hour", "six_day", "day", "week", "month" ];
-
-/*
- *  Inherit from Usergrid.Entity.
- *  Note: This only accounts for data on the group object itself.
- *  You need to use add and remove to manipulate group membership.
- */
-Usergrid.Counter.prototype = new Usergrid.Entity();
-
-/*
- * overrides Entity.prototype.fetch. Returns all data for counters
- * associated with the object as specified in the constructor
- *
- * @public
- * @method increment
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.fetch = function(callback) {
-    this.getData({}, callback);
-};
-
-/*
- * increments the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method increment
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.increment = function(options, callback) {
-    var self = this, name = options.name, value = options.value;
-    if (!name) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("'name' for increment, decrement must be a number"), null, self ], self);
-    } else if (isNaN(value)) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("'value' for increment, decrement must be a number"), null, self ], self);
-    } else {
-        self._data.counters[name] = parseInt(value) || 1;
-        return self.save(callback);
-    }
-};
-
-/*
- * decrements the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method decrement
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.decrement = function(options, callback) {
-    var self = this, name = options.name, value = options.value;
-    self.increment({
-        name: name,
-        value: -(parseInt(value) || 1)
-    }, callback);
-};
-
-/*
- * resets the counter for a specific event
- *
- * options object: {name: counter_name}
- *
- * @public
- * @method reset
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.reset = function(options, callback) {
-    var self = this, name = options.name;
-    self.increment({
-        name: name,
-        value: 0
-    }, callback);
-};
-
-/*
- * gets data for one or more counters over a given
- * time period at a specified resolution
- *
- * options object: {
- *                   counters: ['counter1', 'counter2', ...],
- *                   start: epoch timestamp or ISO date string,
- *                   end: epoch timestamp or ISO date string,
- *                   resolution: one of ('all', 'minute', 'five_minutes', 'half_hour', 'hour', 'six_day', 'day', 'week', or 'month')
- *                   }
- *
- * @public
- * @method getData
- * @params {object} options
- * @param {function} callback
- * @returns {callback} callback(err, event)
- */
-Usergrid.Counter.prototype.getData = function(options, callback) {
-    var start_time, end_time, start = options.start || 0, end = options.end || Date.now(), resolution = (options.resolution || "all").toLowerCase(), counters = options.counters || Object.keys(this._data.counters), res = (resolution || "all").toLowerCase();
-    if (COUNTER_RESOLUTIONS.indexOf(res) === -1) {
-        res = "all";
-    }
-    start_time = getSafeTime(start);
-    end_time = getSafeTime(end);
-    var self = this;
-    var params = Object.keys(counters).map(function(counter) {
-        return [ "counter", encodeURIComponent(counters[counter]) ].join("=");
-    });
-    params.push("resolution=" + res);
-    params.push("start_time=" + String(start_time));
-    params.push("end_time=" + String(end_time));
-    var endpoint = "counters?" + params.join("&");
-    this._client.request({
-        endpoint: endpoint
-    }, function(err, data) {
-        if (data.counters && data.counters.length) {
-            data.counters.forEach(function(counter) {
-                self._data.counters[counter.name] = counter.value || counter.values;
-            });
-        }
-        return doCallback(callback, [ err, data, self ], self);
-    });
-};
-
-function getSafeTime(prop) {
-    var time;
-    switch (typeof prop) {
-      case "undefined":
-        time = Date.now();
-        break;
-
-      case "number":
-        time = prop;
-        break;
-
-      case "string":
-        time = isNaN(prop) ? Date.parse(prop) : parseInt(prop);
-        break;
-
-      default:
-        time = Date.parse(prop.toString());
-    }
-    return time;
-}
-
-/*
- *  A class to model a Usergrid folder.
- *
- *  @constructor
- *  @param {object} options {name:"MyPhotos", path:"/user/uploads", owner:"00000000-0000-0000-0000-000000000000" }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder = function(options, callback) {
-    var self = this, messages = [];
-    console.log("FOLDER OPTIONS", options);
-    self._client = options.client;
-    self._data = options.data || {};
-    self._data.type = "folders";
-    var missingData = [ "name", "owner", "path" ].some(function(required) {
-        return !(required in self._data);
-    });
-    if (missingData) {
-        return doCallback(callback, [ new UsergridInvalidArgumentError("Invalid asset data: 'name', 'owner', and 'path' are required properties."), null, self ], self);
-    }
-    self.save(function(err, response) {
-        if (err) {
-            doCallback(callback, [ new UsergridError(response), response, self ], self);
-        } else {
-            if (response && response.entities && response.entities.length) {
-                self.set(response.entities[0]);
-            }
-            doCallback(callback, [ null, response, self ], self);
-        }
-    });
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- */
-Usergrid.Folder.prototype = new Usergrid.Entity();
-
-/*
- *  fetch the folder and associated assets
- *
- *  @method fetch
- *  @public
- *  @param {function} callback(err, self)
- *  @returns {callback} callback(err, self)
- */
-Usergrid.Folder.prototype.fetch = function(callback) {
-    var self = this;
-    Usergrid.Entity.prototype.fetch.call(self, function(err, data) {
-        console.log("self", self.get());
-        console.log("data", data);
-        if (!err) {
-            self.getAssets(function(err, response) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(response), resonse, self ], self);
-                } else {
-                    doCallback(callback, [ null, self ], self);
-                }
-            });
-        } else {
-            doCallback(callback, [ null, data, self ], self);
-        }
-    });
-};
-
-/*
- *  Add an asset to the folder.
- *
- *  @method addAsset
- *  @public
- *  @param {object} options {asset:(uuid || Usergrid.Asset || {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }) }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder.prototype.addAsset = function(options, callback) {
-    var self = this;
-    if ("asset" in options) {
-        var asset = null;
-        switch (typeof options.asset) {
-          case "object":
-            asset = options.asset;
-            if (!(asset instanceof Usergrid.Entity)) {
-                asset = new Usergrid.Asset(asset);
-            }
-            break;
-
-          case "string":
-            if (isUUID(options.asset)) {
-                asset = new Usergrid.Asset({
-                    client: self._client,
-                    data: {
-                        uuid: options.asset,
-                        type: "assets"
-                    }
-                });
-            }
-            break;
-        }
-        if (asset && asset instanceof Usergrid.Entity) {
-            asset.fetch(function(err, data) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(data), data, self ], self);
-                } else {
-                    var endpoint = [ "folders", self.get("uuid"), "assets", asset.get("uuid") ].join("/");
-                    var options = {
-                        method: "POST",
-                        endpoint: endpoint
-                    };
-                    self._client.request(options, callback);
-                }
-            });
-        }
-    } else {
-        doCallback(callback, [ new UsergridInvalidArgumentError("No asset specified"), null, self ], self);
-    }
-};
-
-/*
- *  Remove an asset from the folder.
- *
- *  @method removeAsset
- *  @public
- *  @param {object} options {asset:(uuid || Usergrid.Asset || {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }) }
- *  @returns {callback} callback(err, folder)
- */
-Usergrid.Folder.prototype.removeAsset = function(options, callback) {
-    var self = this;
-    if ("asset" in options) {
-        var asset = null;
-        switch (typeof options.asset) {
-          case "object":
-            asset = options.asset;
-            break;
-
-          case "string":
-            if (isUUID(options.asset)) {
-                asset = new Usergrid.Asset({
-                    client: self._client,
-                    data: {
-                        uuid: options.asset,
-                        type: "assets"
-                    }
-                });
-            }
-            break;
-        }
-        if (asset && asset !== null) {
-            var endpoint = [ "folders", self.get("uuid"), "assets", asset.get("uuid") ].join("/");
-            self._client.request({
-                method: "DELETE",
-                endpoint: endpoint
-            }, function(err, response) {
-                if (err) {
-                    doCallback(callback, [ new UsergridError(response), response, self ], self);
-                } else {
-                    doCallback(callback, [ null, response, self ], self);
-                }
-            });
-        }
-    } else {
-        doCallback(callback, [ new UsergridInvalidArgumentError("No asset specified"), null, self ], self);
-    }
-};
-
-/*
- *  List the assets in the folder.
- *
- *  @method getAssets
- *  @public
- *  @returns {callback} callback(err, assets)
- */
-Usergrid.Folder.prototype.getAssets = function(callback) {
-    return this.getConnections("assets", callback);
-};
-
-/*
- *  XMLHttpRequest.prototype.sendAsBinary polyfill
- *  from: https://developer.mozilla.org/en-US/docs/DOM/XMLHttpRequest#sendAsBinary()
- *
- *  @method sendAsBinary
- *  @param {string} sData
- */
-if (!XMLHttpRequest.prototype.sendAsBinary) {
-    XMLHttpRequest.prototype.sendAsBinary = function(sData) {
-        var nBytes = sData.length, ui8Data = new Uint8Array(nBytes);
-        for (var nIdx = 0; nIdx < nBytes; nIdx++) {
-            ui8Data[nIdx] = sData.charCodeAt(nIdx) & 255;
-        }
-        this.send(ui8Data);
-    };
-}
-
-/*
- *  A class to model a Usergrid asset.
- *
- *  @constructor
- *  @param {object} options {name:"photo.jpg", path:"/user/uploads", "content-type":"image/jpeg", owner:"F01DE600-0000-0000-0000-000000000000" }
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset = function(options, callback) {
-    var self = this, messages = [];
-    self._client = options.client;
-    self._data = options.data || {};
-    self._data.type = "assets";
-    var missingData = [ "name", "owner", "path" ].some(function(required) {
-        return !(required in self._data);
-    });
-    if (missingData) {
-        doCallback(callback, [ new UsergridError("Invalid asset data: 'name', 'owner', and 'path' are required properties."), null, self ], self);
-    } else {
-        self.save(function(err, data) {
-            if (err) {
-                doCallback(callback, [ new UsergridError(data), data, self ], self);
-            } else {
-                if (data && data.entities && data.entities.length) {
-                    self.set(data.entities[0]);
-                }
-                doCallback(callback, [ null, data, self ], self);
-            }
-        });
-    }
-};
-
-/*
- *  Inherit from Usergrid.Entity.
- */
-Usergrid.Asset.prototype = new Usergrid.Entity();
-
-/*
- *  Add an asset to a folder.
- *
- *  @method connect
- *  @public
- *  @param {object} options {folder:"F01DE600-0000-0000-0000-000000000000"}
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset.prototype.addToFolder = function(options, callback) {
-    var self = this, error = null;
-    if ("folder" in options && isUUID(options.folder)) {
-        var folder = Usergrid.Folder({
-            uuid: options.folder
-        }, function(err, folder) {
-            if (err) {
-                doCallback(callback, [ UsergridError.fromResponse(folder), folder, self ], self);
-            } else {
-                var endpoint = [ "folders", folder.get("uuid"), "assets", self.get("uuid") ].join("/");
-                var options = {
-                    method: "POST",
-                    endpoint: endpoint
-                };
-                this._client.request(options, function(err, response) {
-                    if (err) {
-                        doCallback(callback, [ UsergridError.fromResponse(folder), response, self ], self);
-                    } else {
-                        doCallback(callback, [ null, folder, self ], self);
-                    }
-                });
-            }
-        });
-    } else {
-        doCallback(callback, [ new UsergridError("folder not specified"), null, self ], self);
-    }
-};
-
-Usergrid.Entity.prototype.attachAsset = function(file, callback) {
-    if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
-        doCallback(callback, [ new UsergridError("The File APIs are not fully supported by your browser."), null, this ], this);
-        return;
-    }
-    var self = this;
-    var args = arguments;
-    var type = this._data.type;
-    var attempts = self.get("attempts");
-    if (isNaN(attempts)) {
-        attempts = 3;
-    }
-    if (type != "assets" && type != "asset") {
-        var endpoint = [ this._client.URI, this._client.orgName, this._client.appName, type, self.get("uuid") ].join("/");
-    } else {
-        self.set("content-type", file.type);
-        self.set("size", file.size);
-        var endpoint = [ this._client.URI, this._client.orgName, this._client.appName, "assets", self.get("uuid"), "data" ].join("/");
-    }
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", endpoint, true);
-    xhr.onerror = function(err) {
-        doCallback(callback, [ new UsergridError("The File APIs are not fully supported by your browser.") ], xhr, self);
-    };
-    xhr.onload = function(ev) {
-        if (xhr.status >= 500 && attempts > 0) {
-            self.set("attempts", --attempts);
-            setTimeout(function() {
-                self.attachAsset.apply(self, args);
-            }, 100);
-        } else if (xhr.status >= 300) {
-            self.set("attempts");
-            doCallback(callback, [ new UsergridError(JSON.parse(xhr.responseText)), xhr, self ], self);
-        } else {
-            self.set("attempts");
-            self.fetch();
-            doCallback(callback, [ null, xhr, self ], self);
-        }
-    };
-    var fr = new FileReader();
-    fr.onload = function() {
-        var binary = fr.result;
-        if (type === "assets" || type === "asset") {
-            xhr.overrideMimeType("application/octet-stream");
-            xhr.setRequestHeader("Content-Type", "application/octet-stream");
-        }
-        xhr.sendAsBinary(binary);
-    };
-    fr.readAsBinaryString(file);
-};
-
-/*
- *  Upload Asset data
- *
- *  @method upload
- *  @public
- *  @param {object} data Can be a javascript Blob or File object
- *  @returns {callback} callback(err, asset)
- */
-Usergrid.Asset.prototype.upload = function(data, callback) {
-    this.attachAsset(data, function(err, response) {
-        if (!err) {
-            doCallback(callback, [ null, response, self ], self);
-        } else {
-            doCallback(callback, [ new UsergridError(err), response, self ], self);
-        }
-    });
-};
-
-/*
- *  Download Asset data
- *
- *  @method download
- *  @public
- *  @returns {callback} callback(err, blob) blob is a javascript Blob object.
- */
-Usergrid.Entity.prototype.downloadAsset = function(callback) {
-    var self = this;
-    var endpoint;
-    var type = this._data.type;
-    var xhr = new XMLHttpRequest();
-    if (type != "assets" && type != "asset") {
-        endpoint = [ this._client.URI, this._client.orgName, this._client.appName, type, self.get("uuid") ].join("/");
-    } else {
-        endpoint = [ this._client.URI, this._client.orgName, this._client.appName, "assets", self.get("uuid"), "data" ].join("/");
-    }
-    xhr.open("GET", endpoint, true);
-    xhr.responseType = "blob";
-    xhr.onload = function(ev) {
-        var blob = xhr.response;
-        if (type != "assets" && type != "asset") {
-            doCallback(callback, [ null, blob, xhr ], self);
-        } else {
-            doCallback(callback, [ null, xhr, self ], self);
-        }
-    };
-    xhr.onerror = function(err) {
-        callback(true, err);
-        doCallback(callback, [ new UsergridError(err), xhr, self ], self);
-    };
-    if (type != "assets" && type != "asset") {
-        xhr.setRequestHeader("Accept", self._data["file-metadata"]["content-type"]);
-    } else {
-        xhr.overrideMimeType(self.get("content-type"));
-    }
-    xhr.send();
-};
-
-/*
- *  Download Asset data
- *
- *  @method download
- *  @public
- *  @returns {callback} callback(err, blob) blob is a javascript Blob object.
- */
-Usergrid.Asset.prototype.download = function(callback) {
-    this.downloadAsset(function(err, response) {
-        if (!err) {
-            doCallback(callback, [ null, response, self ], self);
-        } else {
-            doCallback(callback, [ new UsergridError(err), response, self ], self);
-        }
-    });
-};
-
-/**
- * Created by ryan bridges on 2014-02-05.
- */
-(function(global) {
-    var name = "UsergridError", short, _name = global[name], _short = short && short !== undefined ? global[short] : undefined;
-    /*
-     *  Instantiates a new UsergridError
-     *
-     *  @method UsergridError
-     *  @public
-     *  @params {<string>} message
-     *  @params {<string>} id       - the error code, id, or name
-     *  @params {<int>} timestamp
-     *  @params {<int>} duration
-     *  @params {<string>} exception    - the Java exception from Usergrid
-     *  @return Returns - a new UsergridError object
-     *
-     *  Example:
-     *
-     *  UsergridError(message);
-     */
-    function UsergridError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridError.prototype = new Error();
-    UsergridError.prototype.constructor = UsergridError;
-    /*
-     *  Creates a UsergridError from the JSON response returned from the backend
-     *
-     *  @method fromResponse
-     *  @public
-     *  @params {object} response - the deserialized HTTP response from the Usergrid API
-     *  @return Returns a new UsergridError object.
-     *
-     *  Example:
-     *  {
-     *  "error":"organization_application_not_found",
-     *  "timestamp":1391618508079,
-     *  "duration":0,
-     *  "exception":"org.usergrid.rest.exceptions.OrganizationApplicationNotFoundException",
-     *  "error_description":"Could not find application for yourorgname/sandboxxxxx from URI: yourorgname/sandboxxxxx"
-     *  }
-     */
-    UsergridError.fromResponse = function(response) {
-        if (response && "undefined" !== typeof response) {
-            return new UsergridError(response.error_description, response.error, response.timestamp, response.duration, response.exception);
-        } else {
-            return new UsergridError();
-        }
-    };
-    UsergridError.createSubClass = function(name) {
-        if (name in global && global[name]) return global[name];
-        global[name] = function() {};
-        global[name].name = name;
-        global[name].prototype = new UsergridError();
-        return global[name];
-    };
-    function UsergridHTTPResponseError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridHTTPResponseError.prototype = new UsergridError();
-    function UsergridInvalidHTTPMethodError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_http_method";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidHTTPMethodError.prototype = new UsergridError();
-    function UsergridInvalidURIError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_uri";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidURIError.prototype = new UsergridError();
-    function UsergridInvalidArgumentError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name || "invalid_argument";
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridInvalidArgumentError.prototype = new UsergridError();
-    function UsergridKeystoreDatabaseUpgradeNeededError(message, name, timestamp, duration, exception) {
-        this.message = message;
-        this.name = name;
-        this.timestamp = timestamp || Date.now();
-        this.duration = duration || 0;
-        this.exception = exception;
-    }
-    UsergridKeystoreDatabaseUpgradeNeededError.prototype = new UsergridError();
-    global.UsergridHTTPResponseError = UsergridHTTPResponseError;
-    global.UsergridInvalidHTTPMethodError = UsergridInvalidHTTPMethodError;
-    global.UsergridInvalidURIError = UsergridInvalidURIError;
-    global.UsergridInvalidArgumentError = UsergridInvalidArgumentError;
-    global.UsergridKeystoreDatabaseUpgradeNeededError = UsergridKeystoreDatabaseUpgradeNeededError;
-    global[name] = UsergridError;
-    if (short !== undefined) {
-        global[short] = UsergridError;
-    }
-    global[name].noConflict = function() {
-        if (_name) {
-            global[name] = _name;
-        }
-        if (short !== undefined) {
-            global[short] = _short;
-        }
-        return UsergridError;
+        return UsergridHelpers;
     };
     return global[name];
 })(this);
+
+"use strict";
+
+var UsergridClientDefaultOptions = {
+    baseUrl: "https://api.usergrid.com",
+    authMode: UsergridAuthMode.USER
+};
+
+var UsergridClient = function(options) {
+    var self = this;
+    var __appAuth;
+    self.tempAuth = undefined;
+    self.isSharedInstance = false;
+    if (arguments.length === 2) {
+        self.orgId = arguments[0];
+        self.appId = arguments[1];
+    }
+    _.defaults(self, options, UsergridClientDefaultOptions);
+    if (!self.orgId || !self.appId) {
+        throw new Error("'orgId' and 'appId' parameters are required when instantiating UsergridClient");
+    }
+    Object.defineProperty(self, "clientId", {
+        enumerable: false
+    });
+    Object.defineProperty(self, "clientSecret", {
+        enumerable: false
+    });
+    Object.defineProperty(self, "appAuth", {
+        get: function() {
+            return __appAuth;
+        },
+        set: function(options) {
+            if (options instanceof UsergridAppAuth) {
+                __appAuth = options;
+            } else if (typeof options !== "undefined") {
+                __appAuth = new UsergridAppAuth(options);
+            }
+        }
+    });
+    if (self.clientId && self.clientSecret) {
+        self.setAppAuth(self.clientId, self.clientSecret);
+    }
+    return self;
+};
+
+UsergridClient.prototype = {
+    sendRequest: function(usergridRequest) {
+        return usergridRequest.sendRequest();
+    },
+    GET: function() {
+        var usergridRequest = UsergridHelpers.buildRequest(this, UsergridHttpMethod.GET, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    PUT: function() {
+        var usergridRequest = UsergridHelpers.buildRequest(this, UsergridHttpMethod.PUT, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    POST: function() {
+        var usergridRequest = UsergridHelpers.buildRequest(this, UsergridHttpMethod.POST, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    DELETE: function() {
+        var usergridRequest = UsergridHelpers.buildRequest(this, UsergridHttpMethod.DELETE, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    connect: function() {
+        var usergridRequest = UsergridHelpers.buildConnectionRequest(this, UsergridHttpMethod.POST, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    disconnect: function() {
+        var usergridRequest = UsergridHelpers.buildConnectionRequest(this, UsergridHttpMethod.DELETE, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    getConnections: function() {
+        var usergridRequest = UsergridHelpers.buildGetConnectionRequest(this, UsergridHelpers.flattenArgs(arguments));
+        return this.sendRequest(usergridRequest);
+    },
+    usingAuth: function(auth) {
+        var self = this;
+        if (_.isString(auth)) {
+            self.tempAuth = new UsergridAuth(auth);
+        } else if (auth instanceof UsergridAuth) {
+            self.tempAuth = auth;
+        } else {
+            self.tempAuth = undefined;
+        }
+        return self;
+    },
+    setAppAuth: function() {
+        this.appAuth = new UsergridAppAuth(UsergridHelpers.flattenArgs(arguments));
+    },
+    authenticateApp: function(options) {
+        var self = this;
+        var authenticateAppCallback = UsergridHelpers.callback(UsergridHelpers.flattenArgs(arguments));
+        var auth = _.first([ options, self.appAuth, new UsergridAppAuth(options), new UsergridAppAuth(self.clientId, self.clientSecret) ].filter(function(p) {
+            return p instanceof UsergridAppAuth;
+        }));
+        if (!(auth instanceof UsergridAppAuth)) {
+            throw new Error("App auth context was not defined when attempting to call .authenticateApp()");
+        } else if (!auth.clientId || !auth.clientSecret) {
+            throw new Error("authenticateApp() failed because clientId or clientSecret are missing");
+        }
+        var callback = function(error, usergridResponse) {
+            var token = _.get(usergridResponse.responseJSON, "access_token");
+            var expiresIn = _.get(usergridResponse.responseJSON, "expires_in");
+            if (usergridResponse.ok) {
+                if (!self.appAuth) {
+                    self.appAuth = auth;
+                }
+                self.appAuth.token = token;
+                self.appAuth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
+                self.appAuth.tokenTtl = expiresIn;
+            }
+            authenticateAppCallback(error, usergridResponse, token);
+        };
+        var usergridRequest = UsergridHelpers.buildAppAuthRequest(self, auth, callback);
+        return self.sendRequest(usergridRequest);
+    },
+    authenticateUser: function(options) {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var callback = UsergridHelpers.callback(args);
+        var setAsCurrentUser = _.last(args.filter(_.isBoolean)) !== undefined ? _.last(args.filter(_.isBoolean)) : true;
+        var userToAuthenticate = new UsergridUser(options);
+        userToAuthenticate.login(self, function(error, usergridResponse, token) {
+            if (usergridResponse.ok && setAsCurrentUser) {
+                self.currentUser = userToAuthenticate;
+            }
+            callback(usergridResponse.error, usergridResponse, token);
+        });
+    },
+    downloadAsset: function() {
+        var self = this;
+        var usergridRequest = UsergridHelpers.buildRequest(self, UsergridHttpMethod.GET, UsergridHelpers.flattenArgs(arguments));
+        var assetContentType = _.get(usergridRequest, "entity.file-metadata.content-type");
+        if (assetContentType !== undefined) {
+            _.assign(usergridRequest.headers, {
+                Accept: assetContentType
+            });
+        }
+        var realDownloadAssetCallback = usergridRequest.callback;
+        usergridRequest.callback = function(error, usergridResponse) {
+            var entity = usergridRequest.entity;
+            entity.asset = usergridResponse.asset;
+            realDownloadAssetCallback(error, usergridResponse, entity);
+        };
+        return self.sendRequest(usergridRequest);
+    },
+    uploadAsset: function() {
+        var self = this;
+        var usergridRequest = UsergridHelpers.buildRequest(self, UsergridHttpMethod.PUT, UsergridHelpers.flattenArgs(arguments));
+        if (usergridRequest.asset === undefined) {
+            throw new Error("An UsergridAsset was not defined when attempting to call .uploadAsset()");
+        }
+        var realUploadAssetCallback = usergridRequest.callback;
+        usergridRequest.callback = function(error, usergridResponse) {
+            var requestEntity = usergridRequest.entity;
+            var responseEntity = usergridResponse.entity;
+            var requestAsset = usergridRequest.asset;
+            if (usergridResponse.ok && responseEntity !== undefined) {
+                UsergridHelpers.updateEntityFromRemote(requestEntity, usergridResponse);
+                requestEntity.asset = requestAsset;
+                if (responseEntity) {
+                    responseEntity.asset = requestAsset;
+                }
+            }
+            realUploadAssetCallback(error, usergridResponse, requestEntity);
+        };
+        return self.sendRequest(usergridRequest);
+    }
+};
+
+"use strict";
+
+var UsergridSDKVersion = "2.0.0";
+
+var UsergridClientSharedInstance = function() {
+    var self = this;
+    self.isInitialized = false;
+    self.isSharedInstance = true;
+    return self;
+};
+
+UsergridHelpers.inherits(UsergridClientSharedInstance, UsergridClient);
+
+var Usergrid = new UsergridClientSharedInstance();
+
+Usergrid.initSharedInstance = function(options) {
+    if (Usergrid.isInitialized) {
+        console.log("Usergrid shared instance is already initialized");
+    } else {
+        _.assign(Usergrid, new UsergridClient(options));
+        Usergrid.isInitialized = true;
+        Usergrid.isSharedInstance = true;
+    }
+    return Usergrid;
+};
+
+Usergrid.init = Usergrid.initSharedInstance;
+
+"use strict";
+
+var UsergridQuery = function(type) {
+    var self = this;
+    var query = "", queryString, sort, urlTerms = {}, __nextIsNot = false;
+    self._type = type;
+    _.assign(self, {
+        type: function(value) {
+            self._type = value;
+            return self;
+        },
+        collection: function(value) {
+            self._type = value;
+            return self;
+        },
+        limit: function(value) {
+            self._limit = value;
+            return self;
+        },
+        cursor: function(value) {
+            self._cursor = value;
+            return self;
+        },
+        eq: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.EQUAL + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        equal: this.eq,
+        gt: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.GREATER_THAN + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThan: this.gt,
+        gte: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.GREATER_THAN_EQUAL_TO + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        greaterThanOrEqual: this.gte,
+        lt: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.LESS_THAN + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        lessThan: this.lt,
+        lte: function(key, value) {
+            query = self.andJoin(key + " " + UsergridQueryOperator.LESS_THAN_EQUAL_TO + " " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        lessThanOrEqual: this.lte,
+        contains: function(key, value) {
+            query = self.andJoin(key + " contains " + UsergridHelpers.useQuotesIfRequired(value));
+            return self;
+        },
+        locationWithin: function(distanceInMeters, lat, lng) {
+            query = self.andJoin("location within " + distanceInMeters + " of " + lat + ", " + lng);
+            return self;
+        },
+        asc: function(key) {
+            self.sort(key, UsergridQuerySortOrder.ASC);
+            return self;
+        },
+        desc: function(key) {
+            self.sort(key, UsergridQuerySortOrder.DESC);
+            return self;
+        },
+        sort: function(key, order) {
+            sort = key && order ? " order by " + key + " " + order : "";
+            return self;
+        },
+        fromString: function(string) {
+            queryString = string;
+            return self;
+        },
+        urlTerm: function(key, value) {
+            if (key === "ql") {
+                self.fromString();
+            } else {
+                urlTerms[key] = value;
+            }
+            return self;
+        },
+        andJoin: function(append) {
+            if (__nextIsNot) {
+                append = "not " + append;
+                __nextIsNot = false;
+            }
+            if (!append) {
+                return query;
+            } else if (query.length === 0) {
+                return append;
+            } else {
+                return _.endsWith(query, "and") || _.endsWith(query, "or") ? query + " " + append : query + " and " + append;
+            }
+        },
+        orJoin: function() {
+            return query.length > 0 && !_.endsWith(query, "or") ? query + " or" : query;
+        }
+    });
+    Object.defineProperty(self, "_ql", {
+        get: function() {
+            var ql = "select * ";
+            if (queryString !== undefined) {
+                ql = queryString;
+            } else {
+                ql += query.length > 0 ? "where " + (query || "") : "";
+                ql += sort !== undefined ? sort : "";
+            }
+            return ql;
+        }
+    });
+    Object.defineProperty(self, "encodedStringValue", {
+        get: function() {
+            var self = this;
+            var limit = self._limit;
+            var cursor = self._cursor;
+            var requirementsString = self._ql;
+            var returnString = undefined;
+            if (limit !== undefined) {
+                returnString = "limit" + UsergridQueryOperator.EQUAL + limit;
+            }
+            if (!_.isEmpty(cursor)) {
+                var cursorString = "cursor" + UsergridQueryOperator.EQUAL + cursor;
+                if (_.isEmpty(returnString)) {
+                    returnString = cursorString;
+                } else {
+                    returnString += "&" + cursorString;
+                }
+            }
+            _.forEach(urlTerms, function(value, key) {
+                var encodedURLTermString = encodeURIComponent(key) + UsergridQueryOperator.EQUAL + encodeURIComponent(value);
+                if (_.isEmpty(returnString)) {
+                    returnString = encodedURLTermString;
+                } else {
+                    returnString += "&" + encodedURLTermString;
+                }
+            });
+            if (!_.isEmpty(requirementsString)) {
+                var qLString = "ql=" + encodeURIComponent(requirementsString);
+                if (_.isEmpty(returnString)) {
+                    returnString = qLString;
+                } else {
+                    returnString += "&" + qLString;
+                }
+            }
+            if (!_.isEmpty(returnString)) {
+                returnString = "?" + returnString;
+            }
+            return !_.isEmpty(returnString) ? returnString : undefined;
+        }
+    });
+    Object.defineProperty(self, "and", {
+        get: function() {
+            query = self.andJoin("");
+            return self;
+        }
+    });
+    Object.defineProperty(self, "or", {
+        get: function() {
+            query = self.orJoin();
+            return self;
+        }
+    });
+    Object.defineProperty(self, "not", {
+        get: function() {
+            __nextIsNot = true;
+            return self;
+        }
+    });
+    return self;
+};
+
+"use strict";
+
+var UsergridRequest = function(options) {
+    var self = this;
+    var client = UsergridHelpers.validateAndRetrieveClient(options);
+    if (!_.isString(options.type) && !_.isString(options.path) && !_.isString(options.uri)) {
+        throw new Error("one of 'type' (collection name), 'path', or 'uri' parameters are required when initializing a UsergridRequest");
+    }
+    if (!_.includes([ "GET", "PUT", "POST", "DELETE" ], options.method)) {
+        throw new Error("'method' parameter is required when initializing a UsergridRequest");
+    }
+    self.method = options.method;
+    self.callback = options.callback;
+    self.uri = options.uri || UsergridHelpers.uri(client, options);
+    self.entity = options.entity;
+    self.body = options.body;
+    self.asset = options.asset;
+    self.query = options.query;
+    self.queryParams = options.queryParams || options.qs;
+    var defaultHeadersToUse = !self.asset ? UsergridHelpers.DefaultHeaders : {};
+    self.headers = UsergridHelpers.headers(client, options, defaultHeadersToUse);
+    if (self.query !== undefined) {
+        self.uri += UsergridHelpers.normalize(self.query.encodedStringValue, {});
+    }
+    if (self.queryParams) {
+        _.forOwn(self.queryParams, function(value, key) {
+            self.uri += "?" + encodeURIComponent(key) + UsergridQueryOperator.EQUAL + encodeURIComponent(value);
+        });
+        self.uri = UsergridHelpers.normalize(self.uri, {});
+    }
+    if (self.asset) {
+        self.body = new FormData();
+        self.body.append(self.asset.filename, self.asset.data);
+    } else {
+        try {
+            if (_.isPlainObject(self.body)) {
+                self.body = JSON.stringify(self.body);
+            } else if (_.isArray(self.body)) {
+                self.body = JSON.stringify(self.body);
+            }
+        } catch (exception) {
+            console.warn("Unable to convert 'UsergridRequest.body' to a JSON String: " + exception);
+        }
+    }
+    return self;
+};
+
+UsergridRequest.prototype.sendRequest = function() {
+    var self = this;
+    var requestPromise = function() {
+        var promise = new Promise();
+        var xmlHttpRequest = new XMLHttpRequest();
+        xmlHttpRequest.open(self.method, self.uri, true);
+        xmlHttpRequest.onload = function() {
+            promise.done(xmlHttpRequest);
+        };
+        _.forOwn(self.headers, function(value, key) {
+            xmlHttpRequest.setRequestHeader(key, value);
+        });
+        if (self.method === UsergridHttpMethod.GET && _.get(self.headers, "Accept") !== UsergridApplicationJSONHeaderValue) {
+            xmlHttpRequest.responseType = "blob";
+        }
+        xmlHttpRequest.send(self.body);
+        return promise;
+    };
+    var responsePromise = function(xmlRequest) {
+        var promise = new Promise();
+        var usergridResponse = new UsergridResponse(xmlRequest, self);
+        promise.done(usergridResponse);
+        return promise;
+    };
+    var onCompletePromise = function(usergridResponse) {
+        self.callback(usergridResponse.error, usergridResponse);
+    };
+    Promise.chain([ requestPromise, responsePromise ]).then(onCompletePromise);
+    return self;
+};
+
+"use strict";
+
+var UsergridAuth = function(token, expiry) {
+    var self = this;
+    self.token = token;
+    self.expiry = expiry || 0;
+    var usingToken = token ? true : false;
+    Object.defineProperty(self, "hasToken", {
+        get: function() {
+            return self.token !== undefined;
+        },
+        configurable: true
+    });
+    Object.defineProperty(self, "isExpired", {
+        get: function() {
+            return usingToken ? false : Date.now() >= self.expiry;
+        },
+        configurable: true
+    });
+    Object.defineProperty(self, "isValid", {
+        get: function() {
+            return !self.isExpired && self.hasToken;
+        },
+        configurable: true
+    });
+    Object.defineProperty(self, "tokenTtl", {
+        configurable: true,
+        writable: true
+    });
+    _.assign(self, {
+        destroy: function() {
+            self.token = undefined;
+            self.expiry = 0;
+            self.tokenTtl = undefined;
+        }
+    });
+    return self;
+};
+
+var UsergridAppAuth = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    if (_.isPlainObject(args[0])) {
+        self.clientId = args[0].clientId;
+        self.clientSecret = args[0].clientSecret;
+        self.tokenTtl = args[0].tokenTtl;
+    } else {
+        self.clientId = args[0];
+        self.clientSecret = args[1];
+        self.tokenTtl = args[2];
+    }
+    UsergridAuth.call(self);
+    _.assign(self, UsergridAuth);
+    return self;
+};
+
+UsergridHelpers.inherits(UsergridAppAuth, UsergridAuth);
+
+var UsergridUserAuth = function(options) {
+    var self = this;
+    var args = _.flattenDeep(UsergridHelpers.flattenArgs(arguments));
+    if (_.isPlainObject(args[0])) {
+        options = args[0];
+    }
+    self.username = options.username || args[0];
+    self.email = options.email;
+    if (options.password || args[1]) {
+        self.password = options.password || args[1];
+    }
+    self.tokenTtl = options.tokenTtl || args[2];
+    UsergridAuth.call(self);
+    _.assign(self, UsergridAuth);
+    return self;
+};
+
+UsergridHelpers.inherits(UsergridUserAuth, UsergridAuth);
+
+"use strict";
+
+var UsergridEntity = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    if (args.length === 0) {
+        throw new Error("A UsergridEntity object cannot be initialized without passing one or more arguments");
+    }
+    self.asset = undefined;
+    if (_.isPlainObject(args[0])) {
+        _.assign(self, args[0]);
+    } else {
+        if (!self.type) {
+            self.type = _.isString(args[0]) ? args[0] : undefined;
+        }
+        if (!self.name) {
+            self.name = _.isString(args[1]) ? args[1] : undefined;
+        }
+    }
+    if (!_.isString(self.type)) {
+        throw new Error("'type' (or 'collection') parameter is required when initializing a UsergridEntity object");
+    }
+    Object.defineProperty(self, "isUser", {
+        get: function() {
+            return self.type.toLowerCase() === "user";
+        }
+    });
+    Object.defineProperty(self, "hasAsset", {
+        get: function() {
+            return _.has(self, "file-metadata");
+        }
+    });
+    UsergridHelpers.setReadOnly(self, [ "uuid", "name", "type", "created" ]);
+    return self;
+};
+
+UsergridEntity.prototype = {
+    jsonValue: function() {
+        var jsonValue = {};
+        _.forOwn(this, function(value, key) {
+            jsonValue[key] = value;
+        });
+        return jsonValue;
+    },
+    putProperty: function(key, value) {
+        this[key] = value;
+    },
+    putProperties: function(obj) {
+        _.assign(this, obj);
+    },
+    removeProperty: function(key) {
+        this.removeProperties([ key ]);
+    },
+    removeProperties: function(keys) {
+        var self = this;
+        keys.forEach(function(key) {
+            delete self[key];
+        });
+    },
+    insert: function(key, value, idx) {
+        if (!_.isArray(this[key])) {
+            this[key] = this[key] ? [ this[key] ] : [];
+        }
+        this[key].splice.apply(this[key], [ idx, 0 ].concat(value));
+    },
+    append: function(key, value) {
+        this.insert(key, value, Number.MAX_VALUE);
+    },
+    prepend: function(key, value) {
+        this.insert(key, value, 0);
+    },
+    pop: function(key) {
+        if (_.isArray(this[key])) {
+            this[key].pop();
+        }
+    },
+    shift: function(key) {
+        if (_.isArray(this[key])) {
+            this[key].shift();
+        }
+    },
+    reload: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        var callback = UsergridHelpers.callback(args);
+        client.GET(self, function(error, usergridResponse) {
+            UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
+            callback(error, usergridResponse, self);
+        }.bind(self));
+    },
+    save: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        var callback = UsergridHelpers.callback(args);
+        var currentAsset = self.asset;
+        client.PUT(self, function(error, usergridResponse) {
+            UsergridHelpers.updateEntityFromRemote(self, usergridResponse);
+            if (self.hasAsset) {
+                self.asset = currentAsset;
+            }
+            callback(error, usergridResponse, self);
+        }.bind(self));
+    },
+    remove: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        var callback = UsergridHelpers.callback(args);
+        client.DELETE(self, function(error, usergridResponse) {
+            callback(error, usergridResponse, self);
+        }.bind(self));
+    },
+    attachAsset: function(asset) {
+        this.asset = asset;
+    },
+    uploadAsset: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        var callback = UsergridHelpers.callback(args);
+        if (_.has(self, "asset.contentType")) {
+            client.uploadAsset(self, callback);
+        } else {
+            var response = UsergridResponse.responseWithError({
+                name: "asset_not_found",
+                description: "The specified entity does not have a valid asset attached"
+            });
+            callback(response.error, response, self);
+        }
+    },
+    downloadAsset: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        var callback = UsergridHelpers.callback(args);
+        if (_.has(self, "asset.contentType")) {
+            client.downloadAsset(self, callback);
+        } else {
+            var response = UsergridResponse.responseWithError({
+                name: "asset_not_found",
+                description: "The specified entity does not have a valid asset attached"
+            });
+            callback(response.error, response, self);
+        }
+    },
+    connect: function() {
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        args[0] = this;
+        return client.connect.apply(client, args);
+    },
+    disconnect: function() {
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        args[0] = this;
+        return client.disconnect.apply(client, args);
+    },
+    getConnections: function() {
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var client = UsergridHelpers.validateAndRetrieveClient(args);
+        args.shift();
+        args.splice(1, 0, this);
+        return client.getConnections.apply(client, args);
+    }
+};
+
+"use strict";
+
+var UsergridUser = function(obj) {
+    if (!_.has(obj, "email") && !_.has(obj, "username")) {
+        throw new Error("'email' or 'username' property is required when initializing a UsergridUser object");
+    }
+    var self = this;
+    _.assign(self, obj, UsergridEntity);
+    UsergridEntity.call(self, "user");
+    UsergridHelpers.setWritable(self, "name");
+    return self;
+};
+
+UsergridUser.CheckAvailable = function() {
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
+    var callback = UsergridHelpers.callback(args);
+    var username = args[0].username || args[1].username;
+    var email = args[0].email || args[1].email;
+    if (!username && !email) {
+        throw new Error("'username' or 'email' property is required when checking for available users");
+    } else {
+        var checkQuery = new UsergridQuery("users");
+        if (username) {
+            checkQuery.eq("username", username);
+        }
+        if (email) {
+            checkQuery.or.eq("email", email);
+        }
+        client.GET(checkQuery, function(error, usergridResponse) {
+            callback(error, usergridResponse, usergridResponse.entities.length > 0);
+        });
+    }
+};
+
+UsergridHelpers.inherits(UsergridUser, UsergridEntity);
+
+UsergridUser.prototype.uniqueId = function() {
+    var self = this;
+    return _.first([ self.uuid, self.username, self.email ].filter(_.isString));
+};
+
+UsergridUser.prototype.create = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
+    var callback = UsergridHelpers.callback(args);
+    client.POST(self, function(error, usergridResponse) {
+        delete self.password;
+        _.assign(self, usergridResponse.user);
+        callback(error, usergridResponse, self);
+    }.bind(self));
+};
+
+UsergridUser.prototype.login = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
+    var callback = UsergridHelpers.callback(args);
+    client.POST("token", UsergridHelpers.userLoginBody(self), function(error, usergridResponse) {
+        delete self.password;
+        var responseJSON = usergridResponse.responseJSON;
+        var token = _.get(responseJSON, "access_token");
+        var expiresIn = _.get(responseJSON, "expires_in");
+        if (usergridResponse.ok) {
+            self.auth = new UsergridUserAuth(self);
+            self.auth.token = token;
+            self.auth.expiry = UsergridHelpers.calculateExpiry(expiresIn);
+            self.auth.tokenTtl = expiresIn;
+        }
+        callback(error, usergridResponse, token);
+    });
+};
+
+UsergridUser.prototype.logout = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
+    var callback = UsergridHelpers.callback(args);
+    if (!self.auth || !self.auth.isValid) {
+        var response = UsergridResponse.responseWithError({
+            name: "no_valid_token",
+            description: "this user does not have a valid token"
+        });
+        callback(response.error, response);
+    } else {
+        var revokeAll = _.first(args.filter(_.isBoolean)) || false;
+        var requestOptions = {
+            client: client,
+            path: [ "users", self.uniqueId(), "revoketoken" + (revokeAll ? "s" : "") ].join("/"),
+            method: UsergridHttpMethod.PUT,
+            callback: function(error, usergridResponse) {
+                self.auth.destroy();
+                callback(error, usergridResponse, usergridResponse.ok);
+            }.bind(self)
+        };
+        if (!revokeAll) {
+            requestOptions.queryParams = {
+                token: self.auth.token
+            };
+        }
+        var request = new UsergridRequest(requestOptions);
+        client.sendRequest(request);
+    }
+};
+
+UsergridUser.prototype.logoutAllSessions = function() {
+    var args = UsergridHelpers.flattenArgs(arguments);
+    args = _.concat([ UsergridHelpers.validateAndRetrieveClient(args), true ], args);
+    return this.logout.apply(this, args);
+};
+
+UsergridUser.prototype.resetPassword = function() {
+    var self = this;
+    var args = UsergridHelpers.flattenArgs(arguments);
+    var client = UsergridHelpers.validateAndRetrieveClient(args);
+    var callback = UsergridHelpers.callback(args);
+    if (args[0] instanceof UsergridClient) {
+        args.shift();
+    }
+    var body = UsergridHelpers.userResetPasswordBody(args);
+    if (!body.oldpassword || !body.newpassword) {
+        throw new Error("'oldPassword' and 'newPassword' properties are required when resetting a user password");
+    }
+    client.PUT([ "users", self.uniqueId(), "password" ].join("/"), body, callback);
+};
+
+"use strict";
+
+var UsergridResponseError = function(options) {
+    var self = this;
+    _.assign(self, options);
+    return self;
+};
+
+UsergridResponseError.fromJSON = function(responseErrorObject) {
+    var usergridResponseError;
+    var error = {
+        name: _.get(responseErrorObject, "error")
+    };
+    if (error.name) {
+        _.assign(error, {
+            exception: _.get(responseErrorObject, "exception"),
+            description: _.get(responseErrorObject, "error_description") || _.get(responseErrorObject, "description")
+        });
+        usergridResponseError = new UsergridResponseError(error);
+    }
+    return usergridResponseError;
+};
+
+var UsergridResponse = function(xmlRequest, usergridRequest) {
+    var self = this;
+    self.ok = false;
+    self.request = usergridRequest;
+    if (xmlRequest) {
+        self.statusCode = parseInt(xmlRequest.status);
+        self.ok = self.statusCode < 400;
+        self.headers = UsergridHelpers.parseResponseHeaders(xmlRequest.getAllResponseHeaders());
+        var responseContentType = _.get(self.headers, "content-type");
+        if (responseContentType === UsergridApplicationJSONHeaderValue) {
+            try {
+                var responseJSON = JSON.parse(xmlRequest.responseText);
+                if (responseJSON) {
+                    self.parseResponseJSON(responseJSON);
+                }
+            } catch (e) {}
+        } else {
+            self.asset = new UsergridAsset(xmlRequest.response);
+        }
+    }
+    return self;
+};
+
+UsergridResponse.responseWithError = function(options) {
+    var usergridResponse = new UsergridResponse();
+    usergridResponse.error = new UsergridResponseError(options);
+    return usergridResponse;
+};
+
+UsergridResponse.prototype = {
+    parseResponseJSON: function(responseJSON) {
+        var self = this;
+        self.responseJSON = _.cloneDeep(responseJSON);
+        if (self.ok) {
+            self.cursor = _.get(self, "responseJSON.cursor");
+            self.hasNextPage = !_.isNil(self.cursor);
+            var entitiesJSON = _.get(responseJSON, "entities");
+            if (entitiesJSON) {
+                self.parseResponseEntities(entitiesJSON);
+                delete self.responseJSON.entities;
+            }
+        } else {
+            self.error = UsergridResponseError.fromJSON(responseJSON);
+        }
+        UsergridHelpers.setReadOnly(self.responseJSON);
+    },
+    parseResponseEntities: function(entitiesJSON) {
+        var self = this;
+        self.entities = _.map(entitiesJSON, function(entityJSON) {
+            var entity = new UsergridEntity(entityJSON);
+            if (entity.isUser) {
+                entity = new UsergridUser(entity);
+            }
+            return entity;
+        });
+        self.first = _.first(self.entities);
+        self.entity = self.first;
+        self.last = _.last(self.entities);
+        if (_.get(self, "responseJSON.path") === "/users") {
+            self.user = self.first;
+            self.users = self.entities;
+        }
+    },
+    loadNextPage: function() {
+        var self = this;
+        var args = UsergridHelpers.flattenArgs(arguments);
+        var callback = UsergridHelpers.callback(args);
+        var cursor = self.cursor;
+        if (!cursor) {
+            callback(UsergridResponse.responseWithError({
+                name: "cursor_not_found",
+                description: "Cursor must be present in order perform loadNextPage()."
+            }));
+        } else {
+            var client = UsergridHelpers.validateAndRetrieveClient(args);
+            var type = _.last(_.get(self, "responseJSON.path").split("/"));
+            var limit = _.first(_.get(self, "responseJSON.params.limit"));
+            var ql = _.first(_.get(self, "responseJSON.params.ql"));
+            var query = new UsergridQuery(type).fromString(ql).cursor(cursor).limit(limit);
+            client.GET(query, callback);
+        }
+    }
+};
+
+"use strict";
+
+var UsergridAssetDefaultFileName = "file";
+
+var UsergridAsset = function(fileOrBlob) {
+    if (!fileOrBlob instanceof File || !fileOrBlob instanceof Blob) {
+        throw new Error("UsergridAsset must be initialized with a 'File' or 'Blob'");
+    }
+    var self = this;
+    self.data = fileOrBlob;
+    self.filename = fileOrBlob.name || UsergridAssetDefaultFileName;
+    self.contentLength = fileOrBlob.size;
+    self.contentType = fileOrBlob.type;
+    return self;
+};
